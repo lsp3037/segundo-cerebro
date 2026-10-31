@@ -96,7 +96,7 @@ Supabase › **Authentication** › **Sign In / Providers** › desligue **Allow
 1. Suba o código para um repositório **privado** no GitHub.
 2. Na [Vercel](https://vercel.com/new), importe o repositório.
 3. Em **Environment Variables**, cadastre as mesmas variáveis do `.env.local`.
-4. Em **Settings › Functions › Function Region**, escolha **São Paulo (gru1)**, perto do banco.
+4. A região das funções já vem como **São Paulo (gru1)** pelo `vercel.json`, perto do banco.
 5. Depois do primeiro deploy, volte à etapa 3 e cadastre o endereço `*.vercel.app`.
 
 ### Próximas fases
