@@ -34,7 +34,7 @@ Preencha o `.env.local` (ver [Configuração](#configuração-passo-a-passo)) e 
 npm run dev
 ```
 
-Abra o endereço que aparecer no terminal (normalmente http://localhost:3000).
+Abra o endereço que aparecer no terminal (http://localhost:3333).
 
 ### Comandos úteis
 
@@ -71,10 +71,9 @@ insert into private.allowed_emails (email) values ('outro.email@gmail.com');
 O Supabase só devolve o login para endereços autorizados.
 
 1. Supabase › **Authentication** › **URL Configuration**.
-2. **Site URL**: o endereço do app na Vercel (ex.: `https://segundo-cerebro.vercel.app`). Enquanto não houver deploy, use `http://localhost:3000`.
+2. **Site URL**: o endereço do app na Vercel (ex.: `https://segundo-cerebro.vercel.app`). Enquanto não houver deploy, use `http://localhost:3333`.
 3. Em **Redirect URLs**, adicione:
-   - `http://localhost:3000/**`
-   - `http://localhost:3001/**`
+   - `http://localhost:3333/**`
    - `https://SEU-APP.vercel.app/**` (depois do deploy)
 
 ### 4. Login com Google (Fase 1)
