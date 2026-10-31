@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
 import { Icon } from "@/components/icon";
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -65,59 +66,62 @@ export function CommandMenu({
       title="Busca"
       description="Vá para uma tela, área ou pasta"
     >
-      <CommandInput placeholder="Para onde você quer ir?" />
-      <CommandList>
-        <CommandEmpty>Nada encontrado.</CommandEmpty>
+      {/* Nesta versão do shadcn, o CommandDialog não inclui o <Command>; sem ele a busca quebra. */}
+      <Command>
+        <CommandInput placeholder="Para onde você quer ir?" />
+        <CommandList>
+          <CommandEmpty>Nada encontrado.</CommandEmpty>
 
-        <CommandGroup heading="Telas">
-          {TABS.map((tab) => (
-            <CommandItem key={tab.href} value={`tela ${tab.label}`} onSelect={() => go(tab.href)}>
-              <Icon name={tab.icon} />
-              {tab.label}
+          <CommandGroup heading="Telas">
+            {TABS.map((tab) => (
+              <CommandItem key={tab.href} value={`tela ${tab.label}`} onSelect={() => go(tab.href)}>
+                <Icon name={tab.icon} />
+                {tab.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+
+          <CommandGroup heading="Filtrar por área">
+            {areas.map((area) => (
+              <CommandItem key={area.id} value={`area ${area.name}`} onSelect={() => go(`/hoje?area=${area.slug}`)}>
+                <span className="size-2 rounded-full" style={{ backgroundColor: area.color }} />
+                {area.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+
+          <CommandGroup heading="Pastas">
+            {folderEntries.map(({ folder, area, path }) => (
+              <CommandItem key={folder.id} value={`pasta ${path}`} onSelect={() => go(`/p/${folder.id}`)}>
+                <Icon name={folder.icon} className="text-muted-foreground" />
+                <span className="truncate">{path}</span>
+                {area && <span className="ml-auto size-1.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+
+          <CommandSeparator />
+
+          <CommandGroup heading="Ações">
+            <CommandItem value="configuracoes" onSelect={() => go("/configuracoes")}>
+              <SettingsIcon />
+              Configurações
             </CommandItem>
-          ))}
-        </CommandGroup>
-
-        <CommandGroup heading="Filtrar por área">
-          {areas.map((area) => (
-            <CommandItem key={area.id} value={`area ${area.name}`} onSelect={() => go(`/hoje?area=${area.slug}`)}>
-              <span className="size-2 rounded-full" style={{ backgroundColor: area.color }} />
-              {area.name}
+            <CommandItem value="tema claro" onSelect={() => run(() => setTheme("light"))}>
+              <SunIcon />
+              Tema claro
             </CommandItem>
-          ))}
-        </CommandGroup>
-
-        <CommandGroup heading="Pastas">
-          {folderEntries.map(({ folder, area, path }) => (
-            <CommandItem key={folder.id} value={`pasta ${path}`} onSelect={() => go(`/p/${folder.id}`)}>
-              <Icon name={folder.icon} className="text-muted-foreground" />
-              <span className="truncate">{path}</span>
-              {area && <span className="ml-auto size-1.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />}
+            <CommandItem value="tema escuro" onSelect={() => run(() => setTheme("dark"))}>
+              <MoonIcon />
+              Tema escuro
             </CommandItem>
-          ))}
-        </CommandGroup>
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Ações">
-          <CommandItem value="configuracoes" onSelect={() => go("/configuracoes")}>
-            <SettingsIcon />
-            Configurações
-          </CommandItem>
-          <CommandItem value="tema claro" onSelect={() => run(() => setTheme("light"))}>
-            <SunIcon />
-            Tema claro
-          </CommandItem>
-          <CommandItem value="tema escuro" onSelect={() => run(() => setTheme("dark"))}>
-            <MoonIcon />
-            Tema escuro
-          </CommandItem>
-          <CommandItem value="tema sistema" onSelect={() => run(() => setTheme("system"))}>
-            <MonitorIcon />
-            Tema igual ao sistema
-          </CommandItem>
-        </CommandGroup>
-      </CommandList>
+            <CommandItem value="tema sistema" onSelect={() => run(() => setTheme("system"))}>
+              <MonitorIcon />
+              Tema igual ao sistema
+            </CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </Command>
     </CommandDialog>
   );
 }
