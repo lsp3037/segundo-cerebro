@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
+import { type AgentSuggestion, getMarketingAgent, isMarketingAgentLive } from "@/lib/integrations/marketing-agent";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
@@ -77,6 +78,7 @@ const ideaFields = z
     references: z.array(link).max(50),
     tags: z.array(z.string().trim().min(1).max(40)).max(30),
     folder_id: id.nullable(),
+    marketing_agent_ref: z.string().max(200).nullable(),
   })
   .partial();
 
@@ -161,4 +163,53 @@ export async function trashContent(kind: "content_ideas" | "publications", itemI
   if (error) return fail("Não foi possível excluir.");
   revalidatePath("/", "layout");
   return ok();
+}
+
+// ---------------------------------------------------------------------------
+// Agente de Marketing (por enquanto, versão de teste: veja lib/integrations/marketing-agent)
+// ---------------------------------------------------------------------------
+
+export type AgentSuggestionView = AgentSuggestion & { test: boolean };
+
+export async function getAgentSuggestions(): Promise<ActionResult<AgentSuggestionView[]>> {
+  await getCurrentUser();
+  const supabase = await createClient();
+  const { data: pillars } = await supabase.from("content_pillars").select("name").order("sort_order");
+  try {
+    const agent = getMarketingAgent();
+    const suggestions = await agent.getSuggestions({ pillars: (pillars ?? []).map((p) => p.name), limit: 5 });
+    return ok(suggestions.map((s) => ({ ...s, test: !isMarketingAgentLive() })));
+  } catch (error) {
+    console.error("getAgentSuggestions", error);
+    return fail("O Agente de Marketing não respondeu.");
+  }
+}
+
+export async function sendIdeaToAgent(ideaId: string): Promise<ActionResult<{ ref: string }>> {
+  await getCurrentUser();
+  if (!id.safeParse(ideaId).success) return fail("Ideia inválida.");
+
+  const supabase = await createClient();
+  const { data: idea } = await supabase
+    .from("content_ideas")
+    .select("id, title, format, notes, content_pillars(name)")
+    .eq("id", ideaId)
+    .single();
+  if (!idea) return fail("Ideia não encontrada.");
+
+  try {
+    const { ref } = await getMarketingAgent().sendIdea({
+      id: idea.id,
+      title: idea.title,
+      format: idea.format as AgentSuggestion["format"],
+      pillar: idea.content_pillars?.name ?? null,
+      notes: idea.notes,
+    });
+    await supabase.from("content_ideas").update({ marketing_agent_ref: ref }).eq("id", ideaId);
+    revalidatePath("/", "layout");
+    return ok({ ref });
+  } catch (error) {
+    console.error("sendIdeaToAgent", error);
+    return fail("O Agente de Marketing não respondeu.");
+  }
 }

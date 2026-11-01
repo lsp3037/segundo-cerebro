@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarPlusIcon, Settings2Icon, Trash2Icon } from "lucide-react";
+import { CalendarPlusIcon, MegaphoneIcon, Settings2Icon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -14,9 +14,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useOpenParam } from "@/components/use-open-param";
 import { useOptimisticList } from "@/components/use-optimistic-list";
 import { useWorkspace } from "@/components/workspace";
-import { type ContentIdeaInput, createContentIdea, createPublication, trashContent, updateContentIdea } from "@/lib/actions/content";
+import {
+  type ContentIdeaInput,
+  createContentIdea,
+  createPublication,
+  sendIdeaToAgent,
+  trashContent,
+  updateContentIdea,
+} from "@/lib/actions/content";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
+import { AgentSuggestionsDialog } from "./agent-suggestions-dialog";
 import { CONTENT_FORMATS, CONTENT_IDEA_STATUS, labelOf } from "./meta";
 import { PillarsDialog } from "./pillars-dialog";
 
@@ -38,6 +46,7 @@ export function ContentIdeasBoard({
   const list = useOptimisticList(initialIdeas);
   const [pillars, setPillars] = useState(initialPillars);
   const [pillarsOpen, setPillarsOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [pillarFilter, setPillarFilter] = useState(ALL);
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [openId, setOpenId] = useOpenParam("ideia");
@@ -84,7 +93,11 @@ export function ContentIdeasBoard({
             {p.name}
           </button>
         ))}
-        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setPillarsOpen(true)}>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setAgentOpen(true)}>
+          <SparklesIcon />
+          Sugestões do Agente
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setPillarsOpen(true)}>
           <Settings2Icon />
           Pilares
         </Button>
@@ -135,6 +148,28 @@ export function ContentIdeasBoard({
         </Button>
       )}
 
+      <AgentSuggestionsDialog
+        open={agentOpen}
+        onOpenChange={setAgentOpen}
+        onAdd={async (sug) => {
+          const pillar = pillars.find((p) => p.name === sug.pillar);
+          const result = await createContentIdea({
+            title: sug.title,
+            notes: sug.notes,
+            format: sug.format,
+            pillar_id: pillar?.id ?? null,
+            folder_id: folderId,
+            marketing_agent_ref: sug.ref,
+          });
+          if (!result.ok) {
+            toast.error(result.error);
+            return false;
+          }
+          list.setItems((items) => [result.data, ...items]);
+          return true;
+        }}
+      />
+
       <PillarsDialog open={pillarsOpen} onOpenChange={setPillarsOpen} pillars={pillars} onChange={setPillars} />
 
       <Sheet open={open !== null} onOpenChange={(o) => !o && setOpenId(null)}>
@@ -173,6 +208,7 @@ function ContentIdeaForm({
   const [title, setTitle] = useState(idea.title);
   const [notes, setNotes] = useState(idea.notes ?? "");
   const [planning, setPlanning] = useState(false);
+  const [sending, setSending] = useState(false);
   const publicationsFolder = foldersFor("publications")[0]?.folder;
 
   async function plan() {
@@ -282,10 +318,29 @@ function ContentIdeaForm({
           <LinksEditor value={idea.references as LinkItem[]} onChange={(references) => onUpdate({ references })} />
         </Field>
 
-        <Button variant="outline" size="sm" onClick={plan} disabled={planning}>
-          <CalendarPlusIcon />
-          Planejar publicação
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={plan} disabled={planning}>
+            <CalendarPlusIcon />
+            Planejar publicação
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={sending}
+            onClick={async () => {
+              setSending(true);
+              const result = await sendIdeaToAgent(idea.id);
+              setSending(false);
+              if (!result.ok) return toast.error(result.error);
+              onUpdate({ marketing_agent_ref: result.data.ref });
+              toast.success("Enviada ao Agente (versão de teste).");
+            }}
+          >
+            <MegaphoneIcon />
+            Enviar ao Agente
+          </Button>
+          {idea.marketing_agent_ref && <span className="text-xs text-muted-foreground">No Agente: {idea.marketing_agent_ref}</span>}
+        </div>
       </div>
 
       <SheetFooter className="flex-row justify-end border-t">
