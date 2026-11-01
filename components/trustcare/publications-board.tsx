@@ -110,7 +110,7 @@ export function PublicationsBoard({
             <Button variant="ghost" size="icon-sm" onClick={() => setMonth(addMonths(month, -1))} aria-label="Mês anterior">
               <ChevronLeftIcon />
             </Button>
-            <span className="min-w-36 text-center text-sm font-medium capitalize">{formatMonthYear(month)}</span>
+            <span className="inline-block min-w-36 text-center text-sm font-medium first-letter:uppercase">{formatMonthYear(month)}</span>
             <Button variant="ghost" size="icon-sm" onClick={() => setMonth(addMonths(month, 1))} aria-label="Próximo mês">
               <ChevronRightIcon />
             </Button>
