@@ -4,9 +4,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
+import { HabitsManager } from "@/components/habits/habits-manager";
+import { IdeasBoard } from "@/components/ideas/ideas-board";
+import { LearningBoard } from "@/components/learning/learning-board";
 import { LgpdNotice } from "@/components/lgpd-notice";
+import { NotesList } from "@/components/notes/notes-list";
 import { PageHeader, PhasePlaceholder } from "@/components/page";
+import { TASK_VIEWS, type TaskView, TasksBoard } from "@/components/tasks/tasks-board";
+import { getHabits } from "@/lib/data/habits";
+import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
+import { getNotes } from "@/lib/data/notes";
 import { getSidebarData } from "@/lib/data/sidebar";
+import { getTasks } from "@/lib/data/tasks";
+import { todayIso } from "@/lib/dates";
 import { type Folder, type FolderModule, MODULES } from "@/lib/modules";
 
 async function loadFolder(folderId: string) {
@@ -17,7 +27,14 @@ async function loadFolder(folderId: string) {
 
   const path: Folder[] = [];
   for (let f: Folder | undefined = folder; f; f = folders.find((p) => p.id === f!.parent_id)) path.unshift(f);
-  return { folder, area: areas.find((a) => a.id === folder.area_id)!, path };
+
+  // A pasta mostra o próprio conteúdo e o das subpastas.
+  const subtree = [folder.id];
+  for (let i = 0; i < subtree.length; i++) {
+    for (const f of folders) if (f.parent_id === subtree[i]) subtree.push(f.id);
+  }
+
+  return { folder, area: areas.find((a) => a.id === folder.area_id)!, path, subtree };
 }
 
 export async function generateMetadata(props: PageProps<"/p/[folderId]">): Promise<Metadata> {
@@ -25,11 +42,55 @@ export async function generateMetadata(props: PageProps<"/p/[folderId]">): Promi
   return { title: data?.folder.name ?? "Pasta" };
 }
 
+const FOLDER_TASK_VIEWS: TaskView[] = ["lista", "kanban", "semana", "mes"];
+
 export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
   const data = await loadFolder((await props.params).folderId);
   if (!data) notFound();
-  const { folder, area, path } = data;
-  const mod = MODULES[folder.module as FolderModule];
+  const { folder, area, path, subtree } = data;
+  const kind = folder.module as FolderModule;
+  const mod = MODULES[kind];
+  const filter = { folderIds: subtree };
+  const today = todayIso();
+
+  let content: React.ReactNode;
+  switch (kind) {
+    case "tasks": {
+      const { v } = await props.searchParams;
+      const view = FOLDER_TASK_VIEWS.includes(v as TaskView) ? (v as TaskView) : "lista";
+      content = (
+        <TasksBoard
+          key={view}
+          initialTasks={await getTasks(filter)}
+          today={today}
+          view={view}
+          views={TASK_VIEWS.map((x) => x.value).filter((x) => FOLDER_TASK_VIEWS.includes(x))}
+          defaultAreaId={area.id}
+          folderId={folder.id}
+        />
+      );
+      break;
+    }
+    case "notes":
+    case "meetings":
+      content = (
+        <NotesList notes={await getNotes(filter)} defaultAreaId={area.id} folderId={folder.id} meeting={kind === "meetings"} />
+      );
+      break;
+    case "routine": {
+      const { habits, logs } = await getHabits(filter);
+      content = <HabitsManager habits={habits} logs={logs} today={today} areaId={area.id} folderId={folder.id} />;
+      break;
+    }
+    case "learning":
+      content = <LearningBoard initialItems={await getLearningItems(filter)} defaultAreaId={area.id} folderId={folder.id} />;
+      break;
+    case "ideas":
+      content = <IdeasBoard initialIdeas={await getIdeas(filter)} defaultAreaId={area.id} folderId={folder.id} />;
+      break;
+    default:
+      content = <PhasePlaceholder phase={mod.phase} items={[mod.description]} className={area.show_lgpd_notice ? "pt-4" : undefined} />;
+  }
 
   return (
     <>
@@ -55,8 +116,8 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           </nav>
         }
       />
-      {area.show_lgpd_notice && <LgpdNotice className="mx-6 mt-6 max-w-xl" />}
-      <PhasePlaceholder phase={mod.phase} items={[mod.description]} className={area.show_lgpd_notice ? "pt-4" : undefined} />
+      {area.show_lgpd_notice && <LgpdNotice className="mx-4 mt-4 max-w-xl md:mx-6" />}
+      {content}
     </>
   );
 }
