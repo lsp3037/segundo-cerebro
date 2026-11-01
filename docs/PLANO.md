@@ -243,3 +243,12 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **Sincronização:** aviso instantâneo do Google (`/api/google/webhook`, canais de 7 dias renovados sozinhos) + rotina do `pg_cron` a cada 15 min (`/api/cron/google-sync`, com `cron_secret` e `app_url` no Vault). Testado nos dois sentidos pelo Luan.
 - **Google Cloud:** app publicado ("Em produção"), sem verificação (uso pessoal, abaixo de 100 usuários); páginas públicas `/privacidade` e `/termos` exigidas pelo Google.
 - Lição: ao colar o ID do cliente do arquivo JSON do Google, conferir que não veio junto o trecho `client_id":"`.
+
+## 9. Fase 4 concluída (2026-11-01)
+
+- **Atalhos** com card do Gerenciador de O.S.: abertas, atrasadas e aguardando peça, lidos pela API do Gerenciador (`GET /api/v1/orders`, chave só `orders:read`). Decisão: "atrasada" = aberta há mais de 7 dias, porque a API não devolve a data prevista. Só números; nenhum dado de cliente é guardado.
+- **Ideias de Conteúdo** com pilares e **Planejamento de Publicações** (calendário + funil). Decisão: o calendário principal fica no Segundo Cérebro; o Agente de Marketing vira fonte de sugestões.
+- **Agente de Marketing:** interface + versão de teste em `lib/integrations/marketing-agent`. A API real fica para a Fase 6.
+- **Fluxos de Atendimento** (5 sugeridos) e **Assistente de Respostas** com máscara de telefone, e-mail, CPF, CNPJ, CEP e endereço (`lib/mask.ts`) antes do Gemini. Testado: nada do que voltou da IA continha os dados mascarados.
+- Em aberto: o assistente aceita só texto, sem prints, porque num print o número do cliente não pode ser mascarado. Decidir depois.
+- Alerta para o projeto do Gerenciador (fora deste repositório): a tabela `order_status_transitions` está sem RLS no Supabase "Trust Care".

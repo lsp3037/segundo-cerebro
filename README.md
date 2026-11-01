@@ -10,7 +10,7 @@ Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a 
 | 1. Fundação | Login fechado, layout com abas e árvore lateral, temas, cores por área, banco e RLS | ✅ |
 | 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, Ideias, hábitos, busca no conteúdo | ✅ |
 | 3. Agenda | Google Agenda nos dois sentidos, duas contas (pessoal e SES), blocos de tarefa | ✅ |
-| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | 🚧 |
+| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | ✅ |
 | 5. Finanças e Revisão Semanal | | — |
 | 6. Extras | Telegram, busca com IA, Agente de Marketing, PWA | — |
 
@@ -120,7 +120,7 @@ Configuração (uma etapa de cada vez):
 6. Vercel › Environment Variables: `SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` e `CRON_SECRET` (os mesmos valores do `.env.local`) e `APP_URL=https://segundo-cerebro-one-omega.vercel.app`.
 7. O endereço do app e o `CRON_SECRET` vão para o Vault do Supabase (usado pelo `pg_cron`) pela função `admin_set_secret`, chamada com a chave secreta.
 
-### 9. Trust Care (Fase 4)
+### 9. Trust Care (Fase 4) ✅
 
 - **Atalhos:** cards de acesso rápido. O card do Gerenciador de O.S. mostra abertas, atrasadas (abertas há mais de 7 dias, porque a API não informa a data prevista) e aguardando peça. Lê a API do Gerenciador (`GET /api/v1/orders`) com uma chave **só de leitura**; só os números aparecem, nenhum dado de cliente é guardado.
 - **Ideias de Conteúdo** (com pilares) e **Planejamento de Publicações** (calendário e funil). O calendário fica aqui; o Agente de Marketing vira fonte de sugestões.
