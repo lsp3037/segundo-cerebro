@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOutIcon, MenuIcon, SearchIcon, SettingsIcon, XIcon } from "lucide-react";
+import { InboxIcon, LogOutIcon, MenuIcon, SearchIcon, SettingsIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -28,11 +28,13 @@ export function Topbar({
   areas,
   onOpenNav,
   onOpenCommand,
+  onOpenCapture,
 }: {
   user: ShellUser;
   areas: Area[];
   onOpenNav: () => void;
   onOpenCommand: () => void;
+  onOpenCapture: () => void;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -84,6 +86,16 @@ export function Topbar({
           <XIcon className="size-3 text-muted-foreground" />
         </Link>
       )}
+
+      <Button
+        size="sm"
+        onClick={onOpenCapture}
+        className="shrink-0"
+        title="Capturar na Caixa de Entrada (Alt+N)"
+      >
+        <InboxIcon />
+        <span className="hidden sm:inline">Capturar</span>
+      </Button>
 
       <Button
         variant="outline"

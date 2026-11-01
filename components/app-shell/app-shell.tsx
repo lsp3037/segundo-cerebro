@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 
+import { CaptureDialog } from "@/components/inbox/capture-dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { WorkspaceProvider } from "@/components/workspace";
 import type { Area, Folder } from "@/lib/modules";
@@ -24,13 +25,18 @@ export function AppShell({
 }) {
   const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
 
-  // Ctrl+K (ou ⌘K no Mac) abre a busca de qualquer lugar.
+  // Atalhos globais: Ctrl+K (⌘K no Mac) abre a busca; Alt+N abre a captura rápida.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey)) {
+      const key = event.key.toLowerCase();
+      if (key === "k" && (event.ctrlKey || event.metaKey)) {
         event.preventDefault();
         setCommandOpen((open) => !open);
+      } else if (event.code === "KeyN" && event.altKey && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        setCaptureOpen(true);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -41,35 +47,43 @@ export function AppShell({
 
   return (
     <WorkspaceProvider areas={areas} folders={folders}>
-    <div className="flex h-svh flex-col">
-      <Suspense fallback={<div className="h-12 border-b" />}>
-        <Topbar
-          user={user}
+      <div className="flex h-svh flex-col">
+        <Suspense fallback={<div className="h-12 border-b" />}>
+          <Topbar
+            user={user}
+            areas={areas}
+            onOpenNav={() => setNavOpen(true)}
+            onOpenCommand={() => setCommandOpen(true)}
+            onOpenCapture={() => setCaptureOpen(true)}
+          />
+        </Suspense>
+
+        <div className="flex min-h-0 flex-1">
+          <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:block">
+            <Suspense>{sidebar}</Suspense>
+          </aside>
+          <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        </div>
+
+        <Sheet open={navOpen} onOpenChange={setNavOpen}>
+          <SheetContent side="left" className="w-72 gap-0 p-0">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navegação</SheetTitle>
+              <SheetDescription>Áreas e pastas</SheetDescription>
+            </SheetHeader>
+            <Suspense>{sidebar}</Suspense>
+          </SheetContent>
+        </Sheet>
+
+        <CommandMenu
+          open={commandOpen}
+          onOpenChange={setCommandOpen}
           areas={areas}
-          onOpenNav={() => setNavOpen(true)}
-          onOpenCommand={() => setCommandOpen(true)}
+          folders={folders}
+          onCapture={() => setCaptureOpen(true)}
         />
-      </Suspense>
-
-      <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-64 shrink-0 border-r bg-sidebar md:block">
-          <Suspense>{sidebar}</Suspense>
-        </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
       </div>
-
-      <Sheet open={navOpen} onOpenChange={setNavOpen}>
-        <SheetContent side="left" className="w-72 gap-0 p-0">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navegação</SheetTitle>
-            <SheetDescription>Áreas e pastas</SheetDescription>
-          </SheetHeader>
-          <Suspense>{sidebar}</Suspense>
-        </SheetContent>
-      </Sheet>
-
-      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} areas={areas} folders={folders} />
-    </div>
     </WorkspaceProvider>
   );
 }

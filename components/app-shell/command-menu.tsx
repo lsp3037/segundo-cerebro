@@ -1,6 +1,6 @@
 "use client";
 
-import { MonitorIcon, MoonIcon, SettingsIcon, SunIcon } from "lucide-react";
+import { InboxIcon, MonitorIcon, MoonIcon, SettingsIcon, SunIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useMemo } from "react";
@@ -25,11 +25,13 @@ export function CommandMenu({
   onOpenChange,
   areas,
   folders,
+  onCapture,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   areas: Area[];
   folders: Folder[];
+  onCapture: () => void;
 }) {
   const router = useRouter();
   const { setTheme } = useTheme();
@@ -103,6 +105,10 @@ export function CommandMenu({
           <CommandSeparator />
 
           <CommandGroup heading="Ações">
+            <CommandItem value="capturar caixa de entrada" onSelect={() => run(onCapture)}>
+              <InboxIcon />
+              Capturar na Caixa de Entrada
+            </CommandItem>
             <CommandItem value="configuracoes" onSelect={() => go("/configuracoes")}>
               <SettingsIcon />
               Configurações

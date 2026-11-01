@@ -1,22 +1,30 @@
 import type { Metadata } from "next";
 
-import { TabPage } from "@/components/tab-page";
-import { getAreaFilter } from "@/lib/data/area-filter";
+import { InboxList } from "@/components/inbox/inbox-list";
+import { PageHeader } from "@/components/page";
+import { isAiConfigured } from "@/lib/ai";
+import { getInboxItems } from "@/lib/data/inbox";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[2];
 
 export const metadata: Metadata = { title: tab.label };
 
-export default async function Page(props: PageProps<"/entrada">) {
-  const area = await getAreaFilter(props.searchParams);
+export default async function InboxPage() {
+  const items = await getInboxItems();
 
   return (
-    <TabPage
-      tab={tab}
-      area={area}
-      description="Tudo que ainda não foi organizado."
-      items={["Campo rápido para jogar qualquer coisa, com atalho de teclado", "Classificar em tarefa, nota, ideia ou aprendizado", "Itens enviados pelo bot do Telegram (Fase 6)"]}
-    />
+    <>
+      <PageHeader
+        title={tab.label}
+        icon={tab.icon}
+        description={
+          items.length > 0
+            ? `${items.length} ${items.length === 1 ? "item" : "itens"} para organizar, do mais antigo para o mais novo.`
+            : "Tudo organizado."
+        }
+      />
+      <InboxList initialItems={items} aiConfigured={isAiConfigured()} />
+    </>
   );
 }
