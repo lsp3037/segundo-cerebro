@@ -1,22 +1,38 @@
 import type { Metadata } from "next";
 
-import { TabPage } from "@/components/tab-page";
+import { IdeasBoard } from "@/components/ideas/ideas-board";
+import { PageHeader } from "@/components/page";
 import { getAreaFilter } from "@/lib/data/area-filter";
+import { getIdeas } from "@/lib/data/learning-ideas";
+import { getSidebarData } from "@/lib/data/sidebar";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[3];
 
 export const metadata: Metadata = { title: tab.label };
 
-export default async function Page(props: PageProps<"/ideias">) {
+export default async function IdeasPage(props: PageProps<"/ideias">) {
   const area = await getAreaFilter(props.searchParams);
+  const [{ areas }, ideas] = await Promise.all([getSidebarData(), getIdeas({ areaId: area?.id })]);
+  const defaultArea = area ?? areas.find((a) => a.slug === "pessoal") ?? areas[0];
 
   return (
-    <TabPage
-      tab={tab}
-      area={area}
-      description="Banco de ideias gerais, de todas as áreas."
-      items={["Ideias com status: solta, amadurecendo, virou projeto", "Filtro por área e por tag", "As ideias de conteúdo da Trust Care ficam na pasta própria (Fase 4)"]}
-    />
+    <>
+      <PageHeader
+        title={tab.label}
+        icon={tab.icon}
+        accent={area?.color}
+        description={
+          area ? (
+            <>
+              Ideias de <strong style={{ color: area.color }}>{area.name}</strong>
+            </>
+          ) : (
+            "Banco de ideias gerais. As ideias de conteúdo da Trust Care ficam na pasta própria."
+          )
+        }
+      />
+      <IdeasBoard initialIdeas={ideas} defaultAreaId={defaultArea.id} />
+    </>
   );
 }
