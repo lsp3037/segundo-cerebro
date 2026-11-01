@@ -102,6 +102,24 @@ function googleToRow(cal: Calendar, item: GEvent, existing: Pick<EventRow, "kind
   };
 }
 
+// Grava no banco o evento que o Google acabou de devolver (depois de criar/editar pelo app).
+export async function saveGoogleEvent(
+  admin: Admin,
+  cal: Calendar,
+  item: GEvent,
+  keep: Pick<EventRow, "kind" | "area_id">,
+): Promise<EventRow> {
+  const row = googleToRow(cal, item, keep);
+  if (!row) throw new Error("Evento sem data.");
+  const { data, error } = await admin
+    .from("events")
+    .upsert(row, { onConflict: "calendar_id,google_event_id" })
+    .select("*")
+    .single();
+  if (error || !data) throw new Error(`Falha ao gravar o evento: ${error?.message}`);
+  return data;
+}
+
 // ---------------------------------------------------------------------------
 // Sincronização Google → app
 // ---------------------------------------------------------------------------

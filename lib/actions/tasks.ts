@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { nextOccurrence, RECURRENCE_OPTIONS } from "@/lib/recurrence";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { syncTaskBlock, unscheduleTaskBlock } from "./events";
 import { type ActionResult, fail, ok } from "./result";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida.");
@@ -70,6 +71,12 @@ export async function updateTask(taskId: string, patch: Partial<TaskInput>): Pro
   if (Object.keys(data).length > 0) {
     const { error } = await supabase.from("tasks").update(data).eq("id", taskId);
     if (error) return fail("Não foi possível salvar a tarefa.");
+  }
+
+  // Se a tarefa já é um bloco na agenda, o bloco acompanha a mudança.
+  if (["title", "due_date", "start_time", "duration_min"].some((k) => k in data)) {
+    const block = await syncTaskBlock(taskId);
+    if (!block.ok) return fail(`Tarefa salva, mas a agenda não foi atualizada: ${block.error}`);
   }
 
   revalidate();
@@ -149,6 +156,8 @@ export async function trashTask(taskId: string): Promise<ActionResult> {
   if (!z.uuid().safeParse(taskId).success) return fail("Tarefa inválida.");
 
   const supabase = await createClient();
+  // O bloco na agenda (se houver) sai junto.
+  await unscheduleTaskBlock(taskId);
   const { error } = await supabase.from("tasks").update({ deleted_at: new Date().toISOString() }).eq("id", taskId);
   if (error) return fail("Não foi possível excluir a tarefa.");
 
