@@ -48,9 +48,9 @@ export function Topbar({
         <MenuIcon />
       </Button>
 
-      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 md:w-[15.25rem]">
+      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 2xl:w-[15.25rem]">
         <BrainMark className="size-5" />
-        <span className="hidden text-sm font-semibold tracking-tight lg:inline">Segundo Cérebro</span>
+        <span className="hidden text-sm font-semibold tracking-tight 2xl:inline">Segundo Cérebro</span>
       </Link>
 
       <nav aria-label="Seções" className="no-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
@@ -61,6 +61,8 @@ export function Topbar({
               key={tab.href}
               href={`${tab.href}${query}`}
               aria-current={active ? "page" : undefined}
+              aria-label={tab.label}
+              title={tab.label}
               className={cn(
                 "relative flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm transition-colors",
                 active
@@ -69,7 +71,8 @@ export function Topbar({
               )}
             >
               <Icon name={tab.icon} className="size-3.5" />
-              {tab.label}
+              {/* Em telas menores só a aba atual mostra o nome; as outras ficam só com o ícone. */}
+              <span className={active ? undefined : "hidden 2xl:inline"}>{tab.label}</span>
             </Link>
           );
         })}
@@ -94,20 +97,20 @@ export function Topbar({
         title="Capturar na Caixa de Entrada (Alt+N)"
       >
         <InboxIcon />
-        <span className="hidden sm:inline">Capturar</span>
+        <span className="hidden lg:inline">Capturar</span>
       </Button>
 
       <Button
         variant="outline"
         size="sm"
         onClick={onOpenCommand}
-        className="hidden w-52 shrink-0 justify-start gap-2 font-normal text-muted-foreground sm:flex"
+        className="hidden w-52 shrink-0 justify-start gap-2 font-normal text-muted-foreground lg:flex"
       >
         <SearchIcon />
         <span className="flex-1 text-left">Buscar…</span>
         <Kbd>Ctrl K</Kbd>
       </Button>
-      <Button variant="ghost" size="icon" className="sm:hidden" onClick={onOpenCommand} aria-label="Buscar">
+      <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenCommand} aria-label="Buscar (Ctrl+K)">
         <SearchIcon />
       </Button>
 
