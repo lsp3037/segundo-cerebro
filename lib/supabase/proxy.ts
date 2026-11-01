@@ -5,7 +5,7 @@ import { isEmailAllowed, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/en
 
 // Rotas que abrem sem login. Avisos do Google e o pg_cron chegam sem sessão,
 // mas cada uma dessas rotas confere a própria assinatura/segredo.
-const PUBLIC_PATHS = ["/login", "/auth", "/acesso-negado", "/api/google/webhook", "/api/cron"];
+const PUBLIC_PATHS = ["/login", "/auth", "/acesso-negado", "/privacidade", "/termos", "/api/google/webhook", "/api/cron"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
