@@ -13,6 +13,7 @@ import { PageHeader, PhasePlaceholder } from "@/components/page";
 import { TASK_VIEWS, type TaskView } from "@/components/tasks/meta";
 import { TasksBoard } from "@/components/tasks/tasks-board";
 import { ContentIdeasBoard } from "@/components/trustcare/content-ideas-board";
+import { FlowsBoard } from "@/components/trustcare/flows-board";
 import { PublicationsBoard } from "@/components/trustcare/publications-board";
 import { ShortcutsBoard } from "@/components/trustcare/shortcuts-board";
 import { getHabits } from "@/lib/data/habits";
@@ -20,7 +21,7 @@ import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getNotes } from "@/lib/data/notes";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
-import { getContentIdeas, getContentPillars, getPublications, getShortcuts } from "@/lib/data/trustcare";
+import { getContentIdeas, getContentPillars, getPublications, getServiceFlows, getShortcuts } from "@/lib/data/trustcare";
 import { todayIso } from "@/lib/dates";
 import { getOsSummary } from "@/lib/integrations/os-manager";
 import { type Folder, type FolderModule, MODULES } from "@/lib/modules";
@@ -115,6 +116,9 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
       );
       break;
     }
+    case "service_flows":
+      content = <FlowsBoard initialFlows={await getServiceFlows()} />;
+      break;
     default:
       content = <PhasePlaceholder phase={mod.phase} items={[mod.description]} className={area.show_lgpd_notice ? "pt-4" : undefined} />;
   }
