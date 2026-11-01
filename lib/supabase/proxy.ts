@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { isEmailAllowed, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/env";
 
-// Rotas que abrem sem login.
-const PUBLIC_PATHS = ["/login", "/auth", "/acesso-negado"];
+// Rotas que abrem sem login. Avisos do Google e o pg_cron chegam sem sessão,
+// mas cada uma dessas rotas confere a própria assinatura/segredo.
+const PUBLIC_PATHS = ["/login", "/auth", "/acesso-negado", "/api/google/webhook", "/api/cron"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

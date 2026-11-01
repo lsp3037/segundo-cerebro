@@ -97,16 +97,20 @@ export type Database = {
       }
       calendars: {
         Row: {
+          access_role: string | null
           color: string | null
           connection_id: string
           created_at: string
           default_area_id: string | null
           google_calendar_id: string
           id: string
+          is_primary: boolean
+          last_error: string | null
           last_synced_at: string | null
           name: string
           sync_enabled: boolean
           sync_token: string | null
+          time_zone: string | null
           updated_at: string
           user_id: string
           watch_channel_id: string | null
@@ -114,16 +118,20 @@ export type Database = {
           watch_resource_id: string | null
         }
         Insert: {
+          access_role?: string | null
           color?: string | null
           connection_id: string
           created_at?: string
           default_area_id?: string | null
           google_calendar_id: string
           id?: string
+          is_primary?: boolean
+          last_error?: string | null
           last_synced_at?: string | null
           name: string
           sync_enabled?: boolean
           sync_token?: string | null
+          time_zone?: string | null
           updated_at?: string
           user_id?: string
           watch_channel_id?: string | null
@@ -131,16 +139,20 @@ export type Database = {
           watch_resource_id?: string | null
         }
         Update: {
+          access_role?: string | null
           color?: string | null
           connection_id?: string
           created_at?: string
           default_area_id?: string | null
           google_calendar_id?: string
           id?: string
+          is_primary?: boolean
+          last_error?: string | null
           last_synced_at?: string | null
           name?: string
           sync_enabled?: boolean
           sync_token?: string | null
+          time_zone?: string | null
           updated_at?: string
           user_id?: string
           watch_channel_id?: string | null
@@ -328,10 +340,12 @@ export type Database = {
           etag: string | null
           google_event_id: string | null
           google_updated_at: string | null
+          html_link: string | null
           id: string
           kind: string
           local_updated_at: string
           location: string | null
+          original_start_at: string | null
           recurrence: string[] | null
           recurring_event_id: string | null
           search: unknown
@@ -352,10 +366,12 @@ export type Database = {
           etag?: string | null
           google_event_id?: string | null
           google_updated_at?: string | null
+          html_link?: string | null
           id?: string
           kind?: string
           local_updated_at?: string
           location?: string | null
+          original_start_at?: string | null
           recurrence?: string[] | null
           recurring_event_id?: string | null
           search?: unknown
@@ -376,10 +392,12 @@ export type Database = {
           etag?: string | null
           google_event_id?: string | null
           google_updated_at?: string | null
+          html_link?: string | null
           id?: string
           kind?: string
           local_updated_at?: string
           location?: string | null
+          original_start_at?: string | null
           recurrence?: string[] | null
           recurring_event_id?: string | null
           search?: unknown
@@ -1605,6 +1623,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_set_secret: {
+        Args: { secret_name: string; secret_value: string }
+        Returns: undefined
+      }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       search_all: {
         Args: { max_results?: number; q: string }

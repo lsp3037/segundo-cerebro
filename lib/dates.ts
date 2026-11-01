@@ -1,6 +1,9 @@
 // Todas as datas aparecem no horário de Cuiabá, não no do servidor (que roda em UTC).
 // Datas "de calendário" (prazo de tarefa, dia de hábito) circulam como texto ISO "AAAA-MM-DD".
 export const TIME_ZONE = "America/Cuiaba";
+// Cuiabá está em UTC-4 o ano todo (sem horário de verão desde 2019).
+export const TZ_OFFSET = "-04:00";
+export const TZ_OFFSET_MS = -4 * 60 * 60 * 1000;
 
 const longDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: TIME_ZONE });
 const shortDateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: TIME_ZONE });
