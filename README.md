@@ -9,7 +9,7 @@ Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a 
 |---|---|---|
 | 1. Fundação | Login fechado, layout com abas e árvore lateral, temas, cores por área, banco e RLS | ✅ |
 | 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, Ideias, hábitos, busca no conteúdo | ✅ |
-| 3. Agenda | Google Agenda nos dois sentidos | — |
+| 3. Agenda | Google Agenda nos dois sentidos | 🚧 |
 | 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | — |
 | 5. Finanças e Revisão Semanal | | — |
 | 6. Extras | Telegram, busca com IA, Agente de Marketing, PWA | — |
@@ -99,10 +99,28 @@ Supabase › **Authentication** › **Sign In / Providers** › desligue **Allow
 4. A região das funções já vem como **São Paulo (gru1)** pelo `vercel.json`, perto do banco.
 5. Depois do primeiro deploy, volte à etapa 3 e cadastre o endereço `*.vercel.app`.
 
-### Próximas fases
+### 7. Gemini (Fase 2) ✅
 
-- **Google Agenda (Fase 3):** ativar a Google Calendar API no mesmo projeto do Google Cloud e gerar `TOKEN_ENCRYPTION_KEY` e `CRON_SECRET`.
-- **Gemini (Fases 2 e 6):** criar a chave em [Google AI Studio](https://aistudio.google.com/apikey).
+Chave criada em [Google AI Studio](https://aistudio.google.com/apikey) no projeto "Segundo Cerebro". `GEMINI_MODEL=gemini-3.5-flash` e `GEMINI_FALLBACK_MODEL=gemini-flash-latest` (o reserva entra quando o principal está sobrecarregado).
+
+### 8. Google Agenda (Fase 3)
+
+Como funciona:
+- **Conectar:** Configurações › Google Agenda › Conectar. É um login separado só para a Agenda; o token fica criptografado (`TOKEN_ENCRYPTION_KEY`) numa tabela que o navegador não lê.
+- **Google → app:** o Google avisa `/api/google/webhook` quando algo muda (canais "watch", renovados automaticamente) e o app busca só o que mudou (`syncToken`).
+- **Rotina de segurança:** o `pg_cron` do Supabase chama `/api/cron/google-sync` a cada 15 minutos (renova canais e sincroniza). Não usamos o cron da Vercel porque no plano gratuito ele roda só uma vez por dia.
+- **App → Google:** criar, editar e apagar eventos grava primeiro no Google. Conflitos: vale a última edição; ficam registrados em `sync_log`.
+
+Configuração (uma etapa de cada vez):
+1. Supabase › Project Settings › API Keys › **Secret keys**: copie a chave `sb_secret_…` para `SUPABASE_SECRET_KEY` no `.env.local`.
+2. Google Cloud › APIs e serviços › Biblioteca: ative a **Google Calendar API**.
+3. Google Auth Platform › Acesso a dados: adicione o escopo `…/auth/calendar`.
+4. Google Auth Platform › Público-alvo: **Publicar app** (em "Em teste", o Google corta o acesso a cada 7 dias). Aparece o aviso "app não verificado"; para uso pessoal é só continuar.
+5. Google Auth Platform › Clientes › o cliente do Supabase: adicione os URIs de redirecionamento `https://segundo-cerebro-one-omega.vercel.app/api/google/callback` e `http://localhost:3333/api/google/callback`; copie ID e chave secreta para `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`.
+6. Vercel › Environment Variables: `SUPABASE_SECRET_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TOKEN_ENCRYPTION_KEY` e `CRON_SECRET` (os mesmos valores do `.env.local`) e `APP_URL=https://segundo-cerebro-one-omega.vercel.app`.
+7. O endereço do app e o `CRON_SECRET` vão para o Vault do Supabase (usado pelo `pg_cron`) pela função `admin_set_secret`, chamada com a chave secreta.
+
+### Próximas fases
 - **Telegram (Fase 6):** criar o bot com o [@BotFather](https://t.me/BotFather).
 
 ---
