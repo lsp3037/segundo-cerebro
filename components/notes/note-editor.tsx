@@ -1,5 +1,7 @@
 "use client";
 
+import "@blocknote/shadcn/style.css";
+
 import type { Block } from "@blocknote/core";
 import { filterSuggestionItems } from "@blocknote/core/extensions";
 import { pt } from "@blocknote/core/locales";

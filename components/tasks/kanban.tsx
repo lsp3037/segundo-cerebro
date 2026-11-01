@@ -12,7 +12,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { addDays } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ const COLUMNS: TaskStatus[] = ["todo", "doing", "waiting", "done"];
 // Quadro por status. Arrastar um cartão para outra coluna muda o status.
 export function TasksKanban({ list, today, defaultAreaId, folderId, onOpen, onToggle }: ViewProps) {
   const [dragging, setDragging] = useState<Task | null>(null);
+  const dndId = useId();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor),
@@ -56,7 +57,7 @@ export function TasksKanban({ list, today, defaultAreaId, folderId, onOpen, onTo
   return (
     <div className="space-y-4">
       <TaskQuickAdd list={list} today={today} defaultAreaId={defaultAreaId} folderId={folderId} />
-      <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
+      <DndContext id={dndId} sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDragging(null)}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {columns.map((col) => (
             <Column key={col.status} status={col.status} label={col.label} count={col.tasks.length}>

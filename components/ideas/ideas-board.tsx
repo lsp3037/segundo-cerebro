@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useOptimisticList } from "@/components/use-optimistic-list";
 import { useWorkspace } from "@/components/workspace";
 import { createIdea, type IdeaInput, trashItem, updateIdea } from "@/lib/actions/learning-ideas";
-import { formatShortDate } from "@/lib/dates";
+import { formatShortDate, todayIso } from "@/lib/dates";
 import type { Tables } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +90,7 @@ export function IdeasBoard({
                         {idea.tags.map((t) => (
                           <span key={t}>#{t}</span>
                         ))}
-                        <span className="ml-auto">{formatShortDate(idea.created_at.slice(0, 10))}</span>
+                        <span className="ml-auto">{formatShortDate(todayIso(new Date(idea.created_at)))}</span>
                       </span>
                     </button>
                   </li>
@@ -141,7 +141,7 @@ function IdeaForm({ idea, onUpdate, onTrash }: { idea: Idea; onUpdate: (patch: I
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title.trim() && title.trim() !== idea.title && onUpdate({ title: title.trim() })}
           aria-label="Ideia"
-          className="border-none px-0 text-base font-medium shadow-none focus-visible:ring-0"
+          className="border-none px-0 text-base font-medium shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
       </SheetHeader>
 

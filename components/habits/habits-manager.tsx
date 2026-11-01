@@ -81,7 +81,7 @@ export function HabitsManager({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-xs text-muted-foreground">
-                  <th className="px-3 py-2 text-left font-medium">Hábito</th>
+                  <th className="min-w-44 px-3 py-2 text-left font-medium">Hábito</th>
                   {lastDays.map((d) => (
                     <th key={d} className={cn("w-9 py-2 text-center font-medium", d === today && "text-foreground")}>
                       <div className="uppercase">{formatWeekdayShort(d).slice(0, 3)}</div>

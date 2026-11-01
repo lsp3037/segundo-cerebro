@@ -140,3 +140,11 @@
     display: none;
   }
 }
+
+/* Editor de notas sem fundo próprio: fica com a cor da página. */
+.bn-root.bn-container {
+  --bn-colors-editor-background: transparent;
+}
+.bn-root.bn-container .bn-editor {
+  background-color: transparent;
+}

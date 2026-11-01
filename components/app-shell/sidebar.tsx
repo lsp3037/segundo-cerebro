@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, use, useMemo, useRef, useState, useTransition } from "react";
+import { createContext, use, useId, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Icon } from "@/components/icon";
@@ -196,6 +196,8 @@ function AreaSection({ area, onToggle }: { area: Area; onToggle: () => void }) {
 function FolderList({ areaId, parentId, depth }: { areaId: string; parentId: string | null; depth: number }) {
   const { childrenOf, setFolders } = useTree();
   const items = childrenOf(areaId, parentId);
+  // Id estável evita diferença entre o HTML do servidor e o do navegador.
+  const dndId = useId();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -226,7 +228,7 @@ function FolderList({ areaId, parentId, depth }: { areaId: string; parentId: str
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <DndContext id={dndId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
       <SortableContext items={items.map((f) => f.id)} strategy={verticalListSortingStrategy}>
         <ul role="list">
           {items.map((folder) => (

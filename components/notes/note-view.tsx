@@ -97,21 +97,25 @@ export function NoteView({
         </span>
       </div>
 
-      <input
+      <textarea
         value={title}
-        onChange={(e) => setTitle(e.target.value)}
+        onChange={(e) => setTitle(e.target.value.replace(/\n/g, " "))}
         onBlur={() => {
           const text = title.trim() || "Sem título";
           setTitle(text);
           if (text !== note.title) saveMeta({ title: text });
         }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
         }}
+        rows={1}
         placeholder="Sem título"
         aria-label="Título da nota"
         maxLength={300}
-        className="w-full bg-transparent px-[54px] text-3xl font-bold tracking-tight outline-none placeholder:text-muted-foreground/50 max-md:px-0"
+        className="field-sizing-content w-full resize-none bg-transparent px-[54px] text-3xl leading-tight font-bold tracking-tight outline-none placeholder:text-muted-foreground/50 max-md:px-0"
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-2 px-[54px] max-md:px-0">

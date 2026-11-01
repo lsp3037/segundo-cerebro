@@ -156,7 +156,7 @@ function LearningForm({
           onChange={(e) => setTopic(e.target.value)}
           onBlur={() => topic.trim() && topic.trim() !== item.topic && onUpdate({ topic: topic.trim() })}
           aria-label="Tema"
-          className="border-none px-0 text-base font-medium shadow-none focus-visible:ring-0"
+          className="border-none px-0 text-base font-medium shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
       </SheetHeader>
 

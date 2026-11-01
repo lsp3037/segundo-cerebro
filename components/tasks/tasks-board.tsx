@@ -23,21 +23,11 @@ import {
 } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { TasksKanban } from "./kanban";
-import { compareTasks, isOpen, type Task } from "./meta";
+import { compareTasks, isOpen, type Task, TASK_VIEWS, type TaskView } from "./meta";
 import { TaskQuickAdd } from "./task-quick-add";
 import { TaskRow } from "./task-row";
 import { TaskSheet } from "./task-sheet";
 import { type TaskList, useTaskList } from "./use-task-list";
-
-export const TASK_VIEWS = [
-  { value: "hoje", label: "Hoje" },
-  { value: "semana", label: "Semana" },
-  { value: "mes", label: "Mês" },
-  { value: "lista", label: "Lista" },
-  { value: "kanban", label: "Kanban" },
-] as const;
-
-export type TaskView = (typeof TASK_VIEWS)[number]["value"];
 
 export function TasksBoard({
   initialTasks,

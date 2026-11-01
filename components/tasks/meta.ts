@@ -33,3 +33,14 @@ export function compareTasks(a: Task, b: Task) {
   if (b.start_time) return 1;
   return a.priority - b.priority || a.created_at.localeCompare(b.created_at);
 }
+
+// Visões das tarefas. Fica aqui (fora de arquivo "use client") porque as páginas do servidor também leem.
+export const TASK_VIEWS = [
+  { value: "hoje", label: "Hoje" },
+  { value: "semana", label: "Semana" },
+  { value: "mes", label: "Mês" },
+  { value: "lista", label: "Lista" },
+  { value: "kanban", label: "Kanban" },
+] as const;
+
+export type TaskView = (typeof TASK_VIEWS)[number]["value"];

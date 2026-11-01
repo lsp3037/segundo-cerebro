@@ -4,7 +4,8 @@ import Link from "next/link";
 
 import { HabitsToday } from "@/components/habits/habits-today";
 import { PageHeader } from "@/components/page";
-import { TASK_VIEWS, type TaskView, TasksBoard } from "@/components/tasks/tasks-board";
+import { TASK_VIEWS, type TaskView } from "@/components/tasks/meta";
+import { TasksBoard } from "@/components/tasks/tasks-board";
 import { getAreaFilter } from "@/lib/data/area-filter";
 import { getHabits } from "@/lib/data/habits";
 import { countOpenInbox } from "@/lib/data/inbox";
