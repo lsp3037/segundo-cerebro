@@ -15,13 +15,15 @@ import { TasksBoard } from "@/components/tasks/tasks-board";
 import { ContentIdeasBoard } from "@/components/trustcare/content-ideas-board";
 import { FlowsBoard } from "@/components/trustcare/flows-board";
 import { PublicationsBoard } from "@/components/trustcare/publications-board";
+import { ReplyAssistant } from "@/components/trustcare/reply-assistant";
 import { ShortcutsBoard } from "@/components/trustcare/shortcuts-board";
+import { isAiConfigured } from "@/lib/ai";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getNotes } from "@/lib/data/notes";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
-import { getContentIdeas, getContentPillars, getPublications, getServiceFlows, getShortcuts } from "@/lib/data/trustcare";
+import { getContentIdeas, getContentPillars, getPublications, getReplyCases, getServiceFlows, getShortcuts } from "@/lib/data/trustcare";
 import { todayIso } from "@/lib/dates";
 import { getOsSummary } from "@/lib/integrations/os-manager";
 import { type Folder, type FolderModule, MODULES } from "@/lib/modules";
@@ -119,6 +121,17 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
     case "service_flows":
       content = <FlowsBoard initialFlows={await getServiceFlows()} />;
       break;
+    case "reply_assistant": {
+      const [cases, flows] = await Promise.all([getReplyCases(), getServiceFlows()]);
+      content = (
+        <ReplyAssistant
+          initialCases={cases}
+          flows={flows.filter((f) => f.active).map(({ id, name }) => ({ id, name }))}
+          aiReady={isAiConfigured() && area.ai_enabled}
+        />
+      );
+      break;
+    }
     default:
       content = <PhasePlaceholder phase={mod.phase} items={[mod.description]} className={area.show_lgpd_notice ? "pt-4" : undefined} />;
   }
