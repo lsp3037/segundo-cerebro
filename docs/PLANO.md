@@ -213,3 +213,14 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - Por isso, **não vale a pena** montar um Supabase local no Docker só para isso (2 a 3 GB de RAM para guardar uma linha). Basta exportar a tabela `settings` e pausar o projeto.
 - **Impacto na Fase 4:** o Agente **não tem API**. O adaptador `lib/integrations/marketing-agent` fica com o mock até decidirmos. Como o painel roda no PC e o Segundo Cérebro roda na internet, o caminho natural é o inverso: **o painel chama a API do Segundo Cérebro** (localhost → Vercel funciona; Vercel → localhost não).
 - O painel também tem um **Planejador de Conteúdo do Instagram (30 dias)**, que se sobrepõe ao Planejamento de Publicações do Segundo Cérebro. Decidir na Fase 4 qual dos dois fica como principal.
+
+---
+
+## 6. Fase 1 concluída (2026-10-31)
+
+- Produção: https://segundo-cerebro-one-omega.vercel.app (Vercel, funções em `gru1`). Repositório privado: `lsp3037/segundo-cerebro`.
+- Supabase "Segundo Cerebro" (`ynbxqftfhbpgnqdiqqlk`, sa-east-1): 29 tabelas com RLS, seed por usuário, bucket privado `attachments`.
+- Login: link mágico e Google (ligados à mesma conta), novos cadastros desligados, `ALLOWED_EMAILS` + `private.allowed_emails`.
+- Desenvolvimento local na porta **3333** (a 3000 é de outro projeto).
+- Decisões tomadas durante a fase: Next.js 16 com `cacheComponents` desligado (conteúdo é todo pessoal e dinâmico); `proxy.ts` no lugar do antigo middleware; migrations aplicadas pelo Supabase e versionadas em `supabase/migrations/`.
+- Testado pelo Luan: login (PC e Vercel), árvore de pastas (criar, renomear, arrastar, mover, excluir e restaurar), tema, cores e Ctrl+K.
