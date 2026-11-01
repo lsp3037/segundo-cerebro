@@ -20,7 +20,7 @@ export function getAiProvider(): AiProvider {
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL;
   if (!apiKey || !model) throw new AiNotConfiguredError();
-  return createGeminiProvider({ apiKey, model });
+  return createGeminiProvider({ apiKey, model, fallbackModel: process.env.GEMINI_FALLBACK_MODEL });
 }
 
 export function isAiConfigured() {
