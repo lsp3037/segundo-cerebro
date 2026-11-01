@@ -224,3 +224,14 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - Desenvolvimento local na porta **3333** (a 3000 é de outro projeto).
 - Decisões tomadas durante a fase: Next.js 16 com `cacheComponents` desligado (conteúdo é todo pessoal e dinâmico); `proxy.ts` no lugar do antigo middleware; migrations aplicadas pelo Supabase e versionadas em `supabase/migrations/`.
 - Testado pelo Luan: login (PC e Vercel), árvore de pastas (criar, renomear, arrastar, mover, excluir e restaurar), tema, cores e Ctrl+K.
+
+## 7. Fase 2 (2026-11-01)
+
+- **Tarefas:** visões Hoje, Semana, Mês, Lista e Kanban; atrasadas em destaque; repetição (RRULE simples) que cria a próxima ocorrência ao concluir; painel lateral de edição.
+- **Hábitos:** diário, dias da semana ou X vezes por semana; checklist na aba Hoje; sequência e mapa do mês na pasta Rotina.
+- **Caixa de Entrada:** captura por botão, `Alt+N` ou `Ctrl+K`; organizar em tarefa, nota, ideia, ideia de conteúdo ou aprendizado.
+- **Conhecimento:** editor BlockNote em português (`/` blocos, `@` link para outra nota), anexos no bucket privado via `/api/arquivos/...`, notas que apontam para esta, tags, modelo de reunião.
+- **Aprender e Ideias gerais**, e as pastas mostrando o próprio conteúdo (com subpastas).
+- **Busca `Ctrl+K`** no conteúdo (`public.search_all`).
+- **IA:** camada `lib/ai` (Gemini via `@google/genai`) com trava por área; o botão "Sugerir com IA" da Caixa de Entrada fica ativo quando `GEMINI_API_KEY` e `GEMINI_MODEL` estiverem configurados.
+- "Sair" agora desconecta só o navegador atual.

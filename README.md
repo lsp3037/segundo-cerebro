@@ -8,7 +8,7 @@ Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a 
 | Fase | Conteúdo | Situação |
 |---|---|---|
 | 1. Fundação | Login fechado, layout com abas e árvore lateral, temas, cores por área, banco e RLS | ✅ |
-| 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, hábitos | — |
+| 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, Ideias, hábitos, busca no conteúdo | ✅ |
 | 3. Agenda | Google Agenda nos dois sentidos | — |
 | 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | — |
 | 5. Finanças e Revisão Semanal | | — |
