@@ -1,7 +1,7 @@
-# Segundo Cérebro: proposta inicial (antes de qualquer código)
+# Segundo Cérebro: plano técnico e diário de decisões
 
-> Status: **aguardando aprovação do Luan**. Nada foi instalado nem criado ainda.
-> Fonte: `prompt-segundo-cerebro.md`.
+> Status (2026-11-01): **Fases 1 a 4 concluídas**; Fase 5 aguardando aprovação. As seções 1 a 4 são a proposta inicial (com a estrutura de pastas atualizada); as seções 5 em diante registram respostas e entregas.
+> Fonte: [`especificacao-original.md`](especificacao-original.md). O "o quê" e o "porquê" estão no [`PRD.md`](PRD.md); o dia a dia, no [`OPERACAO.md`](OPERACAO.md).
 
 ---
 
@@ -128,40 +128,45 @@ attachments ──(qualquer entidade)
 
 ## 3. Estrutura de pastas do projeto
 
+> Atualizada em 2026-11-01 para refletir o código real. Diferenças em relação à proposta inicial: o Gerenciador de O.S. é lido pela **API dele** (não por um cliente Supabase), a integração com o Google ficou em `lib/google/`, as áreas e pastas padrão são criadas por gatilho na migration `auth_seed` (não há `seed.sql`), e a IA é chamada por Server Actions (não há `api/ai`). As pastas do Telegram e do PWA chegam na Fase 6.
+
 ```
 segundo-cerebro/
 ├─ app/
 │  ├─ (auth)/login/            tela de login
 │  ├─ auth/callback/           retorno do login
+│  ├─ acesso-negado/           e-mail fora da lista
+│  ├─ (legal)/privacidade/ termos/   páginas públicas exigidas pelo Google
 │  ├─ (app)/                   tudo que exige login
 │  │  ├─ layout.tsx            barra superior (abas + Ctrl+K) e árvore lateral
-│  │  ├─ hoje/  agenda/  entrada/  ideias/  conhecimento/
-│  │  ├─ aprender/  financas/  revisao/  configuracoes/
-│  │  └─ p/[folderId]/         telas das pastas sem aba própria (Atalhos, Fluxos…)
+│  │  ├─ hoje/  agenda/  entrada/  ideias/  conhecimento/  aprender/
+│  │  ├─ financas/  revisao/   (Fase 5)
+│  │  ├─ configuracoes/        áreas, trava de IA, lixeira, Google Agenda
+│  │  └─ p/[folderId]/         telas das pastas (Atalhos, Fluxos, Publicações…)
 │  └─ api/
-│     ├─ google/               conectar agenda + webhook de avisos
-│     ├─ telegram/webhook/
-│     ├─ cron/                 chamado pelo pg_cron (protegido por segredo)
-│     └─ ai/                   classificar, responder, perguntar
+│     ├─ google/connect|callback|webhook/   conectar a agenda e receber avisos
+│     ├─ cron/google-sync/     chamado pelo pg_cron (protegido por segredo)
+│     └─ arquivos/[...path]/   entrega anexos privados do Storage
 ├─ components/
 │  ├─ ui/                      componentes do shadcn
-│  ├─ layout/                  abas, árvore, busca, troca de tema
-│  └─ tasks/ notes/ calendar/ finance/ trustcare/ …
+│  ├─ app-shell/               barra superior, árvore lateral, busca Ctrl+K
+│  ├─ tasks/ habits/ inbox/ notes/ learning/ ideas/ agenda/
+│  └─ trustcare/               atalhos, conteúdo, publicações, fluxos, assistente
 ├─ lib/
-│  ├─ supabase/                client (navegador), server, admin (só servidor)
+│  ├─ supabase/                client (navegador), server, admin (só servidor), tipos
+│  ├─ actions/                 Server Actions (gravam no banco)
+│  ├─ data/                    leituras do banco
 │  ├─ ai/                      interface do provedor + gemini.ts + trava por área
+│  ├─ google/                  API do Calendar, sincronização, criptografia dos tokens
 │  ├─ integrations/
-│  │  ├─ google-calendar/
-│  │  ├─ telegram/
-│  │  ├─ marketing-agent/      types.ts (interface) + mock.ts
-│  │  └─ os-manager/           cliente Supabase somente-leitura
-│  ├─ crypto.ts                criptografia dos tokens
-│  └─ utils/                   datas (Cuiabá), dinheiro (centavos ↔ R$)
-├─ supabase/
-│  ├─ migrations/              criação das tabelas, versionada
-│  └─ seed.sql                 áreas e pastas padrão
-├─ public/                     ícones e manifest do PWA
-├─ docs/PLANO.md               este arquivo
+│  │  ├─ os-manager.ts         resumo das O.S. pela API do Gerenciador (só leitura)
+│  │  └─ marketing-agent/      interface + mock (API real na Fase 6)
+│  ├─ mask.ts                  máscara de dados pessoais antes da IA
+│  ├─ service-flows.ts         formato e fluxos de atendimento sugeridos
+│  └─ dates.ts recurrence.ts events-expand.ts …   datas em Cuiabá e repetições
+├─ supabase/migrations/        banco versionado (tabelas, RLS, seed por usuário, cron)
+├─ scripts/set-vault.mjs       grava app_url e cron_secret no Vault do Supabase
+├─ docs/                       PRD, plano, operação e especificação original
 ├─ .env.example
 └─ README.md
 ```
@@ -225,7 +230,7 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - Decisões tomadas durante a fase: Next.js 16 com `cacheComponents` desligado (conteúdo é todo pessoal e dinâmico); `proxy.ts` no lugar do antigo middleware; migrations aplicadas pelo Supabase e versionadas em `supabase/migrations/`.
 - Testado pelo Luan: login (PC e Vercel), árvore de pastas (criar, renomear, arrastar, mover, excluir e restaurar), tema, cores e Ctrl+K.
 
-## 7. Fase 2 (2026-11-01)
+## 7. Fase 2 concluída (2026-11-01)
 
 - **Tarefas:** visões Hoje, Semana, Mês, Lista e Kanban; atrasadas em destaque; repetição (RRULE simples) que cria a próxima ocorrência ao concluir; painel lateral de edição.
 - **Hábitos:** diário, dias da semana ou X vezes por semana; checklist na aba Hoje; sequência e mapa do mês na pasta Rotina.

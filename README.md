@@ -2,8 +2,9 @@
 
 Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a Trust Care e as finanças em um só lugar.
 
-- **Stack:** Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui, Supabase (Postgres, Auth, Storage), Vercel.
-- **Plano completo e decisões:** [`docs/PLANO.md`](docs/PLANO.md).
+- **Stack:** Next.js 16 (App Router) + TypeScript + Tailwind + shadcn/ui, Supabase (Postgres, Auth, RLS, Storage, pg_cron, Vault), Vercel, Gemini (`@google/genai`).
+- **No ar:** https://segundo-cerebro-one-omega.vercel.app (no PC: http://localhost:3333).
+- **Documentos:** [`docs/PRD.md`](docs/PRD.md) (o que o sistema faz e por quê) · [`docs/PLANO.md`](docs/PLANO.md) (plano técnico e decisões) · [`docs/OPERACAO.md`](docs/OPERACAO.md) (testes, problemas comuns e pendências).
 
 | Fase | Conteúdo | Situação |
 |---|---|---|
@@ -43,6 +44,7 @@ Abra o endereço que aparecer no terminal (http://localhost:3333).
 | `npm run dev` | Roda o app no seu PC, atualizando a cada alteração |
 | `npm run build` | Compila como na Vercel (bom para conferir se está tudo certo) |
 | `npm run lint` | Procura erros comuns no código |
+| `npx tsc --noEmit` | Confere os tipos do TypeScript sem compilar |
 
 ---
 
@@ -66,7 +68,7 @@ Além do `ALLOWED_EMAILS`, o banco tem a própria lista: um cadastro com e-mail 
 insert into private.allowed_emails (email) values ('outro.email@gmail.com');
 ```
 
-### 3. Endereços de retorno do login (Fase 1)
+### 3. Endereços de retorno do login (Fase 1) ✅
 
 O Supabase só devolve o login para endereços autorizados.
 
@@ -76,10 +78,10 @@ O Supabase só devolve o login para endereços autorizados.
    - `http://localhost:3333/**`
    - `https://segundo-cerebro-one-omega.vercel.app/**`
 
-### 4. Login com Google (Fase 1)
+### 4. Login com Google (Fase 1) ✅
 
 1. No [Google Cloud Console](https://console.cloud.google.com/), crie um projeto (ex.: "Segundo Cérebro").
-2. **APIs e serviços › Tela de consentimento OAuth**: tipo **Externo**, preencha nome e e-mail de suporte e adicione seu Gmail como **usuário de teste**.
+2. **APIs e serviços › Tela de consentimento OAuth**: tipo **Externo**, preencha nome e e-mail de suporte. Na Fase 3 o app é **publicado** (ver etapa 8), porque em modo de teste o Google corta o acesso à Agenda a cada 7 dias.
 3. **APIs e serviços › Credenciais › Criar credenciais › ID do cliente OAuth**, tipo **Aplicativo da Web**.
    - **URIs de redirecionamento autorizados**: `https://ynbxqftfhbpgnqdiqqlk.supabase.co/auth/v1/callback`
 4. Copie o **ID do cliente** e a **chave secreta**.
@@ -87,11 +89,11 @@ O Supabase só devolve o login para endereços autorizados.
 
 > O mesmo projeto do Google Cloud será reaproveitado na Fase 3 (Agenda), com uma permissão a mais.
 
-### 5. Depois de entrar pela primeira vez (Fase 1)
+### 5. Depois de entrar pela primeira vez (Fase 1) ✅
 
 Supabase › **Authentication** › **Sign In / Providers** › desligue **Allow new users to sign up**. Isso fecha a primeira camada do login. A sua conta continua funcionando.
 
-### 6. Deploy na Vercel (Fase 1)
+### 6. Deploy na Vercel (Fase 1) ✅
 
 1. Suba o código para um repositório **privado** no GitHub.
 2. Na [Vercel](https://vercel.com/new), importe o repositório.
@@ -142,6 +144,8 @@ Configuração:
 - **RLS em todas as tabelas:** cada linha tem um dono (`user_id`) e o banco só entrega as suas. Toda migration termina com `select private.assert_rls_enabled();`, que falha se alguma tabela ficar sem RLS.
 - **Tokens do Google e mensagens do Telegram:** tabelas sem acesso pelo navegador; só o servidor lê.
 - **LGPD:** a área Profissional mostra um aviso para não registrar dados de pacientes e nasce com a IA desligada. A trava de IA de cada área fica em **Configurações**.
+- **Conversas de clientes e IA:** antes de ir para o Gemini, telefone, e-mail, CPF, CNPJ, CEP e endereço viram marcadores (`lib/mask.ts`). O texto original fica só no banco.
+- **Integrações só de leitura:** o resumo de O.S. usa uma chave do Gerenciador com escopo `orders:read` e guarda só números.
 - **Lixeira:** excluir uma pasta não apaga nada de vez; dá para restaurar em Configurações.
 
 ## Estrutura do projeto
@@ -150,16 +154,31 @@ Configuração:
 app/
   (auth)/login/         tela de login
   auth/callback/        retorno do login
+  (legal)/              privacidade e termos (públicas, exigidas pelo Google)
   (app)/                telas que exigem login (abas, pastas, configurações)
+  api/google/           conectar a agenda e receber avisos do Google
+  api/cron/             chamado pelo pg_cron a cada 15 min (protegido por segredo)
+  api/arquivos/         entrega anexos privados
 components/
   app-shell/            barra superior, árvore lateral, busca Ctrl+K
+  trustcare/            atalhos, conteúdo, publicações, fluxos, assistente
+  tasks/ notes/ agenda/ …  uma pasta por módulo
   ui/                   componentes do shadcn/ui
 lib/
   actions/              Server Actions (gravam no banco)
   data/                 leituras do banco
+  ai/                   camada de IA (Gemini) com trava por área
+  google/               Google Agenda: API, sincronização, criptografia dos tokens
+  integrations/         Gerenciador de O.S. (só leitura) e Agente de Marketing (teste)
+  mask.ts               esconde dados pessoais antes de ir para a IA
   supabase/             clientes do Supabase e tipos gerados
 supabase/migrations/    criação das tabelas, versionada
-docs/PLANO.md           plano e decisões
+scripts/set-vault.mjs   grava endereço do app e CRON_SECRET no Vault
+docs/
+  PRD.md                o que o sistema faz e por quê
+  PLANO.md              plano técnico e diário de decisões
+  OPERACAO.md           rodar, testar, resolver problemas, pendências
+  especificacao-original.md   o pedido original do Luan
 ```
 
 ## Banco de dados
