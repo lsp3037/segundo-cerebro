@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { WorkspaceProvider } from "@/components/workspace";
 import type { Area, Folder } from "@/lib/modules";
 import { CommandMenu } from "./command-menu";
 import { Sidebar } from "./sidebar";
@@ -39,6 +40,7 @@ export function AppShell({
   const sidebar = <Sidebar areas={areas} folders={folders} onNavigate={() => setNavOpen(false)} />;
 
   return (
+    <WorkspaceProvider areas={areas} folders={folders}>
     <div className="flex h-svh flex-col">
       <Suspense fallback={<div className="h-12 border-b" />}>
         <Topbar
@@ -68,5 +70,6 @@ export function AppShell({
 
       <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} areas={areas} folders={folders} />
     </div>
+    </WorkspaceProvider>
   );
 }

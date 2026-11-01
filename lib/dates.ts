@@ -101,6 +101,11 @@ export function formatRelativeDay(iso: IsoDate, today = todayIso()) {
   return `${clean(weekdayShort.format(d))}, ${clean(dayMonth.format(d))}`;
 }
 
+// "26 out"
+export function formatShortDate(iso: IsoDate) {
+  return clean(dayMonth.format(toUtc(iso)));
+}
+
 // "seg", "ter"…
 export function formatWeekdayShort(iso: IsoDate) {
   return clean(weekdayShort.format(toUtc(iso)));
