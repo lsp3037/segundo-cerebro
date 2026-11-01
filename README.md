@@ -71,10 +71,10 @@ insert into private.allowed_emails (email) values ('outro.email@gmail.com');
 O Supabase só devolve o login para endereços autorizados.
 
 1. Supabase › **Authentication** › **URL Configuration**.
-2. **Site URL**: o endereço do app na Vercel (ex.: `https://segundo-cerebro.vercel.app`). Enquanto não houver deploy, use `http://localhost:3333`.
+2. **Site URL**: o endereço do app na Vercel (hoje `https://segundo-cerebro-one-omega.vercel.app`). Enquanto não houver deploy, use `http://localhost:3333`.
 3. Em **Redirect URLs**, adicione:
    - `http://localhost:3333/**`
-   - `https://SEU-APP.vercel.app/**` (depois do deploy)
+   - `https://segundo-cerebro-one-omega.vercel.app/**`
 
 ### 4. Login com Google (Fase 1)
 
