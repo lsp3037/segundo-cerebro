@@ -9,7 +9,7 @@ Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a 
 |---|---|---|
 | 1. Fundação | Login fechado, layout com abas e árvore lateral, temas, cores por área, banco e RLS | ✅ |
 | 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, Ideias, hábitos, busca no conteúdo | ✅ |
-| 3. Agenda | Google Agenda nos dois sentidos | 🚧 |
+| 3. Agenda | Google Agenda nos dois sentidos, duas contas (pessoal e SES), blocos de tarefa | ✅ |
 | 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | — |
 | 5. Finanças e Revisão Semanal | | — |
 | 6. Extras | Telegram, busca com IA, Agente de Marketing, PWA | — |
@@ -103,7 +103,7 @@ Supabase › **Authentication** › **Sign In / Providers** › desligue **Allow
 
 Chave criada em [Google AI Studio](https://aistudio.google.com/apikey) no projeto "Segundo Cerebro". `GEMINI_MODEL=gemini-3.5-flash` e `GEMINI_FALLBACK_MODEL=gemini-flash-latest` (o reserva entra quando o principal está sobrecarregado).
 
-### 8. Google Agenda (Fase 3)
+### 8. Google Agenda (Fase 3) ✅
 
 Como funciona:
 - **Conectar:** Configurações › Google Agenda › Conectar. É um login separado só para a Agenda; o token fica criptografado (`TOKEN_ENCRYPTION_KEY`) numa tabela que o navegador não lê.

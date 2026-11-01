@@ -235,3 +235,11 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **Busca `Ctrl+K`** no conteúdo (`public.search_all`).
 - **IA:** camada `lib/ai` (Gemini via `@google/genai`) com trava por área; o botão "Sugerir com IA" da Caixa de Entrada fica ativo quando `GEMINI_API_KEY` e `GEMINI_MODEL` estiverem configurados.
 - "Sair" agora desconecta só o navegador atual.
+
+## 8. Fase 3 concluída (2026-11-01)
+
+- **Agenda:** visões dia, semana e mês; criar, editar e apagar eventos (inclusive repetidos); tarefas com horário viram blocos na agenda ("Bloquear na agenda").
+- **Duas contas Google conectadas:** Gmail pessoal (6 agendas ligadas) e `@ses.mt.gov.br` (agenda principal na área Profissional). A SES **não** bloqueou o acesso, então o plano B não foi necessário.
+- **Sincronização:** aviso instantâneo do Google (`/api/google/webhook`, canais de 7 dias renovados sozinhos) + rotina do `pg_cron` a cada 15 min (`/api/cron/google-sync`, com `cron_secret` e `app_url` no Vault). Testado nos dois sentidos pelo Luan.
+- **Google Cloud:** app publicado ("Em produção"), sem verificação (uso pessoal, abaixo de 100 usuários); páginas públicas `/privacidade` e `/termos` exigidas pelo Google.
+- Lição: ao colar o ID do cliente do arquivo JSON do Google, conferir que não veio junto o trecho `client_id":"`.
