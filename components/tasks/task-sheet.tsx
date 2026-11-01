@@ -1,7 +1,8 @@
 "use client";
 
-import { Trash2Icon } from "lucide-react";
-import { useState } from "react";
+import { CalendarClockIcon, Loader2Icon, Trash2Icon } from "lucide-react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { LgpdNotice } from "@/components/lgpd-notice";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useWorkspace } from "@/components/workspace";
+import { scheduleTaskBlock, unscheduleTaskBlock } from "@/lib/actions/events";
 import { formatDateTime } from "@/lib/dates";
 import { RECURRENCE_OPTIONS } from "@/lib/recurrence";
 import { PRIORITIES, STATUSES, type Task, type TaskStatus } from "./meta";
@@ -196,6 +198,8 @@ function TaskForm({ task, list, onClose }: { task: Task; list: TaskList; onClose
           </Field>
         </div>
 
+        {task.due_date && task.start_time && <AgendaBlock task={task} list={list} />}
+
         <Field label="Notas" htmlFor="task-notes">
           <Textarea
             id="task-notes"
@@ -247,6 +251,44 @@ function Field({
       </Label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+// Tarefa com data e horário pode virar um bloco de tempo no Google Agenda.
+function AgendaBlock({ task, list }: { task: Task; list: TaskList }) {
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+      <div className="flex items-center gap-2 text-sm">
+        <CalendarClockIcon className="size-4 text-muted-foreground" />
+        {task.event_id ? "Bloco reservado no Google Agenda" : "Reservar este horário na agenda?"}
+      </div>
+      <Button
+        variant={task.event_id ? "ghost" : "outline"}
+        size="sm"
+        disabled={pending}
+        onClick={() =>
+          startTransition(async () => {
+            if (task.event_id) {
+              const result = await unscheduleTaskBlock(task.id);
+              if (!result.ok) toast.error(result.error);
+              else list.patchLocal(task.id, { event_id: null });
+            } else {
+              const result = await scheduleTaskBlock(task.id);
+              if (!result.ok) toast.error(result.error);
+              else {
+                list.patchLocal(task.id, { event_id: result.data.eventId });
+                toast.success("Horário reservado no Google Agenda.");
+              }
+            }
+          })
+        }
+      >
+        {pending && <Loader2Icon className="animate-spin" />}
+        {task.event_id ? "Tirar da agenda" : "Bloquear na agenda"}
+      </Button>
     </div>
   );
 }

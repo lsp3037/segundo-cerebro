@@ -119,6 +119,24 @@ export function formatMonthYear(iso: IsoDate) {
   return monthYear.format(toUtc(iso));
 }
 
+// Data e minuto do dia (0–1439) de um instante, no relógio de Cuiabá.
+export function wallParts(iso: string) {
+  const d = new Date(new Date(iso).getTime() + TZ_OFFSET_MS);
+  return { date: d.toISOString().slice(0, 10) as IsoDate, minutes: d.getUTCHours() * 60 + d.getUTCMinutes() };
+}
+
+// Instante (ISO) a partir de data + minuto do dia em Cuiabá.
+export function fromWallParts(date: IsoDate, minutes: number) {
+  const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const mm = String(minutes % 60).padStart(2, "0");
+  return new Date(`${date}T${hh}:${mm}:00${TZ_OFFSET}`).toISOString();
+}
+
+// "08:30" a partir de minutos do dia
+export function minutesToTime(minutes: number) {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
 // "08:30" a partir de "08:30:00"
 export function formatTime(time: string | null | undefined) {
   return time ? time.slice(0, 5) : "";

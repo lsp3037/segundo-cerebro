@@ -76,7 +76,7 @@ export function useTaskList(initial: Task[]) {
     });
   }
 
-  return { tasks, update, setStatus, add, remove };
+  return { tasks, update, setStatus, add, remove, patchLocal };
 }
 
 export type TaskList = ReturnType<typeof useTaskList>;

@@ -281,3 +281,12 @@ export async function disconnectGoogle(connectionId: string): Promise<ActionResu
   revalidatePath("/", "layout");
   return ok();
 }
+
+// Dados completos de um evento para a janela de edição.
+export async function getEventForEdit(eventId: string): Promise<ActionResult<Tables<"events">>> {
+  await getCurrentUser();
+  if (!id.safeParse(eventId).success) return fail("Evento inválido.");
+  const supabase = await createClient();
+  const { data } = await supabase.from("events").select("*").eq("id", eventId).single();
+  return data ? ok(data) : fail("Evento não encontrado.");
+}

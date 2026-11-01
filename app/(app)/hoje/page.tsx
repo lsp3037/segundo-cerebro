@@ -2,16 +2,18 @@ import { InboxIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { TodayAgenda } from "@/components/agenda/today-agenda";
 import { HabitsToday } from "@/components/habits/habits-today";
 import { PageHeader } from "@/components/page";
 import { TASK_VIEWS, type TaskView } from "@/components/tasks/meta";
 import { TasksBoard } from "@/components/tasks/tasks-board";
 import { getAreaFilter } from "@/lib/data/area-filter";
+import { getCalendars, getOccurrences } from "@/lib/data/events";
 import { getHabits } from "@/lib/data/habits";
 import { countOpenInbox } from "@/lib/data/inbox";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
-import { formatLongDate, todayIso } from "@/lib/dates";
+import { addDays, formatLongDate, fromWallParts, todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[0];
@@ -24,11 +26,13 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
   const area = await getAreaFilter(props.searchParams);
   const today = todayIso();
 
-  const [{ areas, folders }, tasks, { habits, logs }, inboxCount] = await Promise.all([
+  const [{ areas, folders }, tasks, { habits, logs }, inboxCount, todayEvents, calendars] = await Promise.all([
     getSidebarData(),
     getTasks({ areaId: area?.id }),
     getHabits({ areaId: area?.id, activeOnly: true }),
     countOpenInbox(),
+    view === "hoje" ? getOccurrences(fromWallParts(today, 0), fromWallParts(addDays(today, 1), 0), area?.id) : Promise.resolve([]),
+    view === "hoje" ? getCalendars() : Promise.resolve([]),
   ]);
 
   const defaultArea = area ?? areas.find((a) => a.slug === "pessoal") ?? areas[0];
@@ -59,6 +63,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
         aside={
           view === "hoje" ? (
             <>
+              <TodayAgenda occurrences={todayEvents} areas={areas} connected={calendars.some((c) => c.sync_enabled)} />
               <HabitsToday
                 habits={habits}
                 logs={logs}
