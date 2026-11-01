@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useOpenParam } from "@/components/use-open-param";
 import { useWorkspace } from "@/components/workspace";
 import {
   addDays,
@@ -56,7 +57,7 @@ export function TasksBoard({
   aside?: React.ReactNode;
 }) {
   const list = useTaskList(initialTasks);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useOpenParam("tarefa");
   const openTask = list.tasks.find((t) => t.id === openId) ?? null;
 
   const props: ViewProps = {

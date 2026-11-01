@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { AreaFolderFields, Field, type LinkItem, LinksEditor, QuickAddInput } from "@/components/form-bits";
 import { Button } from "@/components/ui/button";
+import { useOpenParam } from "@/components/use-open-param";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,7 +45,7 @@ export function LearningBoard({
 }) {
   const { folderById } = useWorkspace();
   const list = useOptimisticList(initialItems);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useOpenParam("item");
   const open = list.items.find((i) => i.id === openId) ?? null;
 
   function update(item: Item, patch: LearningInput) {

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { AreaFolderFields, Field, type LinkItem, LinksEditor, QuickAddInput, TagsInput } from "@/components/form-bits";
 import { LgpdNotice } from "@/components/lgpd-notice";
 import { Button } from "@/components/ui/button";
+import { useOpenParam } from "@/components/use-open-param";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +38,7 @@ export function IdeasBoard({
 }) {
   const { areaById, folderById } = useWorkspace();
   const list = useOptimisticList(initialIdeas);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useOpenParam("ideia");
   const [showDiscarded, setShowDiscarded] = useState(false);
   const open = list.items.find((i) => i.id === openId) ?? null;
 

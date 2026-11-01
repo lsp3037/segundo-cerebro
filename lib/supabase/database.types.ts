@@ -1606,6 +1606,18 @@ export type Database = {
     }
     Functions: {
       immutable_unaccent: { Args: { "": string }; Returns: string }
+      search_all: {
+        Args: { max_results?: number; q: string }
+        Returns: {
+          area_id: string
+          folder_id: string
+          id: string
+          kind: string
+          snippet: string
+          title: string
+          updated_at: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
