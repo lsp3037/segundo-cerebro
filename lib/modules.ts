@@ -16,6 +16,7 @@ export const FOLDER_MODULES = [
   "service_flows",
   "reply_assistant",
   "finance",
+  "marketing_director",
 ] as const;
 
 export type FolderModule = (typeof FOLDER_MODULES)[number];
@@ -34,6 +35,12 @@ export const MODULES: Record<FolderModule, { label: string; icon: string; phase:
   service_flows: { label: "Fluxos de atendimento", icon: "workflow", phase: 4, description: "Etapas, perguntas, mensagens-modelo e objeções por serviço." },
   reply_assistant: { label: "Assistente de respostas", icon: "message-square-text", phase: 4, description: "Sugestões de resposta para leads e clientes." },
   finance: { label: "Finanças", icon: "wallet", phase: 5, description: "Entradas, saídas, saldo e lucro por notebook." },
+  marketing_director: {
+    label: "Diretoria de Marketing",
+    icon: "megaphone",
+    phase: 4,
+    description: "Planejador de conteúdo, campanhas, matriz de ângulos e Meta Ads.",
+  },
 };
 
 // Abas da barra superior.

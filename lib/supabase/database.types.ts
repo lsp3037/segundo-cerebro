@@ -176,6 +176,74 @@ export type Database = {
           },
         ]
       }
+      campaign_angles: {
+        Row: {
+          asset_url: string | null
+          body_copy: string | null
+          call_to_action: string | null
+          campaign_id: string
+          created_at: string
+          creative_format: string
+          deleted_at: string | null
+          headline: string | null
+          hook_angle: string
+          id: string
+          meta_ad_id: string | null
+          metrics_cached: Json
+          status: string
+          target_avatar: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_url?: string | null
+          body_copy?: string | null
+          call_to_action?: string | null
+          campaign_id: string
+          created_at?: string
+          creative_format?: string
+          deleted_at?: string | null
+          headline?: string | null
+          hook_angle?: string
+          id?: string
+          meta_ad_id?: string | null
+          metrics_cached?: Json
+          status?: string
+          target_avatar?: string | null
+          title: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          asset_url?: string | null
+          body_copy?: string | null
+          call_to_action?: string | null
+          campaign_id?: string
+          created_at?: string
+          creative_format?: string
+          deleted_at?: string | null
+          headline?: string | null
+          hook_angle?: string
+          id?: string
+          meta_ad_id?: string | null
+          metrics_cached?: Json
+          status?: string
+          target_avatar?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_angles_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_chunks: {
         Row: {
           area_id: string | null
@@ -228,6 +296,7 @@ export type Database = {
       }
       content_ideas: {
         Row: {
+          campaign_angle_id: string | null
           created_at: string
           deleted_at: string | null
           folder_id: string | null
@@ -237,6 +306,7 @@ export type Database = {
           notes: string | null
           pillar_id: string | null
           references: Json
+          script_data: Json
           search: unknown
           status: string
           tags: string[]
@@ -245,6 +315,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          campaign_angle_id?: string | null
           created_at?: string
           deleted_at?: string | null
           folder_id?: string | null
@@ -254,6 +325,7 @@ export type Database = {
           notes?: string | null
           pillar_id?: string | null
           references?: Json
+          script_data?: Json
           search?: unknown
           status?: string
           tags?: string[]
@@ -262,6 +334,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
+          campaign_angle_id?: string | null
           created_at?: string
           deleted_at?: string | null
           folder_id?: string | null
@@ -271,6 +344,7 @@ export type Database = {
           notes?: string | null
           pillar_id?: string | null
           references?: Json
+          script_data?: Json
           search?: unknown
           status?: string
           tags?: string[]
@@ -279,6 +353,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "content_ideas_campaign_angle_id_fkey"
+            columns: ["campaign_angle_id"]
+            isOneToOne: false
+            referencedRelation: "campaign_angles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "content_ideas_folder_id_fkey"
             columns: ["folder_id"]
@@ -863,6 +944,133 @@ export type Database = {
             columns: ["note_id"]
             isOneToOne: false
             referencedRelation: "notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketing_campaigns: {
+        Row: {
+          budget_daily_cents: number
+          budget_total_cents: number
+          created_at: string
+          deleted_at: string | null
+          end_date: string | null
+          folder_id: string | null
+          id: string
+          meta_campaign_id: string | null
+          name: string
+          notes: string | null
+          objective: string
+          start_date: string
+          status: string
+          target_audience: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget_daily_cents?: number
+          budget_total_cents?: number
+          created_at?: string
+          deleted_at?: string | null
+          end_date?: string | null
+          folder_id?: string | null
+          id?: string
+          meta_campaign_id?: string | null
+          name: string
+          notes?: string | null
+          objective?: string
+          start_date: string
+          status?: string
+          target_audience?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          budget_daily_cents?: number
+          budget_total_cents?: number
+          created_at?: string
+          deleted_at?: string | null
+          end_date?: string | null
+          folder_id?: string | null
+          id?: string
+          meta_campaign_id?: string | null
+          name?: string
+          notes?: string | null
+          objective?: string
+          start_date?: string
+          status?: string
+          target_audience?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketing_campaigns_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_ads_metrics: {
+        Row: {
+          campaign_id: string | null
+          clicks: number
+          conversions: number
+          cost_per_conversion_cents: number
+          cpc_cents: number
+          created_at: string
+          ctr: number
+          date_reported: string
+          id: string
+          impressions: number
+          meta_ad_id: string | null
+          meta_campaign_id: string
+          raw_data: Json
+          spend_cents: number
+          user_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          clicks?: number
+          conversions?: number
+          cost_per_conversion_cents?: number
+          cpc_cents?: number
+          created_at?: string
+          ctr?: number
+          date_reported: string
+          id?: string
+          impressions?: number
+          meta_ad_id?: string | null
+          meta_campaign_id: string
+          raw_data?: Json
+          spend_cents?: number
+          user_id?: string
+        }
+        Update: {
+          campaign_id?: string | null
+          clicks?: number
+          conversions?: number
+          cost_per_conversion_cents?: number
+          cpc_cents?: number
+          created_at?: string
+          ctr?: number
+          date_reported?: string
+          id?: string
+          impressions?: number
+          meta_ad_id?: string | null
+          meta_campaign_id?: string
+          raw_data?: Json
+          spend_cents?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_ads_metrics_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_campaigns"
             referencedColumns: ["id"]
           },
         ]

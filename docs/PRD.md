@@ -58,7 +58,7 @@ Consequências para o produto:
 - **Árvore lateral por área**, com pastas personalizáveis (criar, renomear, reordenar, subpastas):
   - Profissional › Demandas · Reuniões
   - Pessoal › Demandas · Rotina · Coisas a aprender
-  - Trust Care › Atalhos · Ideias de Conteúdo · Planejamento de Publicações · Repositório da Empresa · Fluxos de Atendimento · Assistente de Respostas
+  - Trust Care › Atalhos · Diretoria de Marketing (Conteúdo, Campanhas, Meta Ads) · Ideias de Conteúdo · Planejamento de Publicações · Repositório da Empresa · Fluxos de Atendimento · Assistente de Respostas
   - Finanças › Pessoal · Trust Care
 - Visual neutro, tema claro e escuro, e uma cor de destaque por área.
 
@@ -140,6 +140,11 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 ### 7.15 PWA ⏳ Fase 6
 - Instalável no celular, para consulta e captura.
 
+### 7.16 Diretoria de Marketing (Trust Care) ✅ Fase 4
+- **Planejador de Conteúdo:** Roteirização rica em 3 formatos: Reels (Gancho 3s, Retenção em bancada, CTA), Stories (Sequência em 4 quadros com enquetes/links) e Carrosséis (Slide a slide com gancho visual). Integração com IA para geração de ideias e roteiros.
+- **Campanhas e Matriz de Ângulos:** Agendamento cronológico de campanhas com orçamento em centavos, datas no fuso de Cuiabá, público-alvo e Matriz de Ângulos de copy/anúncios (Dor/Lentidão, Custo-benefício de Upgrade, Confiança/Garantia, etc.).
+- **Analisador Meta Ads com MCP e IA:** Painel de KPIs de tráfego pago (Spend, Cliques, CTR, CPC, Leads de WhatsApp, CPL), integração via MCP Meta Ads e diagnóstico executivo gerado por IA com recomendações táticas.
+
 ## 8. Roadmap
 
 | Fase | Conteúdo | Situação |
@@ -164,6 +169,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-01 | O resumo de O.S. vem da API do Gerenciador, com chave só de leitura. "Atrasada" = aberta há mais de 7 dias. |
 | 2026-11-01 | O calendário de publicações principal é o do Segundo Cérebro. |
 | 2026-11-02 | O Assistente de Respostas aceita prints de conversas (Ctrl+V ou upload), analisados diretamente pelo Gemini com visão multimodal. |
+| 2026-11-02 | Criação da Diretoria de Marketing na Trust Care: Planejador de Conteúdo (Reels, Stories, Carrosséis), Matriz de Ângulos de Anúncios e Analisador Meta Ads via MCP com IA. |
 
 ## 10. Pendências e riscos
 

@@ -55,6 +55,10 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [ ] Publicações: clicar num dia cria a publicação, mudar status e ver no funil.
 - [ ] Fluxos: editar etapas, mensagens-modelo (copiar) e objeções.
 - [ ] Assistente: colar print via Ctrl+V ou upload de imagem (ou texto). O Gemini analisa o atendimento, gera 2 a 3 respostas para o WhatsApp, "Copiar" e salva o print no histórico.
+- [ ] Diretoria de Marketing: acessar a pasta e testar:
+  - [ ] Planejador de Conteúdo: criar roteiro de Reel, sequência de Stories em 4 atos e Carrossel; testar "Gerar com IA".
+  - [ ] Campanhas & Ângulos: cadastrar campanha com orçamento e datas; criar ângulos de teste e usar "Sugerir com IA".
+  - [ ] Analisador Meta Ads: visualizar KPIs (Spend, Cliques, CTR, CPC, Leads, CPL); testar botão de sincronização e diagnóstico da IA.
 
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 

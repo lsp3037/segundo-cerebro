@@ -17,9 +17,11 @@ import { FlowsBoard } from "@/components/trustcare/flows-board";
 import { PublicationsBoard } from "@/components/trustcare/publications-board";
 import { ReplyAssistant } from "@/components/trustcare/reply-assistant";
 import { ShortcutsBoard } from "@/components/trustcare/shortcuts-board";
+import { MarketingDirectorHub } from "@/components/trustcare/marketing/marketing-director-hub";
 import { isAiConfigured } from "@/lib/ai";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
+import { getMarketingCampaigns, getCampaignAngles, getMetaAdsMetrics, getMarketingContentScripts } from "@/lib/data/marketing";
 import { getNotes } from "@/lib/data/notes";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
@@ -128,6 +130,24 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           initialCases={cases}
           flows={flows.filter((f) => f.active).map(({ id, name }) => ({ id, name }))}
           aiReady={isAiConfigured() && area.ai_enabled}
+        />
+      );
+      break;
+    }
+    case "marketing_director": {
+      const [campaigns, angles, metrics, scripts] = await Promise.all([
+        getMarketingCampaigns(filter),
+        getCampaignAngles(),
+        getMetaAdsMetrics(),
+        getMarketingContentScripts(filter),
+      ]);
+      content = (
+        <MarketingDirectorHub
+          folder={folder}
+          initialCampaigns={campaigns}
+          initialAngles={angles}
+          initialMetrics={metrics}
+          initialScripts={scripts}
         />
       );
       break;
