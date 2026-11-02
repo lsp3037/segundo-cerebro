@@ -18,13 +18,115 @@ export type CampaignDiagnosticReport = {
   status_badge: "healthy" | "attention" | "optimizing";
 };
 
+async function getStoredMetaSettings(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("settings")
+    .eq("user_id", userId)
+    .single();
+
+  const settings = (profile?.settings as Record<string, unknown>)?.meta_ads as
+    | {
+        ad_account_id?: string;
+        access_token?: string;
+        token_updated_at?: string;
+        account_name?: string;
+      }
+    | undefined;
+
+  return settings;
+}
+
+export async function getMetaAdsCredentials(): Promise<{
+  adAccountId: string | null;
+  accessTokenMasked: string | null;
+  tokenUpdatedAt: string | null;
+  accountName: string | null;
+  isConfigured: boolean;
+  isLive: boolean;
+}> {
+  const user = await getCurrentUser();
+  const supabase = await createClient();
+  const settings = await getStoredMetaSettings(supabase, user.id);
+
+  const adAccountId = settings?.ad_account_id || process.env.META_AD_ACCOUNT_ID || null;
+  const token = settings?.access_token || process.env.META_ACCESS_TOKEN || null;
+
+  return {
+    adAccountId,
+    accessTokenMasked: token ? `${token.slice(0, 10)}...${token.slice(-6)}` : null,
+    tokenUpdatedAt: settings?.token_updated_at || null,
+    accountName: settings?.account_name || null,
+    isConfigured: Boolean(adAccountId && token),
+    isLive: Boolean(adAccountId && token),
+  };
+}
+
+export async function saveMetaAdsCredentials(input: {
+  adAccountId: string;
+  accessToken: string;
+}): Promise<ActionResult<{ accountName?: string }>> {
+  const user = await getCurrentUser();
+  const rawId = input.adAccountId.trim();
+  const adAccountId = rawId.startsWith("act_") ? rawId : `act_${rawId.replace(/^act=?/i, "")}`;
+  const accessToken = input.accessToken.trim();
+
+  if (!adAccountId || adAccountId.length < 5) return fail("ID da conta de anúncios inválido (ex.: act_1671912470896313).");
+  if (!accessToken || accessToken.length < 20) return fail("Token de acesso inválido ou muito curto.");
+
+  // Validação ao vivo na Graph API da Meta
+  try {
+    const testUrl = `https://graph.facebook.com/v21.0/${adAccountId}?fields=name,account_status,currency&access_token=${accessToken}`;
+    const testRes = await fetch(testUrl, { headers: { Accept: "application/json" } });
+    const testJson = await testRes.json();
+
+    if (!testRes.ok || testJson.error) {
+      const msg = testJson.error?.message || "Não foi possível validar o token na Meta.";
+      return fail(`A Meta rejeitou o token: ${msg}`);
+    }
+
+    const accountName = testJson.name || "Conta Trust Care Meta Ads";
+
+    const supabase = await createClient();
+    const { data: currentProfile } = await supabase
+      .from("profiles")
+      .select("settings")
+      .eq("user_id", user.id)
+      .single();
+
+    const currentSettings = (currentProfile?.settings as Record<string, unknown>) || {};
+    const newSettings = {
+      ...currentSettings,
+      meta_ads: {
+        ad_account_id: adAccountId,
+        access_token: accessToken,
+        token_updated_at: new Date().toISOString(),
+        account_name: accountName,
+      },
+    };
+
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ user_id: user.id, settings: newSettings });
+
+    if (error) return fail("Erro ao salvar no banco de dados.");
+
+    revalidatePath("/", "layout");
+    return ok({ accountName });
+  } catch (err) {
+    console.error("Erro ao testar credenciais da Meta:", err);
+    return fail("Erro ao conectar à API da Meta. Verifique o token e tente novamente.");
+  }
+}
+
 /**
  * Busca métricas do Meta Ads através do client de integração,
  * grava em `meta_ads_metrics` e atualiza o cache `metrics_cached` dos ângulos correspondentes.
  */
 export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionResult<{ syncedCount: number }>> {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   const supabase = await createClient();
+  const metaSettings = await getStoredMetaSettings(supabase, user.id);
 
   // 1. Busca as campanhas para sincronizar
   let campaignsQuery = supabase
@@ -90,7 +192,7 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
     }
   }
 
-  const metaClient = getMetaAdsClient();
+  const metaClient = getMetaAdsClient(metaSettings);
   let totalInserted = 0;
 
   for (const campaign of campaigns) {

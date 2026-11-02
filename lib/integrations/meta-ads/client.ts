@@ -246,13 +246,15 @@ function createDirectMetaAdsClient(accessToken: string, adAccountId: string): Me
   };
 }
 
-export function isMetaAdsConfigured(): boolean {
-  return Boolean(process.env.META_ACCESS_TOKEN && process.env.META_AD_ACCOUNT_ID);
+export function isMetaAdsConfigured(customConfig?: { access_token?: string; ad_account_id?: string }): boolean {
+  const token = customConfig?.access_token || process.env.META_ACCESS_TOKEN;
+  const accountId = customConfig?.ad_account_id || process.env.META_AD_ACCOUNT_ID;
+  return Boolean(token && accountId);
 }
 
-export function getMetaAdsClient(): MetaAdsClient {
-  const token = process.env.META_ACCESS_TOKEN;
-  const accountId = process.env.META_AD_ACCOUNT_ID;
+export function getMetaAdsClient(customConfig?: { access_token?: string; ad_account_id?: string }): MetaAdsClient {
+  const token = customConfig?.access_token || process.env.META_ACCESS_TOKEN;
+  const accountId = customConfig?.ad_account_id || process.env.META_AD_ACCOUNT_ID;
 
   if (token && accountId) {
     return createDirectMetaAdsClient(token, accountId);
