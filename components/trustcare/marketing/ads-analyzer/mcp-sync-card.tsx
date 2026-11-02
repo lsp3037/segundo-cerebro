@@ -1,10 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
+import { HelpCircleIcon, KeyIcon, RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { syncMetaAdsMetrics } from "@/lib/actions/meta-ads-sync";
 import { todayIso } from "@/lib/dates";
 
@@ -15,22 +23,23 @@ interface McpSyncCardProps {
 export function McpSyncCard({ onSyncComplete }: McpSyncCardProps) {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(todayIso());
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const handleSync = async () => {
     setSyncing(true);
-    toast.info("Iniciando conexão com MCP Meta Ads...");
+    toast.info("Sincronizando métricas de anúncios...");
 
     try {
       const res = await syncMetaAdsMetrics();
       if (res.ok) {
         setLastSync(todayIso());
-        toast.success(`Sincronização concluída! ${res.data.syncedCount} registros atualizados.`);
+        toast.success(`Sincronização concluída! ${res.data.syncedCount} métricas atualizadas.`);
         if (onSyncComplete) onSyncComplete();
       } else {
         toast.error(res.error);
       }
     } catch {
-      toast.error("Falha ao comunicar com o servidor MCP Meta Ads.");
+      toast.error("Falha ao comunicar com o conector Meta Ads.");
     } finally {
       setSyncing(false);
     }
@@ -58,11 +67,59 @@ export function McpSyncCard({ onSyncComplete }: McpSyncCardProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5">
+                <HelpCircleIcon className="size-3.5" />
+                Como Configurar
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <KeyIcon className="size-4 text-orange-600" />
+                  Configuração do Meta Ads / MCP
+                </DialogTitle>
+                <DialogDescription>
+                  Para conectar sua conta real de anúncios da Trust Care (Facebook / Instagram Ads):
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <p className="font-semibold text-foreground text-xs">
+                    1. Gerar o Token de Acesso (Meta for Developers):
+                  </p>
+                  <ol className="list-decimal pl-4 space-y-1">
+                    <li>Acesse <a href="https://developers.facebook.com" target="_blank" rel="noreferrer" className="underline text-foreground">developers.facebook.com</a>.</li>
+                    <li>Crie um aplicativo do tipo <strong>Negócios</strong> (Business) e adicione o produto <strong>Marketing API</strong>.</li>
+                    <li>Gere um Token de Acesso de Sistema com a permissão <code className="bg-muted px-1 rounded">ads_read</code>.</li>
+                  </ol>
+                </div>
+
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                  <p className="font-semibold text-foreground text-xs">
+                    2. Adicionar as variáveis no arquivo <code className="bg-muted px-1 rounded">.env.local</code> e na Vercel:
+                  </p>
+                  <pre className="bg-black/80 text-emerald-400 p-2.5 rounded font-mono text-[11px] overflow-x-auto whitespace-pre">
+{`META_ACCESS_TOKEN="EAAG..."
+META_AD_ACCOUNT_ID="act_1234567890"`}
+                  </pre>
+                </div>
+
+                <p className="text-[11px]">
+                  💡 <em>Enquanto você não adiciona as chaves reais, o sistema funciona com dados simulados realistas calibrados para Cuiabá e Várzea Grande, permitindo testar diagnósticos de IA e matriz de ângulos.</em>
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {lastSync && (
-            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+            <span className="text-[11px] text-muted-foreground hidden lg:inline">
               Última sincronização: <strong>Hoje</strong>
             </span>
           )}
+
           <Button
             type="button"
             onClick={handleSync}
