@@ -14,6 +14,7 @@ import {
   formatCentsToBrl,
   formatPercent,
 } from "../meta";
+import { MetaDatePicker, type MetaDateRangeValue } from "./meta-date-picker";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 
@@ -26,6 +27,8 @@ interface AdsManagerViewProps {
   angles: Angle[];
   metrics: Metric[];
   adsets?: MetaRealAdSet[];
+  dateRange?: MetaDateRangeValue;
+  onDateRangeChange?: (value: MetaDateRangeValue) => void;
 }
 
 export function AdsManagerView({
@@ -33,6 +36,8 @@ export function AdsManagerView({
   angles,
   metrics,
   adsets = [],
+  dateRange,
+  onDateRangeChange,
 }: AdsManagerViewProps) {
   // Nível ativo: 'campaigns' | 'adsets' | 'ads'
   const [currentLevel, setCurrentLevel] = useState<"campaigns" | "adsets" | "ads">("campaigns");
@@ -177,18 +182,40 @@ export function AdsManagerView({
   );
 
   // Helper de métricas por Anúncio
-  const getMetricsForAd = useCallback((angle: Angle) => {
-    const cached = (angle.metrics_cached as Record<string, number | undefined> | null) || {};
-    const spend = cached.spend_cents ?? 0;
-    const impressions = cached.impressions ?? 0;
-    const clicks = cached.clicks ?? 0;
-    const leads = cached.leads ?? cached.conversions ?? 0;
-    const ctr = cached.ctr ?? (impressions > 0 ? (clicks / impressions) * 100 : 0);
-    const cpc = cached.cpc_cents ?? (clicks > 0 ? Math.round(spend / clicks) : 0);
-    const cpl = cached.cpl_cents ?? (leads > 0 ? Math.round(spend / leads) : 0);
+  const getMetricsForAd = useCallback(
+    (angle: Angle) => {
+      const matching = metrics.filter(
+        (m) => angle.meta_ad_id && m.meta_ad_id === angle.meta_ad_id
+      );
 
-    return { spend, impressions, clicks, ctr, cpc, leads, cpl };
-  }, []);
+      let spend = 0;
+      let impressions = 0;
+      let clicks = 0;
+      let leads = 0;
+
+      if (matching.length > 0) {
+        for (const m of matching) {
+          spend += m.spend_cents;
+          impressions += m.impressions;
+          clicks += m.clicks;
+          leads += m.conversions;
+        }
+      } else {
+        const cached = (angle.metrics_cached as Record<string, number | undefined> | null) || {};
+        spend = cached.spend_cents ?? 0;
+        impressions = cached.impressions ?? 0;
+        clicks = cached.clicks ?? 0;
+        leads = cached.leads ?? cached.conversions ?? 0;
+      }
+
+      const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+      const cpc = clicks > 0 ? Math.round(spend / clicks) : 0;
+      const cpl = leads > 0 ? Math.round(spend / leads) : 0;
+
+      return { spend, impressions, clicks, ctr, cpc, leads, cpl };
+    },
+    [metrics]
+  );
 
   // Filtragem de Campanhas
   const filteredCampaigns = useMemo(() => {
@@ -427,9 +454,16 @@ export function AdsManagerView({
           </div>
         </div>
 
-        <div className="text-[11px] text-muted-foreground flex items-center gap-1 self-end sm:self-auto">
-          <span>Últimos 30 dias (Cuiabá)</span>
-        </div>
+        {dateRange && onDateRangeChange ? (
+          <MetaDatePicker
+            value={dateRange}
+            onChange={onDateRangeChange}
+          />
+        ) : (
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1 self-end sm:self-auto">
+            <span>Últimos 30 dias (Cuiabá)</span>
+          </div>
+        )}
       </div>
 
       {/* 3. TABELA DE NÍVEIS COM O LAYOUT EXATO DO GERENCIADOR DE ANÚNCIOS */}

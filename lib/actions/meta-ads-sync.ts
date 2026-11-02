@@ -11,12 +11,14 @@ import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
 
 export type CampaignDiagnosticReport = {
+  analysis_type?: "general" | "sobral";
   executive_summary: string;
   best_angle_name: string;
   recommended_actions: string[];
   budget_adjustment_suggestion: string;
   fatigued_creatives: string[];
   status_badge: "healthy" | "attention" | "optimizing";
+  commercial_funnel_notes?: string;
 };
 
 async function getStoredMetaSettings(supabase: Awaited<ReturnType<typeof createClient>>, userId: string) {
@@ -222,11 +224,27 @@ export async function getStoredMetaAdSets(): Promise<MetaRealAdSet[]> {
   }
 }
 
+export type MetaSyncOptions = {
+  campaignId?: string;
+  datePreset?: string;
+  since?: string;
+  until?: string;
+};
+
 /**
  * Busca campanhas, conjuntos de anúncios, anúncios e métricas diretamente da Meta Graph API,
  * grava no banco e atualiza os caches dos ângulos correspondentes.
  */
-export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionResult<{ syncedCount: number; message?: string }>> {
+export async function syncMetaAdsMetrics(
+  campaignIdOrOptions?: string | MetaSyncOptions
+): Promise<ActionResult<{ syncedCount: number; message?: string }>> {
+  const options: MetaSyncOptions =
+    typeof campaignIdOrOptions === "string" ? { campaignId: campaignIdOrOptions } : campaignIdOrOptions || {};
+  const campaignId = options.campaignId;
+  const datePreset = options.datePreset;
+  const since = options.since;
+  const until = options.until;
+
   const user = await getCurrentUser();
   const supabase = await createClient();
   const metaSettings = await getStoredMetaSettings(supabase, user.id);
@@ -369,6 +387,9 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
     const campaignInsights = await metaClient.getCampaignInsights({
       campaignId,
       level: "campaign",
+      datePreset,
+      since,
+      until,
     });
     allInsights.push(...campaignInsights);
   } catch (insightErr) {
@@ -379,6 +400,9 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
     const adInsights = await metaClient.getCampaignInsights({
       campaignId,
       level: "ad",
+      datePreset,
+      since,
+      until,
     });
     allInsights.push(...adInsights);
   } catch (adInsightErr) {
@@ -464,6 +488,7 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
 
 /**
  * Análise consultiva com IA a partir de métricas consolidadas reais.
+ * Suporta a Visão Executiva Geral de Negócio e a Metodologia Tática de Pedro Sobral.
  */
 export async function analyzeCampaignsWithAi(data?: {
   totalSpendCents: number;
@@ -471,6 +496,8 @@ export async function analyzeCampaignsWithAi(data?: {
   totalLeads: number;
   avgCtr: number;
   topAngleTitle?: string | null;
+  analysisType?: "general" | "sobral";
+  periodLabel?: string;
 }): Promise<ActionResult<CampaignDiagnosticReport>> {
   await getCurrentUser();
 
@@ -490,60 +517,94 @@ export async function analyzeCampaignsWithAi(data?: {
   const ctr = data?.avgCtr ?? 0;
   const cplCents = leads > 0 ? Math.round(spendCents / leads) : 0;
   const topAngle = data?.topAngleTitle || null;
+  const analysisType = data?.analysisType || "general";
+  const periodLabel = data?.periodLabel || "Últimos 30 dias";
 
   const isZeroSpend = spendCents === 0 && clicks === 0;
 
   try {
     const ai = getAiProvider();
 
-    const prompt = isZeroSpend
-      ? `Você é Pedro Sobral — o maior especialista em tráfego pago do Brasil, mentor de mais de 40 mil gestores na Comunidade Subido.
-Você está prestando consultoria estratégica para o Luan, proprietário da Trust Care (assistência técnica de notebooks, MacBooks e computadores em Cuiabá e Várzea Grande - MT).
+    let system = "";
+    let prompt = "";
 
-CENÁRIO ATUAL:
-A conta do Meta Ads está conectada, mas NÃO possui campanhas veiculando ou gastos registrados nos últimos 30 dias (Gasto: R$ 0,00, Cliques: 0, Leads: 0, CTR: 0,00%).
+    if (analysisType === "general") {
+      system =
+        "Você é o Diretor Executivo de Marketing da Trust Care (assistência técnica líder em manutenção de notebooks, MacBooks e computadores em Cuiabá e Várzea Grande - MT). Foque em visão comercial, rentabilidade, ROI, funil de conversão no WhatsApp e atração de clientes para a oficina técnica.";
 
-DIRETRIZES DE PEDRO SOBRAL:
-1. "Vai lá e faz." Sem teoria vazia. Jedi vai pro campo de batalha e executa; Padawan só consome conteúdo e procrastina.
-2. "Criativo é o novo público." Em negócios locais, o gancho do vídeo (bancada da assistência, problema do notebook) atrai o cliente certo melhor que segmentação complexa de interesses.
-3. "Cada centavo investido é um teste."
-4. Campanha inicial em ABO (orçamento no conjunto) com foco direto em Mensagens de WhatsApp.
+      prompt = isZeroSpend
+        ? `CENÁRIO: A conta está sem veiculação de anúncios no período (${periodLabel}). (Gasto: R$ 0,00, Cliques: 0, Leads: 0).
+Diretrizes: Alinhe a importância de ativar campanhas locais em Cuiabá e VG (manutenção de notebook e upgrade de SSD) para manter a demanda da bancada contínua.
+Gere:
+1. executive_summary: 2 a 3 frases claras de recomendação de negócio para destravar o tráfego.
+2. best_angle_name: Oferta de maior apelo no mercado local (ex.: 'Upgrade de SSD & Manutenção Preventiva').
+3. recommended_actions: 3 ações estratégicas corporativas.
+4. budget_adjustment_suggestion: Verba mensal sugerida (ex.: R$ 25 a R$ 35/dia).
+5. fatigued_creatives: Alerta sobre o posicionamento perante a concorrência informal.
+6. status_badge: 'attention'.
+7. commercial_funnel_notes: Dica para o atendimento do balcão/Zap fechar mais orçamentos.`
+        : `DADOS CONSOLIDADOS DO NEGÓCIO (${periodLabel}):
+- Investimento em anúncios: R$ ${(spendCents / 100).toFixed(2)}
+- Cliques / Contatos: ${clicks}
+- Conversas iniciadas no WhatsApp: ${leads}
+- CTR médio: ${ctr.toFixed(2)}%
+- Custo por Mensagem (CPL): R$ ${(cplCents / 100).toFixed(2)}
+- Oferta / Ângulo Principal: "${topAngle || "Assistência Técnica Geral"}"
 
-Gere o Parecer de Ativação no seu estilo característico:
-1. Resumo executivo em 2 a 3 frases enérgicas, convocando o Luan a tirar o primeiro anúncio do papel hoje ("Vai lá e faz!").
-2. Nome do primeiro ângulo inaugural para testar (ex.: 'Vídeo Bancada: Notebook Travando no Home Office - Troca de SSD em Cuiabá').
-3. 3 ações práticas de tráfego para executar no Gerenciador de Anúncios esta semana.
-4. Sugestão de orçamento diário inicial para teste (ex.: R$ 20,00 a R$ 25,00/dia em ABO).
-5. Alerta do "Problema da Raposa" (não confiar cegamente em recomendações automáticas da Meta e garantir que o número de WhatsApp e raio de 15km de Cuiabá estejam calibrados).
-6. Status: "attention" (pois a conta ainda precisa ser ativada).`
-      : `Você é Pedro Sobral — o maior especialista em tráfego pago do Brasil, mentor da Comunidade Subido.
-Você está analisando os dados REAIS de tráfego pago da Trust Care em Cuiabá e Várzea Grande:
+DIRETRIZES DA DIRETORIA DE MARKETING:
+1. Avalie o ROI comparando o CPL de R$ ${(cplCents / 100).toFixed(2)} com o ticket médio da bancada (R$ 200 a R$ 600).
+2. Avalie o funil de atendimento: tempo de resposta da equipe e conversão de conversa em Ordem de Serviço (O.S.).
+3. Posicionamento da Trust Care como assistência técnica premium em Cuiabá.
 
-DADOS REAIS DA CONTA:
+Gere:
+1. executive_summary: Resumo executivo sobre tração comercial e retorno do investimento.
+2. best_angle_name: Serviço com maior rentabilidade e aderência de público.
+3. recommended_actions: 3 ações executivas de crescimento para este mês.
+4. budget_adjustment_suggestion: Sugestão de gestão e alocação de verba publicitária.
+5. fatigued_creatives: Gargalos potenciais no atendimento ou na mensagem.
+6. status_badge: 'healthy', 'attention' ou 'optimizing'.
+7. commercial_funnel_notes: Dica comercial direta para a recepção fechar mais serviços no Zap.`;
+    } else {
+      // Metodologia Pedro Sobral
+      system =
+        "Você é Pedro Sobral — O Ninja do Tráfego Pago. Use sua metodologia consagrada ('Vai lá e faz', 'Criativo é o novo público', 'Cada centavo é um teste', 'Estratégia do Passo Anterior'). Seja direto, enérgico, pragmático e 100% focado no lucro da assistência técnica em Cuiabá.";
+
+      prompt = isZeroSpend
+        ? `Você é Pedro Sobral prestando consultoria para o Luan na Trust Care (Cuiabá - MT).
+CENÁRIO: Sem anúncios rodando no período selecionado (${periodLabel}). (Gasto: R$ 0,00, Cliques: 0).
+Diretrizes: "Vai lá e faz", "Criativo é o novo público", ABO para teste inicial.
+Gere:
+1. executive_summary: Frases enérgicas convocando a colocar o primeiro anúncio no ar hoje ("Vai lá e faz!").
+2. best_angle_name: Ângulo inaugural de bancada (ex.: 'Vídeo Reel: Dobradiça Quebrada ou Notebook Travando').
+3. recommended_actions: 3 ações de tráfego para rodar no Gerenciador esta semana.
+4. budget_adjustment_suggestion: Verba inicial sugerida (R$ 20 a 25/dia em ABO).
+5. fatigued_creatives: Alerta do Problema da Raposa e raio de 15km de Cuiabá.
+6. status_badge: 'attention'.`
+        : `DADOS DA CONTA (${periodLabel}):
 - Gasto acumulado: R$ ${(spendCents / 100).toFixed(2)}
-- Total de cliques para WhatsApp: ${clicks}
-- Mensagens / Leads iniciados: ${leads}
-- CTR médio no link: ${ctr.toFixed(2)}%
-- Custo por Lead (CPL): R$ ${(cplCents / 100).toFixed(2)}
-- Melhor ângulo testado: "${topAngle || "Campanha Geral"}"
+- Cliques: ${clicks}
+- Conversas WhatsApp: ${leads}
+- CTR: ${ctr.toFixed(2)}%
+- CPL: R$ ${(cplCents / 100).toFixed(2)}
+- Ângulo testado: "${topAngle || "Campanha Geral"}"
 
-METODOLOGIA SOBRAL APLICADA:
-1. "Criativo é o novo público." Avalie se os criativos estão falando a dor real de quem tem PC/notebook estragado.
-2. "Cada centavo é um teste." Compare o CPL de R$ ${(cplCents / 100).toFixed(2)} com o ticket de serviços de informática em Cuiabá (upgrade de SSD R$ 250-450, reparo de dobradiça R$ 180-350, placa mãe R$ 350-800).
-3. "Estratégia do Passo Anterior": como usar públicos mornos (engajamento de Instagram) para baratear o custo por mensagem.
-4. "Problema da Raposa": cortar o que não gera mensagem real e escalar apenas o criativo vencedor em CBO.
+METODOLOGIA SOBRAL:
+1. "Criativo é o novo público": avalie os ganchos locais da assistência técnica.
+2. "Cada centavo é um teste": compare com o ticket médio em Cuiabá.
+3. "ABO para testar, CBO para escalar": momento de subir verba no criativo vencedor.
+4. "Problema da Raposa": cortar o ruim e escalar o que gera mensagem real.
 
-Forneça seu parecer executivo:
-1. Resumo executivo em 2 a 3 frases diretas, avaliando o ROI e a eficiência do tráfego.
-2. Nome do ângulo com maior potencial de escala.
-3. 3 ações cirúrgicas que o Luan deve executar no Gerenciador esta semana.
-4. Sugestão clara de verba (quando subir o orçamento no conjunto vencedor ou testar novos ganchos).
-5. Alerta de fadiga criativa ou saturação de público em Cuiabá.
-6. Status geral: healthy, attention ou optimizing.`;
+Gere:
+1. executive_summary: Parecer direto de tráfego pago.
+2. best_angle_name: Criativo com maior potencial de escala.
+3. recommended_actions: 3 ações cirúrgicas para o Gerenciador de Anúncios.
+4. budget_adjustment_suggestion: Ajuste de orçamento para o criativo vencedor.
+5. fatigued_creatives: Alerta de fadiga criativa ou saturação em Cuiabá.
+6. status_badge: healthy, attention ou optimizing.`;
+    }
 
     const report = await ai.generateJson<CampaignDiagnosticReport>({
-      system:
-        "Você é Pedro Sobral — O Ninja do Tráfego Pago. Use sua metodologia consagrada ('Vai lá e faz', 'Criativo é o novo público', 'Cada centavo é um teste', 'Estratégia do Passo Anterior'). Seja direto, enérgico, pragmático e 100% focado no lucro da assistência técnica em Cuiabá.",
+      system,
       prompt,
       schema: {
         type: "object",
@@ -554,6 +615,7 @@ Forneça seu parecer executivo:
           budget_adjustment_suggestion: { type: "string" },
           fatigued_creatives: { type: "array", items: { type: "string" } },
           status_badge: { type: "string", enum: ["healthy", "attention", "optimizing"] },
+          commercial_funnel_notes: { type: "string" },
         },
         required: [
           "executive_summary",
@@ -566,31 +628,34 @@ Forneça seu parecer executivo:
       },
     });
 
-    return ok(report);
+    return ok({ ...report, analysis_type: analysisType });
   } catch (err) {
     console.error("Erro na geração com IA:", err);
-    if (isZeroSpend) {
+    if (analysisType === "general") {
       return ok({
-        executive_summary:
-          "Sua conta do Meta Ads está pronta, mas enquanto o anúncio não estiver rodando você é um Padawan que sabe a teoria mas não executa. Jedi vai lá e faz: coloque a primeira campanha de WhatsApp no ar hoje mesmo em Cuiabá!",
-        best_angle_name: "Vídeo Reel Bancada: Dobradiça Quebrada ou Notebook Travando",
+        analysis_type: "general",
+        executive_summary: isZeroSpend
+          ? "As campanhas de marketing encontram-se sem veiculação no período selecionado. Para manter a bancada da Trust Care com demanda constante, recomendamos ativar campanhas de captação local com foco em manutenção e reparo de dobradiça."
+          : `Investimento consolidado de R$ ${(spendCents / 100).toFixed(2)} gerando ${leads} conversas de WhatsApp com custo por lead de R$ ${(cplCents / 100).toFixed(2)}. As campanhas apresentam tração comercial positiva em Cuiabá e Várzea Grande.`,
+        best_angle_name: topAngle || "Upgrade de SSD & Manutenção Preventiva",
         recommended_actions: [
-          "Subir 1 campanha ABO com objetivo direto de Mensagens no WhatsApp da Trust Care.",
-          "Gravar na própria bancada um vídeo vertical de 30 a 45 segundos mostrando um notebook sendo consertado.",
-          "Segmentar para pessoas em Cuiabá e Várzea Grande em raio de 15km sem restringir interesses (deixe o criativo filtrar).",
+          "Garantir tempo de resposta no WhatsApp de no máximo 5 minutos.",
+          "Oferecer diagnóstico rápido na bancada para aumentar a taxa de aprovação.",
+          "Manter campanhas com raio de 15km em Cuiabá e Várzea Grande.",
         ],
-        budget_adjustment_suggestion:
-          "Iniciar com R$ 20,00/dia no conjunto de teste. Cada centavo é um teste, avalie os primeiros 5 a 7 dias.",
-        fatigued_creatives: [
-          "Nenhum anúncio fadigado ainda (hora de destravar a primeira veiculação).",
-        ],
-        status_badge: "attention",
+        budget_adjustment_suggestion: "Alocar verba entre R$ 25,00 e R$ 35,00/dia para manter o fluxo diário de atendimentos.",
+        fatigued_creatives: ["Evitar anúncios institucionais sem oferta direta de dor."],
+        status_badge: isZeroSpend ? "attention" : "healthy",
+        commercial_funnel_notes: "A recepção deve enviar fotos da peça danificada e do processo de bancada, aumentando a confiança imediata do cliente.",
       });
     }
 
     return ok({
-      executive_summary: `Investimento acumulado de R$ ${(spendCents / 100).toFixed(2)} com CPL de R$ ${(cplCents / 100).toFixed(2)} por mensagem iniciada. O tráfego local da Trust Care está gerando oportunidade real de bancada.`,
-      best_angle_name: topAngle || "Campanha Principal Trust Care (Cuiabá)",
+      analysis_type: "sobral",
+      executive_summary: isZeroSpend
+        ? "Sua conta do Meta Ads está pronta, mas enquanto o anúncio não estiver rodando você é um Padawan que sabe a teoria mas não executa. Jedi vai lá e faz: coloque a primeira campanha de WhatsApp no ar hoje mesmo em Cuiabá!"
+        : `Investimento acumulado de R$ ${(spendCents / 100).toFixed(2)} com CPL de R$ ${(cplCents / 100).toFixed(2)} por mensagem iniciada. O tráfego local da Trust Care está gerando oportunidade real de bancada.`,
+      best_angle_name: topAngle || "Vídeo Reel Bancada: Dobradiça Quebrada ou Notebook Travando",
       recommended_actions: [
         "Dobrar a velocidade de resposta no WhatsApp: lead quente não espera mais de 5 minutos.",
         "Pausar anúncios com frequência acima de 3.0 para o público local de Cuiabá e VG.",
@@ -598,7 +663,7 @@ Forneça seu parecer executivo:
       ],
       budget_adjustment_suggestion: "Aumentar a verba do conjunto vencedor em 20% a cada 3 dias enquanto o CPL se mantiver saudável.",
       fatigued_creatives: ["Monitore a frequência no público local para evitar saturação da marca."],
-      status_badge: "optimizing",
+      status_badge: isZeroSpend ? "attention" : "optimizing",
     });
   }
 }

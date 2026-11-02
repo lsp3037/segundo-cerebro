@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   DollarSignIcon,
   MousePointerClickIcon,
@@ -14,6 +14,10 @@ import { formatCentsToBrl, formatPercent } from "../meta";
 import { McpSyncCard } from "./mcp-sync-card";
 import { AdsManagerView } from "./ads-manager-view";
 import { AiCampaignDiagnostics } from "./ai-campaign-diagnostics";
+import {
+  computeRangeForPreset,
+  type MetaDateRangeValue,
+} from "./meta-date-picker";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 
@@ -36,22 +40,42 @@ export function AdsAnalyzerDashboard({
   adsets = [],
   onRefreshMetrics,
 }: AdsAnalyzerDashboardProps) {
-  // Constrói totais agregados
+  // Filtro de período no padrão Meta Ads Manager
+  const [dateRange, setDateRange] = useState<MetaDateRangeValue>(() => {
+    const computed = computeRangeForPreset("last_30d");
+    return {
+      preset: "last_30d",
+      startDate: computed.startDate,
+      endDate: computed.endDate,
+      label: computed.label,
+    };
+  });
+
+  // Filtra métricas pelo período selecionado
+  const filteredMetrics = useMemo(() => {
+    if (!metrics || metrics.length === 0) return [];
+    return metrics.filter((m) => {
+      if (!m.date_reported) return true;
+      return m.date_reported >= dateRange.startDate && m.date_reported <= dateRange.endDate;
+    });
+  }, [metrics, dateRange]);
+
+  // Constrói totais agregados para o período
   const summary = useMemo(() => {
     let totalSpend = 0;
     let totalImpressions = 0;
     let totalClicks = 0;
     let totalLeads = 0;
 
-    if (metrics.length > 0) {
-      for (const m of metrics) {
+    if (filteredMetrics.length > 0) {
+      for (const m of filteredMetrics) {
         totalSpend += m.spend_cents;
         totalImpressions += m.impressions;
         totalClicks += m.clicks;
         totalLeads += m.conversions;
       }
     } else {
-      // Se não há métricas consolidadas na tabela de métricas, soma os caches dos ângulos reais
+      // Se não há métricas consolidadas na tabela filtrada, verifica se há métricas brutas ou soma os caches dos ângulos reais
       for (const a of angles) {
         const cached = (a.metrics_cached as Record<string, number | undefined> | null) || {};
         if (cached.spend_cents) totalSpend += cached.spend_cents;
@@ -74,7 +98,7 @@ export function AdsAnalyzerDashboard({
       avgCpc,
       avgCpl,
     };
-  }, [metrics, angles]);
+  }, [filteredMetrics, angles]);
 
   const topAngle = useMemo(() => {
     const winner = angles.find((a) => a.status === "winner");
@@ -85,8 +109,8 @@ export function AdsAnalyzerDashboard({
 
   return (
     <div className="space-y-6">
-      {/* Gatilho MCP Sync */}
-      <McpSyncCard onSyncComplete={onRefreshMetrics} />
+      {/* Gatilho MCP Sync com suporte ao período */}
+      <McpSyncCard onSyncComplete={onRefreshMetrics} dateRange={dateRange} />
 
       {/* Grid de KPIs de Destaque */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -99,7 +123,7 @@ export function AdsAnalyzerDashboard({
           <p className="text-lg font-bold text-foreground">
             {formatCentsToBrl(summary.totalSpend)}
           </p>
-          <span className="text-[10px] text-muted-foreground block">Últimos 30 dias</span>
+          <span className="text-[10px] text-muted-foreground block truncate">{dateRange.label}</span>
         </div>
 
         {/* Impressões */}
@@ -177,21 +201,24 @@ export function AdsAnalyzerDashboard({
         </div>
       </div>
 
-      {/* Visualização em Níveis (Campanhas, Conjuntos, Anúncios) no padrão Meta Ads Manager */}
+      {/* Visualização em Níveis (Campanhas, Conjuntos, Anúncios) no padrão Meta Ads Manager com filtro de período */}
       <AdsManagerView
         campaigns={campaigns}
         angles={angles}
-        metrics={metrics}
+        metrics={filteredMetrics.length > 0 ? filteredMetrics : metrics}
         adsets={adsets}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
       />
 
-      {/* Parecer Executivo de IA (Gemini) */}
+      {/* Parecer Consultivo de IA (Geral Executiva e Pedro Sobral) */}
       <AiCampaignDiagnostics
         totalSpendCents={summary.totalSpend}
         totalClicks={summary.totalClicks}
         totalLeads={summary.totalLeads}
         avgCtr={summary.avgCtr}
         topAngleTitle={topAngle}
+        periodLabel={dateRange.label}
       />
     </div>
   );

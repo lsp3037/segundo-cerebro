@@ -36,9 +36,15 @@ import { formatDateTime, todayIso } from "@/lib/dates";
 
 interface McpSyncCardProps {
   onSyncComplete?: () => void;
+  dateRange?: {
+    preset: string;
+    startDate: string;
+    endDate: string;
+    label: string;
+  };
 }
 
-export function McpSyncCard({ onSyncComplete }: McpSyncCardProps) {
+export function McpSyncCard({ onSyncComplete, dateRange }: McpSyncCardProps) {
   const [syncing, setSyncing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(todayIso());
@@ -140,7 +146,14 @@ export function McpSyncCard({ onSyncComplete }: McpSyncCardProps) {
     toast.info("Sincronizando campanhas, conjuntos e anúncios da Meta...");
 
     try {
-      const res = await syncMetaAdsMetrics();
+      const syncOptions = dateRange
+        ? {
+            datePreset: dateRange.preset,
+            since: dateRange.startDate,
+            until: dateRange.endDate,
+          }
+        : undefined;
+      const res = await syncMetaAdsMetrics(syncOptions);
       if (res.ok) {
         setLastSync(todayIso());
         if (res.data.syncedCount === 0 && res.data.message) {
