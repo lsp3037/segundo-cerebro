@@ -6,6 +6,7 @@ import { getAiProvider } from "@/lib/ai";
 import { assertAreaAllowsAi } from "@/lib/ai/guard";
 import { getCurrentUser } from "@/lib/auth";
 import { getMetaAdsClient } from "@/lib/integrations/meta-ads/client";
+import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
 
@@ -119,8 +120,20 @@ export async function saveMetaAdsCredentials(input: {
   }
 }
 
+export async function getStoredMetaAdSets(): Promise<MetaRealAdSet[]> {
+  const user = await getCurrentUser();
+  const supabase = await createClient();
+  const metaSettings = await getStoredMetaSettings(supabase, user.id);
+  const metaClient = getMetaAdsClient(metaSettings);
+  try {
+    return await metaClient.getAdSets();
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Busca campanhas, anúncios e métricas diretamente da Meta Graph API,
+ * Busca campanhas, conjuntos de anúncios, anúncios e métricas diretamente da Meta Graph API,
  * grava no banco e atualiza os caches dos ângulos correspondentes.
  */
 export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionResult<{ syncedCount: number; message?: string }>> {
@@ -134,13 +147,34 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
 
   const metaClient = getMetaAdsClient(metaSettings);
 
-  // 1. Consulta campanhas na Meta Graph API
+  // 0. Remove dados simulados de teste antigos caso existam
+  try {
+    await supabase.from("marketing_campaigns").delete().eq("meta_campaign_id", "meta_camp_tc_upgrade");
+    await supabase.from("campaign_angles").delete().in("meta_ad_id", ["meta_ad_dor_pc_lento", "meta_ad_custo_beneficio"]);
+    await supabase.from("meta_ads_metrics").delete().eq("meta_campaign_id", "meta_camp_tc_upgrade");
+  } catch (cleanErr) {
+    console.warn("Aviso ao limpar dados antigos:", cleanErr);
+  }
+
+  // 1. Consulta campanhas e conjuntos na Meta Graph API
   let remoteCampaigns: Awaited<ReturnType<typeof metaClient.getCampaigns>> = [];
   try {
     remoteCampaigns = await metaClient.getCampaigns();
   } catch (err) {
     console.error("Erro ao consultar campanhas da Meta:", err);
     return fail(`Erro da Meta API: ${(err as Error).message}`);
+  }
+
+  let remoteAdSets: Awaited<ReturnType<typeof metaClient.getAdSets>> = [];
+  try {
+    remoteAdSets = await metaClient.getAdSets(campaignId);
+  } catch (adSetErr) {
+    console.warn("Aviso ao buscar conjuntos de anúncios:", adSetErr);
+  }
+
+  const adsetMap = new Map<string, string>();
+  for (const s of remoteAdSets) {
+    adsetMap.set(s.id, s.name);
   }
 
   // Descobre a pasta da Diretoria de Marketing (Trust Care)
@@ -205,6 +239,8 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
             .eq("meta_ad_id", ad.id)
             .maybeSingle();
 
+          const adsetName = ad.adset_id ? adsetMap.get(ad.adset_id) || "Conjunto de Anúncios" : null;
+
           const anglePayload = {
             campaign_id: campaignDbId,
             title: ad.name,
@@ -213,6 +249,10 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
             meta_ad_id: ad.id,
             status: ad.status === "active" ? "testing" : "paused",
             user_id: user.id,
+            metrics_cached: {
+              adset_id: ad.adset_id || null,
+              adset_name: adsetName,
+            },
           };
 
           if (existingAngle) {

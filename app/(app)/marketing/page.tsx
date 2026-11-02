@@ -7,6 +7,7 @@ import {
   getMarketingContentScripts,
   getMetaAdsMetrics,
 } from "@/lib/data/marketing";
+import { getStoredMetaAdSets } from "@/lib/actions/meta-ads-sync";
 import type { Folder } from "@/lib/modules";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,11 +25,12 @@ export default async function MarketingPage() {
   const folderIds = folders?.map((f) => f.id) ?? [];
   const filter = folderIds.length > 0 ? { folderIds } : {};
 
-  const [campaigns, angles, metrics, scripts] = await Promise.all([
+  const [campaigns, angles, metrics, scripts, adsets] = await Promise.all([
     getMarketingCampaigns(filter),
     getCampaignAngles(),
     getMetaAdsMetrics(),
     getMarketingContentScripts(filter),
+    getStoredMetaAdSets(),
   ]);
 
   const virtualFolder: Folder = {
@@ -50,12 +52,13 @@ export default async function MarketingPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <MarketingDirectorHub
-        key={`${campaigns.length}-${angles.length}-${metrics.length}`}
+        key={`${campaigns.length}-${angles.length}-${metrics.length}-${adsets.length}`}
         folder={virtualFolder}
         initialCampaigns={campaigns}
         initialAngles={angles}
         initialMetrics={metrics}
         initialScripts={scripts}
+        initialAdSets={adsets}
       />
     </div>
   );

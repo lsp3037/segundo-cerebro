@@ -12,10 +12,10 @@ import {
 
 import { formatCentsToBrl, formatPercent } from "../meta";
 import { McpSyncCard } from "./mcp-sync-card";
-import { CampaignsPerformanceTable } from "./campaigns-performance-table";
+import { AdsManagerView } from "./ads-manager-view";
 import { AiCampaignDiagnostics } from "./ai-campaign-diagnostics";
-import { AnglePerformanceTable } from "./angle-performance-table";
 import type { Tables } from "@/lib/supabase/database.types";
+import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 
 type Campaign = Tables<"marketing_campaigns">;
 type Angle = Tables<"campaign_angles">;
@@ -25,6 +25,7 @@ interface AdsAnalyzerDashboardProps {
   campaigns: Campaign[];
   angles: Angle[];
   metrics: Metric[];
+  adsets?: MetaRealAdSet[];
   onRefreshMetrics?: () => void;
 }
 
@@ -32,6 +33,7 @@ export function AdsAnalyzerDashboard({
   campaigns,
   angles,
   metrics,
+  adsets = [],
   onRefreshMetrics,
 }: AdsAnalyzerDashboardProps) {
   // Constrói totais agregados
@@ -175,11 +177,12 @@ export function AdsAnalyzerDashboard({
         </div>
       </div>
 
-      {/* Tabela de Campanhas Ativas & KPIs Individuais */}
-      <CampaignsPerformanceTable
+      {/* Visualização em Níveis (Campanhas, Conjuntos, Anúncios) no padrão Meta Ads Manager */}
+      <AdsManagerView
         campaigns={campaigns}
         angles={angles}
         metrics={metrics}
+        adsets={adsets}
       />
 
       {/* Parecer Executivo de IA (Gemini) */}
@@ -190,9 +193,6 @@ export function AdsAnalyzerDashboard({
         avgCtr={summary.avgCtr}
         topAngleTitle={topAngle}
       />
-
-      {/* Tabela de Comparativo de Performance dos Ângulos */}
-      <AnglePerformanceTable angles={angles} campaigns={campaigns} />
     </div>
   );
 }

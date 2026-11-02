@@ -17,6 +17,7 @@ import { AnglesMatrix } from "./campaigns/angles-matrix";
 import { AdsAnalyzerDashboard } from "./ads-analyzer/ads-analyzer-dashboard";
 import type { Tables } from "@/lib/supabase/database.types";
 import type { Folder } from "@/lib/modules";
+import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 
 type Campaign = Tables<"marketing_campaigns">;
 type Angle = Tables<"campaign_angles">;
@@ -29,6 +30,7 @@ interface MarketingDirectorHubProps {
   initialAngles: Angle[];
   initialMetrics: Metric[];
   initialScripts: Idea[];
+  initialAdSets?: MetaRealAdSet[];
 }
 
 export function MarketingDirectorHub({
@@ -37,6 +39,7 @@ export function MarketingDirectorHub({
   initialAngles,
   initialMetrics,
   initialScripts,
+  initialAdSets = [],
 }: MarketingDirectorHubProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"planner" | "campaigns" | "analyzer">("planner");
@@ -228,6 +231,7 @@ export function MarketingDirectorHub({
           campaigns={campaigns}
           angles={angles}
           metrics={metrics}
+          adsets={initialAdSets}
           onRefreshMetrics={() => {
             router.refresh();
           }}
