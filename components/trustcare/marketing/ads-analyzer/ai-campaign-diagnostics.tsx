@@ -7,7 +7,7 @@ import {
   AlertTriangleIcon,
   TrophyIcon,
   CheckCircle2Icon,
-  BriefcaseIcon,
+  BarChart3Icon,
   ZapIcon,
   MessageSquareIcon,
 } from "lucide-react";
@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   analyzeCampaignsWithAi,
   type CampaignDiagnosticReport,
+  type CampaignSummaryInput,
 } from "@/lib/actions/meta-ads-sync";
 
 interface AiCampaignDiagnosticsProps {
@@ -27,6 +28,7 @@ interface AiCampaignDiagnosticsProps {
   avgCtr: number;
   topAngleTitle?: string;
   periodLabel?: string;
+  campaigns?: CampaignSummaryInput[];
 }
 
 export function AiCampaignDiagnostics({
@@ -36,6 +38,7 @@ export function AiCampaignDiagnostics({
   avgCtr,
   topAngleTitle,
   periodLabel = "Últimos 30 dias",
+  campaigns = [],
 }: AiCampaignDiagnosticsProps) {
   const [activeTab, setActiveTab] = useState<"general" | "sobral">("general");
   const [generalReport, setGeneralReport] = useState<CampaignDiagnosticReport | null>(null);
@@ -46,7 +49,7 @@ export function AiCampaignDiagnostics({
 
   const handleGenerate = async (typeToGenerate = activeTab) => {
     setLoading(true);
-    const label = typeToGenerate === "general" ? "Visão Executiva Geral" : "Metodologia Pedro Sobral";
+    const label = typeToGenerate === "general" ? "Análise Geral das Campanhas" : "Metodologia Pedro Sobral";
     toast.info(`Gerando ${label} para ${periodLabel}...`);
 
     try {
@@ -58,6 +61,7 @@ export function AiCampaignDiagnostics({
         topAngleTitle,
         analysisType: typeToGenerate,
         periodLabel,
+        campaigns,
       });
 
       if (res.ok) {
@@ -91,7 +95,7 @@ export function AiCampaignDiagnostics({
               <span className="text-[11px] text-muted-foreground">({periodLabel})</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Alterne entre a visão estratégica da diretoria e a metodologia tática de tráfego pago.
+              Análise factual baseada estritamente nas campanhas reais cadastradas na conta.
             </p>
           </div>
         </div>
@@ -108,8 +112,8 @@ export function AiCampaignDiagnostics({
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <BriefcaseIcon className="size-3.5 text-blue-500" />
-              Visão Geral Executiva
+              <BarChart3Icon className="size-3.5 text-blue-500" />
+              Análise Geral da Conta
             </button>
             <button
               type="button"
@@ -144,11 +148,11 @@ export function AiCampaignDiagnostics({
           <p className="text-sm text-muted-foreground max-w-lg mx-auto">
             {activeTab === "general" ? (
               <>
-                Clique em <strong>Gerar Análise</strong> para ver a <strong>Visão Geral Executiva</strong>: retorno sobre investimento (ROI), funil de mensagens no WhatsApp, conversão em Ordens de Serviço (O.S.) e direcionamento comercial para a Trust Care em Cuiabá.
+                Clique em <strong>Gerar Análise</strong> para ver a leitura factual das suas campanhas reais: desempenho da campanha ativa de Dobradiça, histórico da campanha Trust Care, custo por clique (CPC) e conversas de WhatsApp.
               </>
             ) : (
               <>
-                Clique em <strong>Gerar Análise</strong> para ver a <strong>Metodologia Pedro Sobral</strong>: testes de criativo como filtro de público, validação de ganchos de bancada, estratégias ABO vs CBO e cortes rápidos de desperdício.
+                Clique em <strong>Gerar Análise</strong> para ver a <strong>Metodologia Pedro Sobral</strong> aplicada às suas campanhas: validação de ganchos em Cuiabá, volume de cliques e diretriz prática de orçamento.
               </>
             )}
           </p>
@@ -171,8 +175,8 @@ export function AiCampaignDiagnostics({
               >
                 {activeTab === "general" ? (
                   <>
-                    <BriefcaseIcon className="size-3.5" />
-                    Parecer Executivo de Negócio & Diretoria
+                    <BarChart3Icon className="size-3.5" />
+                    Diagnóstico Geral das Campanhas Reais
                   </>
                 ) : (
                   <>
@@ -196,19 +200,19 @@ export function AiCampaignDiagnostics({
 
           {/* Cards de Métricas e Recomendações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Oferta / Ângulo Principal */}
+            {/* Campanha em Destaque */}
             <div className="rounded-lg border bg-card p-3.5 space-y-1.5">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <TrophyIcon className="size-3.5 text-emerald-500" />
-                {activeTab === "general" ? "Oferta de Maior Demanda Local" : "Criativo Campeão (Novo Público)"}
+                {activeTab === "general" ? "Campanha em Destaque" : "Criativo Campeão (Novo Público)"}
               </span>
               <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
                 {currentReport.best_angle_name}
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {activeTab === "general"
-                  ? "Serviço com alto ticket e excelente percepção de valor pelos clientes de Cuiabá e Várzea Grande."
-                  : "Criativo que melhor segmentou o público qualificado de Cuiabá com menor custo por mensagem no WhatsApp."}
+                  ? "Campanha com veiculação ativa ou maior tração histórica identificada na conta."
+                  : "Criativo que melhor segmentou o público de Cuiabá com menor custo por mensagem no WhatsApp."}
               </p>
             </div>
 
@@ -216,7 +220,7 @@ export function AiCampaignDiagnostics({
             <div className="rounded-lg border bg-card p-3.5 space-y-1.5">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUpIcon className="size-3.5 text-blue-500" />
-                {activeTab === "general" ? "Alocação de Verba & ROI" : "Diretriz de Orçamento (ABO vs CBO)"}
+                {activeTab === "general" ? "Gestão do Orçamento Diário" : "Diretriz de Orçamento (ABO vs CBO)"}
               </span>
               <p className="text-xs font-medium leading-relaxed text-foreground">
                 {currentReport.budget_adjustment_suggestion}
@@ -224,12 +228,12 @@ export function AiCampaignDiagnostics({
             </div>
           </div>
 
-          {/* Dica Comercial de Fechamento de WhatsApp (Se Visão Geral) */}
-          {activeTab === "general" && currentReport.commercial_funnel_notes && (
+          {/* Dica Comercial de Atendimento WhatsApp */}
+          {currentReport.commercial_funnel_notes && (
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3.5 space-y-1">
               <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <MessageSquareIcon className="size-3.5" />
-                Diretriz de Atendimento & Balcão no WhatsApp
+                Diretriz de Atendimento no WhatsApp
               </span>
               <p className="text-xs text-foreground leading-relaxed">
                 {currentReport.commercial_funnel_notes}
@@ -241,7 +245,7 @@ export function AiCampaignDiagnostics({
           {currentReport.recommended_actions?.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                {activeTab === "general" ? "Ações Executivas Prioritárias:" : "Ações Recomendadas (Vai lá e faz):"}
+                {activeTab === "general" ? "Ações Práticas Recomendadas:" : "Ações Recomendadas (Vai lá e faz):"}
               </span>
               <div className="space-y-1.5">
                 {currentReport.recommended_actions.map((act, idx) => (
@@ -258,12 +262,12 @@ export function AiCampaignDiagnostics({
             </div>
           )}
 
-          {/* Alertas Estratégicos ou de Fadiga */}
+          {/* Alertas Fatuais sobre Status das Campanhas */}
           {currentReport.fatigued_creatives?.length > 0 && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-1">
               <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                 <AlertTriangleIcon className="size-3.5" />
-                {activeTab === "general" ? "Atenção no Posicionamento & Funil" : "Alerta de Fadiga & Problema da Raposa"}
+                {activeTab === "general" ? "Status & Observações das Campanhas" : "Alerta de Fadiga & Problema da Raposa"}
               </span>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                 {currentReport.fatigued_creatives.map((f, i) => (

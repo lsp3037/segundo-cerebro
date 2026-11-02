@@ -107,6 +107,46 @@ export function AdsAnalyzerDashboard({
     return undefined;
   }, [angles]);
 
+  // Sumário factual de cada campanha para alimentar a análise de IA sem alucinações
+  const campaignsSummary = useMemo(() => {
+    const effectiveMetrics = filteredMetrics.length > 0 ? filteredMetrics : metrics;
+    return campaigns.map((c) => {
+      const campMetrics = effectiveMetrics.filter(
+        (m) => m.campaign_id === c.id || (c.meta_campaign_id && m.meta_campaign_id === c.meta_campaign_id)
+      );
+
+      let spend = 0;
+      let impressions = 0;
+      let clicks = 0;
+      let leads = 0;
+
+      for (const m of campMetrics) {
+        spend += m.spend_cents;
+        impressions += m.impressions;
+        clicks += m.clicks;
+        leads += m.conversions;
+      }
+
+      const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+      const cpc = clicks > 0 ? Math.round(spend / clicks) : 0;
+      const cpl = leads > 0 ? Math.round(spend / leads) : 0;
+
+      return {
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        budget_daily_cents: c.budget_daily_cents,
+        spend_cents: spend,
+        impressions,
+        clicks,
+        ctr,
+        cpc_cents: cpc,
+        leads,
+        cpl_cents: cpl,
+      };
+    });
+  }, [campaigns, filteredMetrics, metrics]);
+
   return (
     <div className="space-y-6">
       {/* Gatilho MCP Sync com suporte ao período */}
@@ -211,7 +251,7 @@ export function AdsAnalyzerDashboard({
         onDateRangeChange={setDateRange}
       />
 
-      {/* Parecer Consultivo de IA (Geral Executiva e Pedro Sobral) */}
+      {/* Parecer Consultivo de IA (Geral das Campanhas e Pedro Sobral) */}
       <AiCampaignDiagnostics
         totalSpendCents={summary.totalSpend}
         totalClicks={summary.totalClicks}
@@ -219,6 +259,7 @@ export function AdsAnalyzerDashboard({
         avgCtr={summary.avgCtr}
         topAngleTitle={topAngle}
         periodLabel={dateRange.label}
+        campaigns={campaignsSummary}
       />
     </div>
   );

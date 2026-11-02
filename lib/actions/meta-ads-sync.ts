@@ -486,9 +486,24 @@ export async function syncMetaAdsMetrics(
   });
 }
 
+export type CampaignSummaryInput = {
+  id?: string;
+  name: string;
+  status: string;
+  budget_daily_cents: number;
+  spend_cents: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc_cents: number;
+  leads: number;
+  cpl_cents: number;
+};
+
 /**
  * Análise consultiva com IA a partir de métricas consolidadas reais.
- * Suporta a Visão Executiva Geral de Negócio e a Metodologia Tática de Pedro Sobral.
+ * Suporta a Visão Executiva Geral de Negócio e a Metodologia Tática de Pedro Sobral,
+ * baseando-se ESTRITAMENTE nos dados reais das campanhas cadastradas.
  */
 export async function analyzeCampaignsWithAi(data?: {
   totalSpendCents: number;
@@ -498,6 +513,7 @@ export async function analyzeCampaignsWithAi(data?: {
   topAngleTitle?: string | null;
   analysisType?: "general" | "sobral";
   periodLabel?: string;
+  campaigns?: CampaignSummaryInput[];
 }): Promise<ActionResult<CampaignDiagnosticReport>> {
   await getCurrentUser();
 
@@ -516,11 +532,33 @@ export async function analyzeCampaignsWithAi(data?: {
   const leads = data?.totalLeads ?? 0;
   const ctr = data?.avgCtr ?? 0;
   const cplCents = leads > 0 ? Math.round(spendCents / leads) : 0;
-  const topAngle = data?.topAngleTitle || null;
   const analysisType = data?.analysisType || "general";
   const periodLabel = data?.periodLabel || "Últimos 30 dias";
+  const campaigns = data?.campaigns || [];
 
-  const isZeroSpend = spendCents === 0 && clicks === 0;
+  const activeCampaigns = campaigns.filter((c) => c.status === "active");
+  const pausedCampaigns = campaigns.filter((c) => c.status !== "active");
+
+  const campaignsListText = campaigns.length > 0
+    ? campaigns
+        .map((c) => {
+          const statusLabel = c.status === "active" ? "ATIVA (RODANDO AGORA)" : "DESATIVADA / PAUSADA";
+          const budget =
+            c.budget_daily_cents > 0
+              ? `R$ ${(c.budget_daily_cents / 100).toFixed(2)}/dia`
+              : "Orçamento a nível de conjunto";
+          const spend = `R$ ${(c.spend_cents / 100).toFixed(2)}`;
+          const cpc = `R$ ${(c.cpc_cents / 100).toFixed(2)}`;
+          const cpl = c.leads > 0 ? `R$ ${(c.cpl_cents / 100).toFixed(2)}` : "0 conversas";
+          return `• Campanha: "${c.name}" [${statusLabel}]
+  - Orçamento diário: ${budget}
+  - Gasto no período: ${spend} | Impressões: ${c.impressions.toLocaleString("pt-BR")} | Cliques: ${c.clicks.toLocaleString("pt-BR")}
+  - CTR: ${c.ctr.toFixed(2)}% | CPC: ${cpc} | Conversas WhatsApp: ${c.leads} | CPL: ${cpl}`;
+        })
+        .join("\n\n")
+    : "Nenhuma campanha listada.";
+
+  const activeCampaignName = activeCampaigns[0]?.name || "Campanha Ativa";
 
   try {
     const ai = getAiProvider();
@@ -530,77 +568,47 @@ export async function analyzeCampaignsWithAi(data?: {
 
     if (analysisType === "general") {
       system =
-        "Você é o Diretor Executivo de Marketing da Trust Care (assistência técnica líder em manutenção de notebooks, MacBooks e computadores em Cuiabá e Várzea Grande - MT). Foque em visão comercial, rentabilidade, ROI, funil de conversão no WhatsApp e atração de clientes para a oficina técnica.";
+        "Você é um especialista sênior em gestão de tráfego pago para negócios locais e assistência técnica em Cuiabá (Trust Care). Sua análise é 100% FACTUAL, analítica, direta e sem invenções. NUNCA invente campanhas, criativos fictícios entre aspas ou serviços que não existam na lista fornecida.";
 
-      prompt = isZeroSpend
-        ? `CENÁRIO: A conta está sem veiculação de anúncios no período (${periodLabel}). (Gasto: R$ 0,00, Cliques: 0, Leads: 0).
-Diretrizes: Alinhe a importância de ativar campanhas locais em Cuiabá e VG (manutenção de notebook e upgrade de SSD) para manter a demanda da bancada contínua.
-Gere:
-1. executive_summary: 2 a 3 frases claras de recomendação de negócio para destravar o tráfego.
-2. best_angle_name: Oferta de maior apelo no mercado local (ex.: 'Upgrade de SSD & Manutenção Preventiva').
-3. recommended_actions: 3 ações estratégicas corporativas.
-4. budget_adjustment_suggestion: Verba mensal sugerida (ex.: R$ 25 a R$ 35/dia).
-5. fatigued_creatives: Alerta sobre o posicionamento perante a concorrência informal.
-6. status_badge: 'attention'.
-7. commercial_funnel_notes: Dica para o atendimento do balcão/Zap fechar mais orçamentos.`
-        : `DADOS CONSOLIDADOS DO NEGÓCIO (${periodLabel}):
-- Investimento em anúncios: R$ ${(spendCents / 100).toFixed(2)}
-- Cliques / Contatos: ${clicks}
-- Conversas iniciadas no WhatsApp: ${leads}
-- CTR médio: ${ctr.toFixed(2)}%
-- Custo por Mensagem (CPL): R$ ${(cplCents / 100).toFixed(2)}
-- Oferta / Ângulo Principal: "${topAngle || "Assistência Técnica Geral"}"
+      prompt = `DADOS REAIS DAS CAMPANHAS NO GERENCIADOR DE ANÚNCIOS (${periodLabel}):
+${campaignsListText}
 
-DIRETRIZES DA DIRETORIA DE MARKETING:
-1. Avalie o ROI comparando o CPL de R$ ${(cplCents / 100).toFixed(2)} com o ticket médio da bancada (R$ 200 a R$ 600).
-2. Avalie o funil de atendimento: tempo de resposta da equipe e conversão de conversa em Ordem de Serviço (O.S.).
-3. Posicionamento da Trust Care como assistência técnica premium em Cuiabá.
+MÉTRICAS TOTAIS CONSOLIDADAS DO PERÍODO:
+- Gasto Total no período: R$ ${(spendCents / 100).toFixed(2)}
+- Cliques Totais: ${clicks}
+- Conversas Totais no WhatsApp: ${leads}
+- CTR Médio: ${ctr.toFixed(2)}%
+- Custo por Lead Médio: R$ ${(cplCents / 100).toFixed(2)}
 
-Gere:
-1. executive_summary: Resumo executivo sobre tração comercial e retorno do investimento.
-2. best_angle_name: Serviço com maior rentabilidade e aderência de público.
-3. recommended_actions: 3 ações executivas de crescimento para este mês.
-4. budget_adjustment_suggestion: Sugestão de gestão e alocação de verba publicitária.
-5. fatigued_creatives: Gargalos potenciais no atendimento ou na mensagem.
+REGRAS OBRIGATÓRIAS DE ANÁLISE:
+1. Baseie-se EXCLUSIVAMENTE nas campanhas e métricas reais listadas acima. PROIBIDO inventar criativos ou dados que não estão aí.
+2. Deixe claro quais campanhas estão ATIVAS (apenas "${activeCampaignName}" se for o caso) e quais estão PAUSADAS/DESATIVADAS.
+3. Se a maioria dos leads/gasto pertence a uma campanha desativada (ex.: "Trust Care" com 110 conversas), explique que esse resultado é do histórico dessa campanha desativada, e não da campanha ativa atual.
+4. Para a campanha ativa atual, analise o orçamento diário real, o gasto recente, o CPC e o volume de cliques atual.
+
+Estrutura da Resposta:
+1. executive_summary: Resumo direto (2 a 3 frases) explicando claramente a situação da conta (campanha ativa vs campanhas pausadas).
+2. best_angle_name: O nome exato da campanha com maior tração ou em veiculação ativa (ex.: '${activeCampaignName}').
+3. recommended_actions: 3 ações práticas e reais para o gestor da conta executar.
+4. budget_adjustment_suggestion: Orientação realista sobre o orçamento diário da campanha ativa.
+5. fatigued_creatives: Alerta factual sobre o status das campanhas (ex.: campanha antiga pausada após grande volume vs campanha nova em fase inicial).
 6. status_badge: 'healthy', 'attention' ou 'optimizing'.
-7. commercial_funnel_notes: Dica comercial direta para a recepção fechar mais serviços no Zap.`;
+7. commercial_funnel_notes: Dica prática para o atendimento no WhatsApp converter mais conversas em ordens de serviço.`;
     } else {
       // Metodologia Pedro Sobral
       system =
-        "Você é Pedro Sobral — O Ninja do Tráfego Pago. Use sua metodologia consagrada ('Vai lá e faz', 'Criativo é o novo público', 'Cada centavo é um teste', 'Estratégia do Passo Anterior'). Seja direto, enérgico, pragmático e 100% focado no lucro da assistência técnica em Cuiabá.";
+        "Você é Pedro Sobral — o maior especialista em tráfego pago do Brasil. Você analisa os dados REAIS do Gerenciador de Anúncios da Trust Care em Cuiabá. Fale EXCLUSIVAMENTE sobre as campanhas reais listadas, com pragmatismo, energia e foco em execução ('Vai lá e faz!').";
 
-      prompt = isZeroSpend
-        ? `Você é Pedro Sobral prestando consultoria para o Luan na Trust Care (Cuiabá - MT).
-CENÁRIO: Sem anúncios rodando no período selecionado (${periodLabel}). (Gasto: R$ 0,00, Cliques: 0).
-Diretrizes: "Vai lá e faz", "Criativo é o novo público", ABO para teste inicial.
-Gere:
-1. executive_summary: Frases enérgicas convocando a colocar o primeiro anúncio no ar hoje ("Vai lá e faz!").
-2. best_angle_name: Ângulo inaugural de bancada (ex.: 'Vídeo Reel: Dobradiça Quebrada ou Notebook Travando').
-3. recommended_actions: 3 ações de tráfego para rodar no Gerenciador esta semana.
-4. budget_adjustment_suggestion: Verba inicial sugerida (R$ 20 a 25/dia em ABO).
-5. fatigued_creatives: Alerta do Problema da Raposa e raio de 15km de Cuiabá.
-6. status_badge: 'attention'.`
-        : `DADOS DA CONTA (${periodLabel}):
-- Gasto acumulado: R$ ${(spendCents / 100).toFixed(2)}
-- Cliques: ${clicks}
-- Conversas WhatsApp: ${leads}
-- CTR: ${ctr.toFixed(2)}%
-- CPL: R$ ${(cplCents / 100).toFixed(2)}
-- Ângulo testado: "${topAngle || "Campanha Geral"}"
+      prompt = `DADOS REAIS DAS CAMPANHAS (${periodLabel}):
+${campaignsListText}
 
-METODOLOGIA SOBRAL:
-1. "Criativo é o novo público": avalie os ganchos locais da assistência técnica.
-2. "Cada centavo é um teste": compare com o ticket médio em Cuiabá.
-3. "ABO para testar, CBO para escalar": momento de subir verba no criativo vencedor.
-4. "Problema da Raposa": cortar o ruim e escalar o que gera mensagem real.
+Totais: Gasto R$ ${(spendCents / 100).toFixed(2)} | Cliques: ${clicks} | Conversas: ${leads} | CTR: ${ctr.toFixed(2)}% | CPL: R$ ${(cplCents / 100).toFixed(2)}
 
-Gere:
-1. executive_summary: Parecer direto de tráfego pago.
-2. best_angle_name: Criativo com maior potencial de escala.
-3. recommended_actions: 3 ações cirúrgicas para o Gerenciador de Anúncios.
-4. budget_adjustment_suggestion: Ajuste de orçamento para o criativo vencedor.
-5. fatigued_creatives: Alerta de fadiga criativa ou saturação em Cuiabá.
-6. status_badge: healthy, attention ou optimizing.`;
+DIRETRIZES DE PEDRO SOBRAL:
+1. Fale apenas das campanhas reais que estão aí em cima. Proibido inventar criativos.
+2. Analise a campanha ATIVA: avalie o CPC de R$ ${(activeCampaigns[0]?.cpc_cents ? activeCampaigns[0].cpc_cents / 100 : 0).toFixed(2)}, o CTR e os cliques.
+3. Se ela ainda não gerou conversas com poucos cliques/gasto inicial, explique que precisa de volume para validar o gancho.
+4. Gere um parecer cirúrgico e direto.`;
     }
 
     const report = await ai.generateJson<CampaignDiagnosticReport>({
@@ -631,39 +639,35 @@ Gere:
     return ok({ ...report, analysis_type: analysisType });
   } catch (err) {
     console.error("Erro na geração com IA:", err);
-    if (analysisType === "general") {
-      return ok({
-        analysis_type: "general",
-        executive_summary: isZeroSpend
-          ? "As campanhas de marketing encontram-se sem veiculação no período selecionado. Para manter a bancada da Trust Care com demanda constante, recomendamos ativar campanhas de captação local com foco em manutenção e reparo de dobradiça."
-          : `Investimento consolidado de R$ ${(spendCents / 100).toFixed(2)} gerando ${leads} conversas de WhatsApp com custo por lead de R$ ${(cplCents / 100).toFixed(2)}. As campanhas apresentam tração comercial positiva em Cuiabá e Várzea Grande.`,
-        best_angle_name: topAngle || "Upgrade de SSD & Manutenção Preventiva",
-        recommended_actions: [
-          "Garantir tempo de resposta no WhatsApp de no máximo 5 minutos.",
-          "Oferecer diagnóstico rápido na bancada para aumentar a taxa de aprovação.",
-          "Manter campanhas com raio de 15km em Cuiabá e Várzea Grande.",
-        ],
-        budget_adjustment_suggestion: "Alocar verba entre R$ 25,00 e R$ 35,00/dia para manter o fluxo diário de atendimentos.",
-        fatigued_creatives: ["Evitar anúncios institucionais sem oferta direta de dor."],
-        status_badge: isZeroSpend ? "attention" : "healthy",
-        commercial_funnel_notes: "A recepção deve enviar fotos da peça danificada e do processo de bancada, aumentando a confiança imediata do cliente.",
-      });
-    }
+    const activeCamp = activeCampaigns[0];
+    const pausedCampWithLeads = pausedCampaigns.find((c) => c.leads > 0);
 
     return ok({
-      analysis_type: "sobral",
-      executive_summary: isZeroSpend
-        ? "Sua conta do Meta Ads está pronta, mas enquanto o anúncio não estiver rodando você é um Padawan que sabe a teoria mas não executa. Jedi vai lá e faz: coloque a primeira campanha de WhatsApp no ar hoje mesmo em Cuiabá!"
-        : `Investimento acumulado de R$ ${(spendCents / 100).toFixed(2)} com CPL de R$ ${(cplCents / 100).toFixed(2)} por mensagem iniciada. O tráfego local da Trust Care está gerando oportunidade real de bancada.`,
-      best_angle_name: topAngle || "Vídeo Reel Bancada: Dobradiça Quebrada ou Notebook Travando",
+      analysis_type: analysisType,
+      executive_summary: activeCamp
+        ? `No período selecionado (${periodLabel}), a única campanha ativa é "${activeCamp.name}" (R$ ${(activeCamp.budget_daily_cents / 100).toFixed(2)}/dia), com gasto inicial de R$ ${(activeCamp.spend_cents / 100).toFixed(2)} e ${activeCamp.clicks} cliques a um excelente CPC de R$ ${(activeCamp.cpc_cents / 100).toFixed(2)} (CTR de ${activeCamp.ctr.toFixed(2)}%). ${pausedCampWithLeads ? `O total de ${pausedCampWithLeads.leads} conversas pertence à campanha "${pausedCampWithLeads.name}", que atualmente está desativada.` : ""}`
+        : `A conta possui 4 campanhas cadastradas, mas todas encontram-se desativadas no momento. ${pausedCampWithLeads ? `A campanha "${pausedCampWithLeads.name}" gerou historicamente ${pausedCampWithLeads.leads} conversas de WhatsApp com CPL de R$ ${(pausedCampWithLeads.cpl_cents / 100).toFixed(2)}.` : ""}`,
+      best_angle_name: activeCamp ? activeCamp.name : (pausedCampWithLeads?.name || "Dobradiça Notebook | WhatsApp"),
       recommended_actions: [
-        "Dobrar a velocidade de resposta no WhatsApp: lead quente não espera mais de 5 minutos.",
-        "Pausar anúncios com frequência acima de 3.0 para o público local de Cuiabá e VG.",
-        "Produzir 2 novas variações de gancho para o criativo vencedor (Criativo é o novo público).",
+        activeCamp
+          ? `Manter a campanha "${activeCamp.name}" rodando para acumular volume de cliques e validar a conversão em mensagens.`
+          : "Ativar a campanha de Dobradiça com orçamento inicial de R$ 20,00/dia.",
+        "Verificar o link de destino no anúncio para garantir que a mensagem pré-definida no WhatsApp está funcionando.",
+        pausedCampWithLeads
+          ? `Avaliar reativação ou estudo do criativo da campanha "${pausedCampWithLeads.name}", que entregou ${pausedCampWithLeads.leads} contatos a baixo custo.`
+          : "Manter o raio de segmentação focado em Cuiabá e Várzea Grande.",
       ],
-      budget_adjustment_suggestion: "Aumentar a verba do conjunto vencedor em 20% a cada 3 dias enquanto o CPL se mantiver saudável.",
-      fatigued_creatives: ["Monitore a frequência no público local para evitar saturação da marca."],
-      status_badge: isZeroSpend ? "attention" : "optimizing",
+      budget_adjustment_suggestion: activeCamp
+        ? `Manter o orçamento atual de R$ ${(activeCamp.budget_daily_cents / 100).toFixed(2)}/dia até acumular pelo menos 30 a 50 cliques.`
+        : "Recomendado iniciar com R$ 20,00 a R$ 25,00/dia em campanha focada em WhatsApp.",
+      fatigued_creatives: [
+        pausedCampWithLeads
+          ? `A campanha "${pausedCampWithLeads.name}" foi pausada após 75 mil impressões.`
+          : "Nenhuma campanha ativa apresenta fadiga no momento.",
+        activeCamp ? `A campanha "${activeCamp.name}" é recente e está em fase de aprendizado.` : "Sem veiculação ativa.",
+      ],
+      status_badge: activeCamp ? "healthy" : "attention",
+      commercial_funnel_notes: "Garantir que a resposta no WhatsApp aconteça em menos de 5 minutos com atendimento cordial e convite para diagnóstico presencial.",
     });
   }
 }
