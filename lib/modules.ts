@@ -48,6 +48,7 @@ export const TABS = [
   { href: "/hoje", label: "Hoje", icon: "sun", phase: 2 },
   { href: "/agenda", label: "Agenda", icon: "calendar", phase: 3 },
   { href: "/entrada", label: "Caixa de Entrada", icon: "inbox", phase: 2 },
+  { href: "/marketing", label: "Marketing", icon: "megaphone", phase: 4 },
   { href: "/ideias", label: "Ideias", icon: "lightbulb", phase: 2 },
   { href: "/conhecimento", label: "Conhecimento", icon: "library", phase: 2 },
   { href: "/aprender", label: "Aprender", icon: "graduation-cap", phase: 2 },
