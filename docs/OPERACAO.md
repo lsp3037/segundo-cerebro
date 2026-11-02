@@ -54,7 +54,7 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [ ] Ideias de Conteúdo: pilares, formato, "Sugestões do Agente" (teste) e "Planejar publicação".
 - [ ] Publicações: clicar num dia cria a publicação, mudar status e ver no funil.
 - [ ] Fluxos: editar etapas, mensagens-modelo (copiar) e objeções.
-- [ ] Assistente: colar uma conversa com telefone. O aviso de máscara aparece, vêm 2 ou 3 respostas, "Usar esta" e o resultado do caso.
+- [ ] Assistente: colar print via Ctrl+V ou upload de imagem (ou texto). O Gemini analisa o atendimento, gera 2 a 3 respostas para o WhatsApp, "Copiar" e salva o print no histórico.
 
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
@@ -78,7 +78,6 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 | Item | Detalhe |
 |---|---|
 | Busca `Ctrl+K` incompleta | Falta procurar em fluxos, eventos e ideias de conteúdo, como pede a especificação. |
-| Prints no Assistente de Respostas | Hoje só aceita texto. Num print, o número do cliente não pode ser mascarado. Decidir com o Luan. |
 | API do Agente de Marketing | Ainda é versão de teste. Combinar rotas, formato e chave na Fase 6. |
 | RLS no Gerenciador de O.S. | A tabela `order_status_transitions` do Supabase "Trust Care" está sem RLS: com a chave pública daquele app, dá para alterar as regras de status. Corrigir **no projeto do Gerenciador**, ligando o RLS e criando uma regra de leitura (ligar sem a regra bloqueia o próprio Gerenciador). |
 | Variável sobrando na Vercel | `NEXT_PUBLIC_SUPABASE` (sem uso) pode ser apagada. |

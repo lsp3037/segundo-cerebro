@@ -107,11 +107,11 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 - Já existe a "tomada" (`lib/integrations/marketing-agent`), com sugestões e envio de ideias em versão de teste.
 - **Pendente:** o Agente ainda não tem API e roda só no PC. Na Fase 6, combinar rotas, formato e chave. O caminho mais provável é o painel chamar a API do Segundo Cérebro.
 
-### 7.10 Fluxos de Atendimento e Assistente de Respostas 🟡 Fase 4
+### 7.10 Fluxos de Atendimento e Assistente de Respostas ✅ Fase 4
 - Fluxos por tipo de serviço: etapas, perguntas, informações a coletar, mensagens-modelo, objeções e próximos passos.
-- Assistente: o Luan cola a conversa, escolhe o fluxo (ou deixa a IA identificar) e recebe de 2 a 3 respostas para o WhatsApp, o próximo passo e o que falta perguntar.
+- Assistente: o Luan cola o print da conversa (`Ctrl+V`, arrastar ou selecionar imagem) ou texto, escolhe o fluxo (ou deixa a IA identificar) e recebe de 2 a 3 respostas para o WhatsApp, o próximo passo e o que falta perguntar.
+- A IA (Gemini Vision multimodal) lê a imagem diretamente, identifica a dúvida e o serviço e sugere respostas prontas para o WhatsApp no estilo do Luan. O print fica salvo no histórico do caso.
 - Histórico com o resultado: fechou, não fechou ou em andamento.
-- **Pendente:** o assistente aceita **só texto, sem print**. Num print, o número do cliente não pode ser mascarado automaticamente. Decidir se vale incluir, e como.
 
 ### 7.11 Busca `Ctrl+K` 🟡 Fase 2 (textual) / ⏳ Fase 6 (perguntar à IA)
 - Hoje procura em tarefas, notas, ideias gerais, aprendizados e Caixa de Entrada.
@@ -163,13 +163,13 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-01 | O app do Google foi publicado sem verificação (uso pessoal, abaixo de 100 usuários). |
 | 2026-11-01 | O resumo de O.S. vem da API do Gerenciador, com chave só de leitura. "Atrasada" = aberta há mais de 7 dias. |
 | 2026-11-01 | O calendário de publicações principal é o do Segundo Cérebro. |
+| 2026-11-02 | O Assistente de Respostas aceita prints de conversas (Ctrl+V ou upload), analisados diretamente pelo Gemini com visão multimodal. |
 
 ## 10. Pendências e riscos
 
 | Item | Tipo | Onde decidir ou resolver |
 |---|---|---|
 | Busca `Ctrl+K` sem fluxos, eventos e ideias de conteúdo | Lacuna da especificação | Próxima fase (sugestão: junto da Fase 5) |
-| Prints no Assistente de Respostas | Decisão em aberto (LGPD) | Com o Luan |
 | API do Agente de Marketing | Depende do Agente | Fase 6 |
 | Tabela `order_status_transitions` sem RLS no Supabase "Trust Care" | Risco de segurança, **em outro projeto** | No projeto do Gerenciador de O.S. |
 | Plano gratuito do Gemini: limites e modelos que mudam | Risco operacional | Modelo reserva já configurado. Acompanhar. |

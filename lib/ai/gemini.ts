@@ -23,13 +23,35 @@ export function createGeminiProvider({
 
   return {
     name: `gemini:${model}`,
-    async generateJson<T>({ system, prompt, schema }: { system: string; prompt: string; schema: Record<string, unknown> }) {
+    async generateJson<T>({
+      system,
+      prompt,
+      images,
+      schema,
+    }: {
+      system: string;
+      prompt: string;
+      images?: { mimeType: string; base64Data: string }[];
+      schema: Record<string, unknown>;
+    }) {
       let lastError: unknown;
       for (const current of models) {
         try {
+          const contents = images && images.length > 0
+            ? [
+                ...images.map((img) => ({
+                  inlineData: {
+                    mimeType: img.mimeType,
+                    data: img.base64Data,
+                  },
+                })),
+                { text: prompt },
+              ]
+            : prompt;
+
           const response = await client.models.generateContent({
             model: current,
-            contents: prompt,
+            contents,
             config: {
               systemInstruction: system,
               responseMimeType: "application/json",

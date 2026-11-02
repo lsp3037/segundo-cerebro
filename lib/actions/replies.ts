@@ -28,20 +28,35 @@ export type ReplySuggestion = {
 
 type ReplyCase = Tables<"reply_cases">;
 
-const suggestInput = z.object({
-  caseId: id.nullable(),
-  label: z.string().trim().max(120).nullable(),
-  conversation: z.string().trim().min(10, "Cole a conversa (pelo menos uma frase).").max(MAX_CONVERSATION, "Conversa muito longa: cole só a parte recente."),
-  flowId: id.nullable(),
+const imagePartSchema = z.object({
+  mimeType: z.string().min(1),
+  base64Data: z.string().min(1),
 });
 
-// Assistente de Respostas: a conversa (com dados pessoais escondidos) + o fluxo + o
+const suggestInput = z
+  .object({
+    caseId: id.nullable().default(null),
+    label: z.string().trim().max(120).nullable().default(null),
+    conversation: z.string().trim().max(MAX_CONVERSATION, "Conversa muito longa: cole só a parte recente.").default(""),
+    flowId: id.nullable().default(null),
+    images: z.array(imagePartSchema).default([]),
+    screenshotPaths: z.array(z.string()).default([]),
+  })
+  .refine(
+    (data) => data.conversation.length >= 3 || data.images.length > 0 || data.screenshotPaths.length > 0,
+    {
+      message: "Envie um print da conversa ou digite o texto para a IA analisar.",
+      path: ["conversation"],
+    },
+  );
+
+// Assistente de Respostas: a conversa ou prints de tela + o fluxo + o
 // Repositório da Empresa vão para a IA, que devolve opções de resposta. Nada é enviado ao cliente.
 export async function suggestReplies(input: z.input<typeof suggestInput>): Promise<ActionResult<ReplyCase>> {
   await getCurrentUser();
   const parsed = suggestInput.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
-  const { caseId, label, conversation, flowId } = parsed.data;
+  const { caseId, label, conversation, flowId, images, screenshotPaths } = parsed.data;
 
   const supabase = await createClient();
   const { data: area } = await supabase.from("areas").select("id").eq("slug", TRUSTCARE_SLUG).single();
@@ -92,39 +107,59 @@ export async function suggestReplies(input: z.input<typeof suggestInput>): Promi
     ? describeFlow(chosen)
     : (flows ?? []).map((f) => `- ${f.slug}: ${f.name}. ${f.description ?? ""}`).join("\n");
 
+  const promptSections: string[] = [
+    chosen
+      ? `Fluxo escolhido pelo Luan:\n${flowContext}`
+      : `Fluxos disponíveis (identifique o mais adequado pelo slug, ou null se nenhum servir):\n${flowContext || "(nenhum)"}`,
+    repository ? `Repositório da Empresa (Preços, regras, serviços e garantia da Trust Care):\n${repository}` : "Repositório da Empresa: (vazio)",
+  ];
+
+  if (images && images.length > 0) {
+    promptSections.push(
+      `Foram anexadas ${images.length} imagem(ns) / print(s) de conversa do WhatsApp. Analise a imagem com atenção: leia as mensagens trocadas, veja a dúvida ou sintoma relatado pelo cliente (ex.: marca/modelo, lentidão, tela quebrada, formatação, upgrade, orçamento) e elabore as respostas com base nisso.`
+    );
+  }
+
+  if (conversation.trim()) {
+    promptSections.push(`Texto ou notas adicionais fornecidas pelo Luan:\n"""${masked}"""`);
+  } else if (images && images.length > 0) {
+    promptSections.push("Identifique a conversa e o que o cliente quer exclusivamente a partir dos prints enviados.");
+  }
+
   let suggestion: ReplySuggestion;
   try {
     const ai = getAiProvider();
     suggestion = await ai.generateJson<ReplySuggestion>({
       system: [
-        "Você ajuda o Luan, dono da Trust Care (manutenção de computadores, upgrades e revenda de notebooks em Cuiabá-MT), a responder leads e clientes no WhatsApp.",
-        "Escreva em português do Brasil, em primeira pessoa, como o próprio Luan: tom humano, direto, cordial, sem cara de propaganda, sem emojis em excesso.",
-        "Mensagens curtas, de WhatsApp. Não invente preços, prazos, políticas, endereço ou loja física que não estejam no Repositório da Empresa; se faltar, sugira perguntar ou combinar depois.",
-        "Dados pessoais aparecem mascarados como [TELEFONE], [EMAIL] etc.; nunca tente adivinhá-los e não os inclua nas respostas.",
-        "Devolva de 2 a 3 opções de resposta com abordagens diferentes, o próximo passo recomendado no funil e o que ainda falta perguntar.",
+        "Você ajuda o Luan, dono da Trust Care (assistência técnica de computadores/notebooks, upgrades e revenda de notebooks em Cuiabá-MT), a responder leads e clientes no WhatsApp.",
+        "Analise cuidadosamente a dúvida ou conversa com o cliente (seja em texto ou em prints do WhatsApp anexados).",
+        "Escreva em português do Brasil, em primeira pessoa, como o próprio Luan: tom humano, direto, cordial, acolhedor, sem cara de propaganda, sem emojis em excesso.",
+        "Mensagens curtas, de WhatsApp, prontas para enviar. Não invente preços fixos, prazos ou garantias que não constem no Repositório da Empresa; se faltar informação, sugira perguntar ao cliente ou estimar com cautela.",
+        "Dados pessoais: não inclua telefones ou CPF nas respostas sugeridas.",
+        "Devolva de 2 a 3 opções de resposta com abordagens complementares (ex.: direta, consultiva/explicativa, ou orientando diagnóstico), o próximo passo recomendado no funil e o que ainda falta perguntar.",
       ].join(" "),
-      prompt: [
-        chosen ? `Fluxo escolhido pelo Luan:\n${flowContext}` : `Fluxos disponíveis (identifique o mais adequado pelo slug, ou null se nenhum servir):\n${flowContext || "(nenhum)"}`,
-        repository ? `Repositório da Empresa:\n${repository}` : "Repositório da Empresa: (vazio)",
-        `Conversa com o cliente:\n"""${masked}"""`,
-      ].join("\n\n"),
+      prompt: promptSections.join("\n\n"),
+      images,
       schema: {
         type: "object",
         properties: {
           flow_slug: { type: ["string", "null"] },
-          summary: { type: "string", description: "O que o cliente quer, em uma frase." },
+          summary: { type: "string", description: "O que o cliente quer ou relatou, em uma frase clara." },
           replies: {
             type: "array",
             minItems: 2,
             maxItems: 3,
             items: {
               type: "object",
-              properties: { label: { type: "string", description: "Abordagem em 2-4 palavras" }, text: { type: "string" } },
+              properties: {
+                label: { type: "string", description: "Abordagem em 2-4 palavras (ex: 'Direta e rápida', 'Consultiva', 'Próximos passos')" },
+                text: { type: "string", description: "Texto exato da mensagem para o WhatsApp." },
+              },
               required: ["label", "text"],
             },
           },
-          next_step: { type: "string" },
-          missing_info: { type: "array", items: { type: "string" } },
+          next_step: { type: "string", description: "Próximo passo recomendado no funil." },
+          missing_info: { type: "array", items: { type: "string" }, description: "O que ainda falta perguntar ao cliente." },
         },
         required: ["flow_slug", "summary", "replies", "next_step", "missing_info"],
       },
@@ -136,17 +171,17 @@ export async function suggestReplies(input: z.input<typeof suggestInput>): Promi
   }
 
   const detected = chosen ?? flows?.find((f) => f.slug === suggestion.flow_slug);
-  // O texto original fica só no banco; a IA recebeu a versão mascarada.
   const row = {
     label: label || suggestion.summary.slice(0, 120),
-    conversation_text: conversation,
+    conversation_text: conversation || (suggestion.summary ? `[Print do WhatsApp] ${suggestion.summary}` : "[Print do WhatsApp]"),
+    screenshot_paths: screenshotPaths,
     service_flow_id: chosen?.id ?? null,
     detected_flow_id: chosen ? null : (detected?.id ?? null),
     ai_output: suggestion,
   };
 
   const { data, error } = caseId
-    ? await supabase.from("reply_cases").update(row).eq("id", caseId).select("*").single()
+    ? await supabase.from("reply_cases").upsert({ id: caseId, ...row }).select("*").single()
     : await supabase.from("reply_cases").insert(row).select("*").single();
   if (error || !data) return fail("A sugestão veio, mas não foi possível salvar o caso.");
   revalidatePath("/", "layout");

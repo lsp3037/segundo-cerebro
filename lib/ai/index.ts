@@ -4,10 +4,20 @@ import { createGeminiProvider } from "./gemini";
 
 // Camada única de IA. Para trocar de provedor, crie outro arquivo que implemente
 // AiProvider e escolha-o aqui (ex.: por uma variável AI_PROVIDER).
+export interface AiImagePart {
+  mimeType: string;
+  base64Data: string;
+}
+
 export interface AiProvider {
   name: string;
   // Gera uma resposta em JSON seguindo o esquema informado (JSON Schema).
-  generateJson<T>(options: { system: string; prompt: string; schema: Record<string, unknown> }): Promise<T>;
+  generateJson<T>(options: {
+    system: string;
+    prompt: string;
+    images?: AiImagePart[];
+    schema: Record<string, unknown>;
+  }): Promise<T>;
 }
 
 export class AiNotConfiguredError extends Error {
