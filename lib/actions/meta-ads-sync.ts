@@ -63,17 +63,108 @@ export async function getMetaAdsCredentials(): Promise<{
   };
 }
 
+export type MetaAdAccountOption = {
+  id: string;
+  name: string;
+  isRecommended: boolean;
+};
+
+export async function listMetaAdAccounts(
+  customToken?: string
+): Promise<ActionResult<MetaAdAccountOption[]>> {
+  const user = await getCurrentUser();
+  const supabase = await createClient();
+  const stored = await getStoredMetaSettings(supabase, user.id);
+  const token = customToken?.trim() || stored?.access_token || process.env.META_ACCESS_TOKEN || "";
+
+  if (!token) {
+    return fail("Nenhum token de acesso disponível. Cole o token gerado no Explorador da Meta.");
+  }
+
+  const accounts: MetaAdAccountOption[] = [];
+  const seenIds = new Set<string>();
+
+  const addAccount = (rawId: string, name: string) => {
+    const formattedId = rawId.startsWith("act_") ? rawId : `act_${rawId.replace(/^act=?/i, "")}`;
+    if (!seenIds.has(formattedId)) {
+      seenIds.add(formattedId);
+      const isRecommended = /trust|care/i.test(name);
+      accounts.push({
+        id: formattedId,
+        name,
+        isRecommended,
+      });
+    }
+  };
+
+  // 1. Consulta contas diretas em /me/adaccounts
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/adaccounts?fields=id,name,account_id,account_status&limit=50&access_token=${encodeURIComponent(token)}`,
+      { headers: { Accept: "application/json" }, cache: "no-store" }
+    );
+    const json = await res.json();
+    if (json.error) {
+      return fail(`Erro da Meta ao listar contas: ${json.error.message}`);
+    }
+    if (Array.isArray(json.data)) {
+      for (const item of json.data) {
+        if (item.id) addAccount(item.id, item.name || "Conta Meta");
+      }
+    }
+  } catch (err) {
+    console.warn("Erro ao buscar /me/adaccounts:", err);
+  }
+
+  // 2. Consulta contas vinculadas via Gerenciador de Negócios (/me/businesses)
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/me/businesses?fields=id,name,owned_ad_accounts{id,name},client_ad_accounts{id,name}&limit=25&access_token=${encodeURIComponent(token)}`,
+      { headers: { Accept: "application/json" }, cache: "no-store" }
+    );
+    const json = await res.json();
+    if (Array.isArray(json.data)) {
+      for (const biz of json.data) {
+        if (Array.isArray(biz.owned_ad_accounts?.data)) {
+          for (const item of biz.owned_ad_accounts.data) {
+            if (item.id) addAccount(item.id, item.name || "Conta Empresa");
+          }
+        }
+        if (Array.isArray(biz.client_ad_accounts?.data)) {
+          for (const item of biz.client_ad_accounts.data) {
+            if (item.id) addAccount(item.id, item.name || "Conta Cliente");
+          }
+        }
+      }
+    }
+  } catch (bizErr) {
+    console.warn("Erro ao buscar /me/businesses:", bizErr);
+  }
+
+  // Ordena para colocar as contas da Trust Care no topo
+  accounts.sort((a, b) => {
+    if (a.isRecommended && !b.isRecommended) return -1;
+    if (!a.isRecommended && b.isRecommended) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return ok(accounts);
+}
+
 export async function saveMetaAdsCredentials(input: {
   adAccountId: string;
-  accessToken: string;
+  accessToken?: string;
 }): Promise<ActionResult<{ accountName?: string }>> {
   const user = await getCurrentUser();
+  const supabase = await createClient();
+  const existingSettings = await getStoredMetaSettings(supabase, user.id);
+
   const rawId = input.adAccountId.trim();
   const adAccountId = rawId.startsWith("act_") ? rawId : `act_${rawId.replace(/^act=?/i, "")}`;
-  const accessToken = input.accessToken.trim();
+  const accessToken = input.accessToken?.trim() || existingSettings?.access_token || process.env.META_ACCESS_TOKEN || "";
 
   if (!adAccountId || adAccountId.length < 5) return fail("ID da conta de anúncios inválido (ex.: act_1671912470896313).");
-  if (!accessToken || accessToken.length < 20) return fail("Token de acesso inválido ou muito curto.");
+  if (!accessToken || accessToken.length < 20) return fail("Token de acesso inválido ou expirado. Cole um novo token gerado.");
 
   // Validação ao vivo na Graph API da Meta
   try {
@@ -82,13 +173,12 @@ export async function saveMetaAdsCredentials(input: {
     const testJson = await testRes.json();
 
     if (!testRes.ok || testJson.error) {
-      const msg = testJson.error?.message || "Não foi possível validar o token na Meta.";
-      return fail(`A Meta rejeitou o token: ${msg}`);
+      const msg = testJson.error?.message || "Não foi possível validar a conta na Meta.";
+      return fail(`A Meta rejeitou o acesso à conta ${adAccountId}: ${msg}`);
     }
 
     const accountName = testJson.name || "Conta Trust Care Meta Ads";
 
-    const supabase = await createClient();
     const { data: currentProfile } = await supabase
       .from("profiles")
       .select("settings")
@@ -199,9 +289,14 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
         .maybeSingle();
 
       let campaignDbId: string;
+      const rawStatus = (rc.status || "").toLowerCase();
+      const validStatus = ["active", "paused", "archived", "completed", "draft", "scheduled"].includes(rawStatus)
+        ? rawStatus
+        : "paused";
+
       const campPayload = {
         name: rc.name,
-        status: rc.status === "active" ? "active" : "paused",
+        status: validStatus,
         objective: rc.objective?.toLowerCase().includes("lead") ? "whatsapp_leads" : "whatsapp_leads",
         budget_daily_cents: rc.daily_budget_cents ?? 0,
         budget_total_cents: rc.lifetime_budget_cents ?? 0,
