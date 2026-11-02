@@ -228,19 +228,31 @@ export async function syncMetaAdsMetrics(campaignId?: string): Promise<ActionRes
     }
   }
 
-  // 3. Busca métricas e insights da Meta
-  let insights: Awaited<ReturnType<typeof metaClient.getCampaignInsights>> = [];
+  // 3. Busca métricas e insights da Meta a nível de campanha e a nível de anúncio
+  const allInsights: Awaited<ReturnType<typeof metaClient.getCampaignInsights>> = [];
   try {
-    insights = await metaClient.getCampaignInsights({
-      campaignId: campaignId,
+    const campaignInsights = await metaClient.getCampaignInsights({
+      campaignId,
+      level: "campaign",
     });
+    allInsights.push(...campaignInsights);
   } catch (insightErr) {
-    console.warn("Aviso ao buscar insights da Meta:", insightErr);
+    console.warn("Aviso ao buscar insights a nível de campanha:", insightErr);
+  }
+
+  try {
+    const adInsights = await metaClient.getCampaignInsights({
+      campaignId,
+      level: "ad",
+    });
+    allInsights.push(...adInsights);
+  } catch (adInsightErr) {
+    console.warn("Aviso ao buscar insights a nível de anúncio:", adInsightErr);
   }
 
   let metricsInserted = 0;
-  if (insights.length > 0) {
-    for (const insight of insights) {
+  if (allInsights.length > 0) {
+    for (const insight of allInsights) {
       const { data: camp } = await supabase
         .from("marketing_campaigns")
         .select("id")

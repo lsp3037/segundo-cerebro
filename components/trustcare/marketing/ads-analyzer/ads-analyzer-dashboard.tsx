@@ -12,6 +12,7 @@ import {
 
 import { formatCentsToBrl, formatPercent } from "../meta";
 import { McpSyncCard } from "./mcp-sync-card";
+import { CampaignsPerformanceTable } from "./campaigns-performance-table";
 import { AiCampaignDiagnostics } from "./ai-campaign-diagnostics";
 import { AnglePerformanceTable } from "./angle-performance-table";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -173,6 +174,13 @@ export function AdsAnalyzerDashboard({
           <span className="text-[10px] text-muted-foreground block">Por mensagem Zap</span>
         </div>
       </div>
+
+      {/* Tabela de Campanhas Ativas & KPIs Individuais */}
+      <CampaignsPerformanceTable
+        campaigns={campaigns}
+        angles={angles}
+        metrics={metrics}
+      />
 
       {/* Parecer Executivo de IA (Gemini) */}
       <AiCampaignDiagnostics

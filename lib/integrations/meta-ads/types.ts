@@ -55,6 +55,7 @@ export interface MetaAdsClient {
     since?: string;
     until?: string;
     datePreset?: string;
+    level?: "campaign" | "ad";
   }): Promise<MetaAdsCampaignInsight[]>;
   getAccountSummary(): Promise<MetaAdsAccountSummary>;
 }

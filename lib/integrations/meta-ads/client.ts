@@ -270,11 +270,21 @@ function createDirectMetaAdsClient(accessToken: string, rawAdAccountId: string):
     async getCampaignInsights(params = {}) {
       const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/insights`);
       url.searchParams.set("access_token", accessToken);
-      url.searchParams.set(
-        "fields",
-        "campaign_id,campaign_name,ad_id,ad_name,date_start,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type"
-      );
-      url.searchParams.set("level", "ad");
+
+      const level = params.level || "campaign";
+      url.searchParams.set("level", level);
+
+      if (level === "ad") {
+        url.searchParams.set(
+          "fields",
+          "campaign_id,campaign_name,ad_id,ad_name,date_start,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type"
+        );
+      } else {
+        url.searchParams.set(
+          "fields",
+          "campaign_id,campaign_name,date_start,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type"
+        );
+      }
       url.searchParams.set("time_increment", "1");
 
       if (params.since && params.until) {
