@@ -1,6 +1,16 @@
 -- Diretoria de Marketing (Fase 4 - Trust Care)
 -- Campanhas, Matriz de Ângulos de Anúncios e Métricas de Tráfego (Meta Ads).
 
+-- 0. Permitir 'marketing_director' no check constraint de folders.module
+alter table public.folders drop constraint if exists folders_module_check;
+alter table public.folders add constraint folders_module_check check (
+  module in (
+    'tasks', 'notes', 'meetings', 'routine', 'learning', 'ideas',
+    'shortcuts', 'content_ideas', 'publications', 'service_flows',
+    'reply_assistant', 'finance', 'marketing_director'
+  )
+);
+
 -- 1. Campanhas de marketing estruturadas no tempo
 create table if not exists public.marketing_campaigns (
   id uuid primary key default gen_random_uuid(),
