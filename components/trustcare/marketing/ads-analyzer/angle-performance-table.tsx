@@ -24,16 +24,16 @@ export function AnglePerformanceTable({
     );
   }
 
-  // Prepara dados com métricas cacheadas ou simuladas
+  // Prepara dados com métricas reais cacheadas
   const rows = angles.map((angle) => {
     const campaign = campaigns.find((c) => c.id === angle.campaign_id);
     const metrics = (angle.metrics_cached as Record<string, number | undefined> | null) || {};
 
-    const spend = metrics.spend_cents ?? (angle.status === "winner" ? 25000 : 12000);
-    const clicks = metrics.clicks ?? (angle.status === "winner" ? 210 : 65);
-    const ctr = metrics.ctr ?? (angle.status === "winner" ? 2.85 : 1.45);
+    const spend = metrics.spend_cents ?? 0;
+    const clicks = metrics.clicks ?? 0;
+    const ctr = metrics.ctr ?? 0;
     const cpc = metrics.cpc_cents ?? (clicks > 0 ? Math.round(spend / clicks) : 0);
-    const leads = metrics.leads ?? (angle.status === "winner" ? 18 : 4);
+    const leads = metrics.leads ?? metrics.conversions ?? 0;
     const cpl = metrics.cpl_cents ?? (leads > 0 ? Math.round(spend / leads) : 0);
 
     return {

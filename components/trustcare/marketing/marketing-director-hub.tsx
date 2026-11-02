@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   MegaphoneIcon,
   VideoIcon,
@@ -37,13 +38,14 @@ export function MarketingDirectorHub({
   initialMetrics,
   initialScripts,
 }: MarketingDirectorHubProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<"planner" | "campaigns" | "analyzer">("planner");
   const [campaignSubView, setCampaignSubView] = useState<"timeline" | "matrix">("timeline");
   const [selectedCampaignForAngles, setSelectedCampaignForAngles] = useState<string | undefined>(undefined);
 
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
   const [angles, setAngles] = useState<Angle[]>(initialAngles);
-  const [metrics] = useState<Metric[]>(initialMetrics);
+  const metrics = initialMetrics;
 
   // Resumo executivo do topo
   const executiveHeader = useMemo(() => {
@@ -227,7 +229,7 @@ export function MarketingDirectorHub({
           angles={angles}
           metrics={metrics}
           onRefreshMetrics={() => {
-            // Recarrega em tempo real
+            router.refresh();
           }}
         />
       )}

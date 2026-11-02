@@ -102,7 +102,11 @@ export function McpSyncCard({ onSyncComplete }: McpSyncCardProps) {
       const res = await syncMetaAdsMetrics();
       if (res.ok) {
         setLastSync(todayIso());
-        toast.success(`Sincronização concluída! ${res.data.syncedCount} métricas atualizadas.`);
+        if (res.data.syncedCount === 0 && res.data.message) {
+          toast.info(res.data.message);
+        } else {
+          toast.success(res.data.message || `Sincronização concluída! ${res.data.syncedCount} itens sincronizados.`);
+        }
         if (onSyncComplete) onSyncComplete();
       } else {
         toast.error(res.error);

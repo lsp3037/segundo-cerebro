@@ -48,17 +48,17 @@ export function AdsAnalyzerDashboard({
         totalLeads += m.conversions;
       }
     } else {
-      // Se não há métricas no banco ainda, calculamos a partir dos ângulos
+      // Se não há métricas consolidadas na tabela de métricas, soma os caches dos ângulos reais
       for (const a of angles) {
         const cached = (a.metrics_cached as Record<string, number | undefined> | null) || {};
-        totalSpend += cached.spend_cents ?? (a.status === "winner" ? 25000 : 12000);
-        totalClicks += cached.clicks ?? (a.status === "winner" ? 210 : 65);
-        totalLeads += cached.leads ?? (a.status === "winner" ? 18 : 4);
-        totalImpressions += a.status === "winner" ? 8500 : 3800;
+        if (cached.spend_cents) totalSpend += cached.spend_cents;
+        if (cached.impressions) totalImpressions += cached.impressions;
+        if (cached.clicks) totalClicks += cached.clicks;
+        if (cached.leads || cached.conversions) totalLeads += (cached.leads ?? cached.conversions ?? 0);
       }
     }
 
-    const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 2.15;
+    const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
     const avgCpc = totalClicks > 0 ? Math.round(totalSpend / totalClicks) : 0;
     const avgCpl = totalLeads > 0 ? Math.round(totalSpend / totalLeads) : 0;
 
@@ -75,7 +75,9 @@ export function AdsAnalyzerDashboard({
 
   const topAngle = useMemo(() => {
     const winner = angles.find((a) => a.status === "winner");
-    return winner ? winner.title : angles[0]?.title ?? "Dor: Computador Lento no Trabalho";
+    if (winner) return winner.title;
+    if (angles.length > 0) return angles[0].title;
+    return undefined;
   }, [angles]);
 
   return (
@@ -130,8 +132,20 @@ export function AdsAnalyzerDashboard({
           <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
             {formatPercent(summary.avgCtr)}
           </p>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium block">
-            Acima da média (1.5%)
+          <span
+            className={`text-[10px] font-medium block ${
+              summary.avgCtr > 1.5
+                ? "text-emerald-600 dark:text-emerald-400"
+                : summary.avgCtr > 0
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-muted-foreground"
+            }`}
+          >
+            {summary.avgCtr > 1.5
+              ? "Acima da média (1.5%)"
+              : summary.avgCtr > 0
+              ? "Abaixo da média"
+              : "Sem veiculação"}
           </span>
         </div>
 

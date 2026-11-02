@@ -50,6 +50,7 @@ export default async function MarketingPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <MarketingDirectorHub
+        key={`${campaigns.length}-${angles.length}-${metrics.length}`}
         folder={virtualFolder}
         initialCampaigns={campaigns}
         initialAngles={angles}

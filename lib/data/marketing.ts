@@ -85,7 +85,7 @@ export async function getCampaigns(filter: CampaignsFilter = {}): Promise<Market
   if (filter.folderId) {
     query = query.eq("folder_id", filter.folderId);
   } else if (filter.folderIds && filter.folderIds.length > 0) {
-    query = query.in("folder_id", filter.folderIds);
+    query = query.or(`folder_id.in.(${filter.folderIds.join(",")}),folder_id.is.null`);
   }
 
   if (filter.status) {
@@ -246,7 +246,7 @@ export async function getContentIdeasWithScripts(filter: ContentIdeasFilter = {}
   if (filter.folderId) {
     query = query.eq("folder_id", filter.folderId);
   } else if (filter.folderIds && filter.folderIds.length > 0) {
-    query = query.in("folder_id", filter.folderIds);
+    query = query.or(`folder_id.in.(${filter.folderIds.join(",")}),folder_id.is.null`);
   }
 
   if (filter.format) query = query.eq("format", filter.format);

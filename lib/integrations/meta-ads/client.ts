@@ -1,62 +1,131 @@
 import "server-only";
 
 import { addDays, todayIso } from "@/lib/dates";
-import type { MetaAdsCampaignInsight, MetaAdsClient } from "./types";
+import type { MetaAdsCampaignInsight, MetaAdsClient, MetaRealAd, MetaRealCampaign } from "./types";
+
+export function formatAdAccountId(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  return `act_${digits}`;
+}
+
+function mapRawInsight(item: Record<string, unknown>): MetaAdsCampaignInsight {
+  const spendFloat = Number.parseFloat((item.spend as string) || "0");
+  const spendCents = Math.round(spendFloat * 100);
+  const impressions = Number.parseInt((item.impressions as string) || "0", 10);
+  const clicks = Number.parseInt((item.clicks as string) || "0", 10);
+  const ctr = Number.parseFloat((item.ctr as string) || "0");
+  const cpcFloat = Number.parseFloat((item.cpc as string) || "0");
+  const cpcCents = Math.round(cpcFloat * 100);
+
+  let conversions = 0;
+  if (Array.isArray(item.actions)) {
+    for (const act of item.actions) {
+      const type = act.action_type as string;
+      if (
+        type === "onsite_conversion.messaging_conversation_started_7d" ||
+        type === "lead" ||
+        type === "contact_total" ||
+        type === "onsite_conversion.messaging_first_reply"
+      ) {
+        conversions += Number.parseInt(act.value as string, 10) || 0;
+      }
+    }
+  }
+
+  const costPerConversionCents = conversions > 0 ? Math.round(spendCents / conversions) : 0;
+
+  return {
+    campaign_id: (item.campaign_id as string) || "unknown",
+    campaign_name: (item.campaign_name as string) || "Campanha Meta",
+    ad_id: (item.ad_id as string) || null,
+    ad_name: (item.ad_name as string) || null,
+    date_reported: (item.date_start as string) || todayIso(),
+    spend_cents: spendCents,
+    impressions,
+    clicks,
+    ctr: Number(ctr.toFixed(2)),
+    cpc_cents: cpcCents,
+    conversions,
+    cost_per_conversion_cents: costPerConversionCents,
+    raw_data: item,
+  };
+}
 
 /**
  * Retorna dados simulados realistas para a Trust Care em Cuiabá e Várzea Grande.
- * Usado como fallback resiliente quando as credenciais do Meta Ads ainda não foram configuradas no .env.
+ * Usado como fallback quando as credenciais do Meta Ads não foram configuradas.
  */
 function createMockMetaAdsClient(): MetaAdsClient {
   return {
     name: "meta-ads:mock-cuiaba",
     isLive: () => false,
 
+    async getCampaigns(): Promise<MetaRealCampaign[]> {
+      return [
+        {
+          id: "meta_camp_tc_upgrade",
+          name: "Campanha Upgrade Turbo 2026",
+          status: "active",
+          objective: "OUTCOME_LEADS",
+          daily_budget_cents: 3500,
+          start_time: todayIso(),
+        },
+        {
+          id: "meta_camp_tc_seminovos",
+          name: "Campanha Notebooks Seminovos Cuiabá",
+          status: "paused",
+          objective: "OUTCOME_LEADS",
+          daily_budget_cents: 4500,
+          start_time: todayIso(),
+        },
+      ];
+    },
+
+    async getAds(): Promise<MetaRealAd[]> {
+      return [
+        {
+          id: "meta_ad_dor_pc_lento",
+          name: "Vídeo Reel: PC Travando no Home Office",
+          status: "active",
+          campaign_id: "meta_camp_tc_upgrade",
+          title: "Seu notebook trava toda hora?",
+          body: "Na Trust Care em Cuiabá recuperamos seu equipamento com upgrade rápido.",
+        },
+        {
+          id: "meta_ad_custo_beneficio",
+          name: "Carrossel: Economize 70% Não Comprando PC Novo",
+          status: "active",
+          campaign_id: "meta_camp_tc_upgrade",
+          title: "Não compre outro PC de 4 mil!",
+          body: "Trocar o HD por SSD deixa seu notebook até 10x mais veloz.",
+        },
+      ];
+    },
+
     async getCampaignInsights(params = {}) {
       const today = todayIso();
       const days = [0, -1, -2, -3, -4, -5, -6];
 
-      // Ângulos reais da Trust Care testados em tráfego local
       const mockAds = [
         {
           campaign_id: "meta_camp_tc_upgrade",
           campaign_name: "Campanha Upgrade Turbo 2026",
           ad_id: "meta_ad_dor_pc_lento",
           ad_name: "Vídeo Reel: PC Travando no Home Office",
-          baseSpend: 4200, // R$ 42,00 / dia
+          baseSpend: 4200,
           baseImpressions: 2400,
-          clicksFactor: 0.032, // CTR 3.2%
-          conversionsFactor: 0.12, // 12% dos cliques viram WhatsApp
+          clicksFactor: 0.032,
+          conversionsFactor: 0.12,
         },
         {
           campaign_id: "meta_camp_tc_upgrade",
           campaign_name: "Campanha Upgrade Turbo 2026",
           ad_id: "meta_ad_custo_beneficio",
           ad_name: "Carrossel: Economize 70% Não Comprando PC Novo",
-          baseSpend: 3500, // R$ 35,00 / dia
+          baseSpend: 3500,
           baseImpressions: 1950,
-          clicksFactor: 0.026, // CTR 2.6%
+          clicksFactor: 0.026,
           conversionsFactor: 0.09,
-        },
-        {
-          campaign_id: "meta_camp_tc_upgrade",
-          campaign_name: "Campanha Upgrade Turbo 2026",
-          ad_id: "meta_ad_autoridade_lab",
-          ad_name: "Reel: Bastidores da Bancada Trust Care",
-          baseSpend: 2800, // R$ 28,00 / dia
-          baseImpressions: 1600,
-          clicksFactor: 0.019, // CTR 1.9%
-          conversionsFactor: 0.06,
-        },
-        {
-          campaign_id: "meta_camp_tc_seminovos",
-          campaign_name: "Campanha Notebooks Seminovos Cuiabá",
-          ad_id: "meta_ad_seminovos_garantia",
-          ad_name: "Carrossel: Notebooks Revisados com Garantia",
-          baseSpend: 4500, // R$ 45,00 / dia
-          baseImpressions: 2100,
-          clicksFactor: 0.028, // CTR 2.8%
-          conversionsFactor: 0.14,
         },
       ];
 
@@ -65,11 +134,8 @@ function createMockMetaAdsClient(): MetaAdsClient {
       for (const dayOffset of days) {
         const date = addDays(today, dayOffset);
         for (const ad of mockAds) {
-          if (params.campaignId && params.campaignId !== ad.campaign_id) {
-            continue;
-          }
+          if (params.campaignId && params.campaignId !== ad.campaign_id) continue;
 
-          // Adiciona leve variação orgânica diária
           const jitter = 0.85 + ((date.charCodeAt(9) + ad.ad_id.charCodeAt(8)) % 30) / 100;
           const spendCents = Math.round(ad.baseSpend * jitter);
           const impressions = Math.round(ad.baseImpressions * jitter);
@@ -95,8 +161,6 @@ function createMockMetaAdsClient(): MetaAdsClient {
             raw_data: {
               source: "simulated_local_cuiaba",
               location: "Cuiabá e Várzea Grande (MT)",
-              objective: "OUTCOME_LEADS",
-              destination: "whatsapp_message",
             },
           });
         }
@@ -132,94 +196,123 @@ function createMockMetaAdsClient(): MetaAdsClient {
 /**
  * Cliente real para a Graph API da Meta (Marketing API).
  */
-function createDirectMetaAdsClient(accessToken: string, adAccountId: string): MetaAdsClient {
-  const accountId = adAccountId.startsWith("act_") ? adAccountId : `act_${adAccountId}`;
+function createDirectMetaAdsClient(accessToken: string, rawAdAccountId: string): MetaAdsClient {
+  const accountId = formatAdAccountId(rawAdAccountId);
 
   return {
-    name: "meta-ads:marketing-api",
+    name: `meta-ads:${accountId}`,
     isLive: () => true,
 
-    async getCampaignInsights(params = {}) {
-      try {
-        const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/insights`);
-        url.searchParams.set("access_token", accessToken);
-        url.searchParams.set(
-          "fields",
-          "campaign_id,campaign_name,ad_id,ad_name,date_start,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type"
-        );
-        url.searchParams.set("level", "ad");
-        url.searchParams.set("time_increment", "1"); // Agrupado por dia
+    async getCampaigns(): Promise<MetaRealCampaign[]> {
+      const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/campaigns`);
+      url.searchParams.set("access_token", accessToken);
+      url.searchParams.set("fields", "id,name,status,objective,daily_budget,lifetime_budget,start_time,stop_time");
+      url.searchParams.set("limit", "50");
 
-        if (params.since && params.until) {
-          url.searchParams.set("time_range", JSON.stringify({ since: params.since, until: params.until }));
-        } else {
-          url.searchParams.set("date_preset", "last_7d");
-        }
+      const response = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
 
-        if (params.campaignId) {
-          url.searchParams.set("filtering", JSON.stringify([{ field: "campaign.id", operator: "EQUAL", value: params.campaignId }]));
-        }
-
-        const response = await fetch(url.toString(), {
-          headers: { Accept: "application/json" },
-          next: { revalidate: 300 }, // Cache 5 min
-        });
-
-        if (!response.ok) {
-          console.warn("Meta Ads API error status:", response.status, await response.text());
-          // Fallback gracioso para simulação
-          return createMockMetaAdsClient().getCampaignInsights(params);
-        }
-
-        const json = await response.json();
-        const data = Array.isArray(json.data) ? json.data : [];
-
-        return data.map((item: Record<string, unknown>) => {
-          const spendFloat = Number.parseFloat((item.spend as string) || "0");
-          const spendCents = Math.round(spendFloat * 100);
-          const impressions = Number.parseInt((item.impressions as string) || "0", 10);
-          const clicks = Number.parseInt((item.clicks as string) || "0", 10);
-          const ctr = Number.parseFloat((item.ctr as string) || "0");
-          const cpcFloat = Number.parseFloat((item.cpc as string) || "0");
-          const cpcCents = Math.round(cpcFloat * 100);
-
-          // Procura ações de lead ou mensagens de WhatsApp
-          let conversions = 0;
-          if (Array.isArray(item.actions)) {
-            for (const act of item.actions) {
-              const type = act.action_type as string;
-              if (
-                type === "onsite_conversion.messaging_conversation_started_7d" ||
-                type === "lead" ||
-                type === "contact_total"
-              ) {
-                conversions += Number.parseInt(act.value as string, 10) || 0;
-              }
-            }
-          }
-
-          const costPerConversionCents = conversions > 0 ? Math.round(spendCents / conversions) : 0;
-
-          return {
-            campaign_id: (item.campaign_id as string) || "unknown",
-            campaign_name: (item.campaign_name as string) || "Campanha Meta",
-            ad_id: (item.ad_id as string) || null,
-            ad_name: (item.ad_name as string) || null,
-            date_reported: (item.date_start as string) || todayIso(),
-            spend_cents: spendCents,
-            impressions,
-            clicks,
-            ctr: Number(ctr.toFixed(2)),
-            cpc_cents: cpcCents,
-            conversions,
-            cost_per_conversion_cents: costPerConversionCents,
-            raw_data: item,
-          };
-        });
-      } catch (error) {
-        console.error("Falha ao consultar Meta Ads API direta:", error);
-        return createMockMetaAdsClient().getCampaignInsights(params);
+      const json = await response.json();
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || `Erro ao consultar campanhas da Meta (${response.status})`);
       }
+
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.map((item: Record<string, unknown>) => ({
+        id: item.id as string,
+        name: (item.name as string) || "Campanha sem nome",
+        status: ((item.status as string) || "ACTIVE").toLowerCase(),
+        objective: item.objective as string,
+        daily_budget_cents: item.daily_budget ? Math.round(Number(item.daily_budget)) : undefined,
+        lifetime_budget_cents: item.lifetime_budget ? Math.round(Number(item.lifetime_budget)) : undefined,
+        start_time: item.start_time as string,
+        stop_time: item.stop_time as string,
+      }));
+    },
+
+    async getAds(campaignId?: string): Promise<MetaRealAd[]> {
+      const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/ads`);
+      url.searchParams.set("access_token", accessToken);
+      url.searchParams.set("fields", "id,name,status,campaign_id,creative{title,body,image_url}");
+      url.searchParams.set("limit", "100");
+
+      if (campaignId) {
+        url.searchParams.set("filtering", JSON.stringify([{ field: "campaign.id", operator: "EQUAL", value: campaignId }]));
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      const json = await response.json();
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || `Erro ao consultar anúncios da Meta (${response.status})`);
+      }
+
+      const list = Array.isArray(json.data) ? json.data : [];
+      return list.map((item: Record<string, unknown>) => {
+        const creative = item.creative as Record<string, unknown> | undefined;
+        return {
+          id: item.id as string,
+          name: (item.name as string) || "Anúncio",
+          status: ((item.status as string) || "ACTIVE").toLowerCase(),
+          campaign_id: item.campaign_id as string,
+          title: creative?.title as string | undefined,
+          body: creative?.body as string | undefined,
+          image_url: creative?.image_url as string | undefined,
+        };
+      });
+    },
+
+    async getCampaignInsights(params = {}) {
+      const url = new URL(`https://graph.facebook.com/v21.0/${accountId}/insights`);
+      url.searchParams.set("access_token", accessToken);
+      url.searchParams.set(
+        "fields",
+        "campaign_id,campaign_name,ad_id,ad_name,date_start,spend,impressions,clicks,ctr,cpc,actions,cost_per_action_type"
+      );
+      url.searchParams.set("level", "ad");
+      url.searchParams.set("time_increment", "1");
+
+      if (params.since && params.until) {
+        url.searchParams.set("time_range", JSON.stringify({ since: params.since, until: params.until }));
+      } else if (params.datePreset) {
+        url.searchParams.set("date_preset", params.datePreset);
+      } else {
+        url.searchParams.set("date_preset", "last_30d");
+      }
+
+      if (params.campaignId) {
+        url.searchParams.set("filtering", JSON.stringify([{ field: "campaign.id", operator: "EQUAL", value: params.campaignId }]));
+      }
+
+      const response = await fetch(url.toString(), {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      const json = await response.json();
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || `Erro da Meta (${response.status}) ao buscar métricas.`);
+      }
+
+      const data = Array.isArray(json.data) ? json.data : [];
+
+      // Se nos últimos 30 dias não houver dados, tenta buscar o histórico total (maximum)
+      if (data.length === 0 && !params.since && !params.datePreset) {
+        const maxUrl = new URL(url.toString());
+        maxUrl.searchParams.set("date_preset", "maximum");
+        const maxRes = await fetch(maxUrl.toString(), { headers: { Accept: "application/json" }, cache: "no-store" });
+        const maxJson = await maxRes.json();
+        if (maxRes.ok && Array.isArray(maxJson.data) && maxJson.data.length > 0) {
+          return maxJson.data.map(mapRawInsight);
+        }
+      }
+
+      return data.map(mapRawInsight);
     },
 
     async getAccountSummary() {
