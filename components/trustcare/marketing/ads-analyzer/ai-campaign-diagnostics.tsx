@@ -28,7 +28,7 @@ export function AiCampaignDiagnostics({
 
   const handleGenerate = async () => {
     setLoading(true);
-    toast.info("A IA do Google Gemini está analisando seus dados de tráfego...");
+    toast.info("A IA com metodologia Pedro Sobral está analisando seus dados de tráfego...");
     try {
       const res = await analyzeCampaignsWithAi({
         totalSpendCents,
@@ -40,7 +40,7 @@ export function AiCampaignDiagnostics({
 
       if (res.ok) {
         setReport(res.data);
-        toast.success("Parecer executivo gerado com sucesso!");
+        toast.success("Parecer executivo gerado com metodologia Sobral!");
       } else {
         toast.error(res.error);
       }
@@ -59,8 +59,15 @@ export function AiCampaignDiagnostics({
             <SparklesIcon className="size-4" />
           </div>
           <div>
-            <h3 className="font-semibold text-base leading-tight">Parecer Consultivo com IA (Gemini)</h3>
-            <p className="text-xs text-muted-foreground">Diagnóstico de escala, verba e fadiga criativa de anúncios</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-base leading-tight">Parecer Consultivo · Metodologia Pedro Sobral</h3>
+              <span className="rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 px-2 py-0.5 text-[10px] font-bold">
+                Ninja do Tráfego
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Diretrizes de tráfego pago: &ldquo;Criativo é o novo público&rdquo;, controle de CPL e ação imediata em Cuiabá.
+            </p>
           </div>
         </div>
 
@@ -73,14 +80,14 @@ export function AiCampaignDiagnostics({
           className="gap-1.5 border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
         >
           <SparklesIcon className="size-3.5" />
-          {loading ? "Analisando Métricas..." : report ? "Atualizar Parecer" : "Gerar Diagnóstico IA"}
+          {loading ? "Consultando Sobral..." : report ? "Atualizar Análise" : "Gerar Análise Sobral"}
         </Button>
       </div>
 
       {!report ? (
         <div className="py-6 text-center space-y-2">
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Clique no botão acima para que a inteligência artificial avalie a eficiência de cada ângulo, identifique oportunidades de economia e recomende ajustes de verba.
+            Clique no botão acima para que a IA analise suas métricas sob a ótica de <strong>Pedro Sobral</strong>: validação de criativos, custo por conversa de WhatsApp e otimização cirúrgica de verba.
           </p>
         </div>
       ) : (
@@ -90,7 +97,7 @@ export function AiCampaignDiagnostics({
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUpIcon className="size-3.5" />
-                Resumo Executivo
+                Diagnóstico de Tráfego (Pedro Sobral)
               </span>
               <Badge className={
                 report.status_badge === "healthy"
@@ -108,13 +115,13 @@ export function AiCampaignDiagnostics({
             <div className="rounded-lg border bg-card p-3.5 space-y-2">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <TrophyIcon className="size-3.5 text-emerald-500" />
-                Ângulo Campeão em Cuiabá
+                Criativo Campeão (Novo Público)
               </span>
               <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                 {report.best_angle_name}
               </p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Este ângulo entregou o menor CPL (Custo por Lead) e maior CTR nos testes locais.
+                Este criativo filtrou o público mais qualificado de Cuiabá com menor custo por mensagem no WhatsApp.
               </p>
             </div>
 
@@ -122,7 +129,7 @@ export function AiCampaignDiagnostics({
             <div className="rounded-lg border bg-card p-3.5 space-y-2">
               <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUpIcon className="size-3.5 text-blue-500" />
-                Recomendação de Verba
+                Diretriz de Orçamento (ABO vs CBO)
               </span>
               <p className="text-xs font-medium leading-relaxed text-foreground">
                 {report.budget_adjustment_suggestion}
@@ -134,7 +141,7 @@ export function AiCampaignDiagnostics({
           {report.recommended_actions?.length > 0 && (
             <div className="space-y-2">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Próximos Passos Recomendados:
+                Ações Recomendadas (Vai lá e faz):
               </span>
               <div className="space-y-1.5">
                 {report.recommended_actions.map((act, idx) => (
@@ -147,12 +154,12 @@ export function AiCampaignDiagnostics({
             </div>
           )}
 
-          {/* Criativos Fadigados */}
+          {/* Criativos Fadigados & Alertas */}
           {report.fatigued_creatives?.length > 0 && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs space-y-1">
               <span className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1">
                 <AlertTriangleIcon className="size-3.5" />
-                Alerta de Fadiga Criativa
+                Alerta de Fadiga &amp; &ldquo;Problema da Raposa&rdquo;
               </span>
               <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
                 {report.fatigued_creatives.map((f, i) => (
