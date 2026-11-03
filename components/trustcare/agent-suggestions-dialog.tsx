@@ -54,14 +54,14 @@ export function AgentSuggestionsDialog({
   onOpenChange: (open: boolean) => void;
   onAdd: (s: AgentSuggestionView) => Promise<boolean>;
 }) {
-  const [items, setItems] = useState<AgentSuggestionView[] | null>(null);
+  const [cache, setCache] = useState<Partial<Record<ContentHypeFocus, AgentSuggestionView[]>>>({});
   const [loading, setLoading] = useState(false);
   const [focus, setFocus] = useState<ContentHypeFocus>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [added, setAdded] = useState<Set<string>>(new Set());
 
-  const fetchSuggestions = useCallback(
-    async (selectedFocus: ContentHypeFocus) => {
+  const fetchFocus = useCallback(
+    async (selectedFocus: ContentHypeFocus, force = false) => {
       setLoading(true);
       const result = await getAgentSuggestions({ focus: selectedFocus });
       setLoading(false);
@@ -69,15 +69,17 @@ export function AgentSuggestionsDialog({
         toast.error(result.error);
         return;
       }
-      setItems(result.data);
+      setCache((prev) => ({ ...prev, [selectedFocus]: result.data }));
     },
     [],
   );
 
   useEffect(() => {
     if (!open) return;
-    fetchSuggestions(focus);
-  }, [open, focus, fetchSuggestions]);
+    if (!cache[focus]) {
+      fetchFocus(focus);
+    }
+  }, [open, focus, cache, fetchFocus]);
 
   const toggleExpand = (ref: string) => {
     setExpanded((prev) => {
@@ -87,6 +89,8 @@ export function AgentSuggestionsDialog({
       return next;
     });
   };
+
+  const currentItems = cache[focus];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -105,7 +109,7 @@ export function AgentSuggestionsDialog({
               size="xs"
               variant="outline"
               disabled={loading}
-              onClick={() => fetchSuggestions(focus)}
+              onClick={() => fetchFocus(focus, true)}
               className="gap-1.5 text-xs h-7"
             >
               <RefreshCwIcon className={cn("size-3", loading && "animate-spin")} />
@@ -127,9 +131,14 @@ export function AgentSuggestionsDialog({
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setFocus(opt.id)}
+                onClick={() => {
+                  setFocus(opt.id);
+                  if (!cache[opt.id]) {
+                    fetchFocus(opt.id);
+                  }
+                }}
                 className={cn(
-                  "flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors",
+                  "flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs transition-colors cursor-pointer",
                   active
                     ? "border-primary/50 bg-primary/10 text-primary font-medium"
                     : "border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40",
@@ -144,18 +153,18 @@ export function AgentSuggestionsDialog({
 
         {/* Lista de Ideias */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-3 py-2">
-          {loading && !items ? (
+          {loading && !currentItems ? (
             <div className="py-12 text-center text-sm text-muted-foreground space-y-2">
               <RefreshCwIcon className="size-6 animate-spin mx-auto text-primary" />
-              <p>Analisando o hype e estruturando ganchos com IA...</p>
+              <p>Buscando formatos e ganchos de {FOCUS_OPTIONS.find((o) => o.id === focus)?.label}...</p>
             </div>
-          ) : !items || items.length === 0 ? (
+          ) : !currentItems || currentItems.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Nenhuma ideia encontrada para este filtro.
+              Nenhuma ideia encontrada para esta categoria.
             </p>
           ) : (
             <ul className="space-y-3">
-              {items.map((s) => {
+              {currentItems.map((s) => {
                 const isAdded = added.has(s.ref);
                 const isExpanded = expanded.has(s.ref);
                 return (
@@ -240,7 +249,7 @@ export function AgentSuggestionsDialog({
                       <button
                         type="button"
                         onClick={() => toggleExpand(s.ref)}
-                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
                         {isExpanded ? (
                           <>

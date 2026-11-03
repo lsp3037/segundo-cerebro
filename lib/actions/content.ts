@@ -296,8 +296,46 @@ const FALLBACK_OOTTO_IDEAS: Record<ContentHypeFocus, AgentSuggestionView[]> = {
         "🔥 Por que está em alta: Guia prático que a pessoa salva para consultar antes de gastar dinheiro.",
         "🗣️ Gancho Falado: 'O passo a passo para saber se o seu notebook merece upgrade ou se já deu o tempo dele.'",
         "📺 Texto na Tela: 'UPGRADE OU PC NOVO?'",
-        "📋 Estrutura & Retenção:\n- Slide 1: Capa com comparativo visual de notebook 2020 vs novo.\n- Slide 2: Quando VALE a pena (processador Core i3/i5/i7 a partir da 6ª geração, carcaça boa).\n- Slide 3: Quando NÃO vale a pena (processador soldado Celeron/Atom muito antigo).\n- Slide 4: O combo perfeito Trust Care: SSD NVMe + 16GB RAM + Limpeza térmica profunda.\n- Slide 5: Garantia e atendimento em Cuiabá.",
+        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: Capa com comparativo visual de notebook 2020 vs novo.\n- Slide 2: Quando VALE a pena (processador Core i3/i5/i7 a partir da 6ª geração, carcaça boa).\n- Slide 3: Quando NÃO vale a pena (processador soldado Celeron/Atom muito antigo).\n- Slide 4: O combo perfeito Trust Care: SSD NVMe + 16GB RAM + Limpeza térmica profunda.\n- Slide 5: Garantia e atendimento em Cuiabá.",
         "👉 CTA: 'Comente o processador do seu notebook que dizemos se vale a pena!'",
+      ].join("\n\n"),
+      test: false,
+    },
+    {
+      ref: "ootto-carrossel-2",
+      title: "SSD SATA vs SSD NVMe M.2: Qual a real diferença no seu dia a dia?",
+      format: "carousel",
+      pillar: "Dicas",
+      onScreenText: "SATA VS NVME: QUAL ESCOLHER?",
+      emotionalAngle: "Educação & Clareza",
+      viralPotential: "Alta Taxa de Salvos",
+      trendReason: "Confusão frequente do cliente entre os tipos de SSD e medo de comprar peça incompatível.",
+      notes: [
+        "🎯 Ângulo: Desmistificando hardware sem complicação.",
+        "🔥 Por que está em alta: Muita gente compra SSD incompatível pela internet e perde dinheiro.",
+        "🗣️ Gancho Falado: 'Você sabe qual SSD o seu notebook realmente aceita?'",
+        "📺 Texto na Tela: 'SATA VS NVME: QUAL ESCOLHER?'",
+        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: Foto lado a lado de um SSD SATA de 2.5\" e um NVMe fininho.\n- Slide 2: Velocidades reais na prática (500 MB/s vs 3.500 MB/s).\n- Slide 3: Quem sente a diferença (abertura de programas pesados vs uso básico).\n- Slide 4: O maior perigo: comprar sem saber se a sua placa-mãe tem o slot M.2 correto.\n- Slide 5: Como a Trust Care escolhe o modelo 100% compatível com a sua máquina.",
+        "👉 CTA: 'Ficou na dúvida? Mande o modelo do seu PC que verificamos a compatibilidade de graça.'",
+      ].join("\n\n"),
+      test: false,
+    },
+    {
+      ref: "ootto-carrossel-3",
+      title: "5 sinais silenciosos de que o seu computador está prestes a pifar",
+      format: "carousel",
+      pillar: "Prevenção",
+      onScreenText: "SEU PC VAI QUEIMAR?",
+      emotionalAngle: "Alerta & Prevenção",
+      viralPotential: "Altíssimo Compartilhamento",
+      trendReason: "Prevenção de prejuízo: consertar antes de queimar sai até 80% mais barato.",
+      notes: [
+        "🎯 Ângulo: Diagnóstico precoce em casa.",
+        "🔥 Por que está em alta: Quase todo mundo ignora pequenos travamentos até o computador não ligar mais.",
+        "🗣️ Gancho Falado: 'Se o seu notebook tem pelo menos 2 desses sintomas, desligue agora.'",
+        "📺 Texto na Tela: 'SEU PC VAI QUEIMAR?'",
+        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: '5 avisos que seu computador dá antes de parar de ligar.'\n- Slide 2: Sinal 1: A ventoinha parece uma turbina de avião o tempo todo.\n- Slide 3: Sinal 2: O teclado ou a base ficam pelando em poucos minutos.\n- Slide 4: Sinal 3: Travamentos aleatórios ao abrir várias abas no navegador.\n- Slide 5: Sinal 4: Luz de HD/SSD piscando sem parar.\n- Slide 6: A solução preventiva na Trust Care antes de precisar trocar a placa.",
+        "👉 CTA: 'Quantos desses sintomas a sua máquina tem hoje? Conte nos comentários.'",
       ].join("\n\n"),
       test: false,
     },
@@ -371,6 +409,14 @@ export async function getAgentSuggestions(params?: {
       venda_notebooks: "Revenda de notebooks seminovos revisados com garantia e procedência na Trust Care versus comprar notebooks novos básicos caros.",
     };
 
+    const allowedFormats = focus === "carrosseis" ? ["carousel"] : focus === "reels" ? ["reel"] : ["reel", "carousel", "story"];
+    const formatRule =
+      focus === "carrosseis"
+        ? "3. FORMATO: OBRIGATORIAMENTE 'carousel'. Todas as 5 ideias DEVEM ser carrosséis educativos ou comparativos slide a slide. NENHUM reel deve ser gerado."
+        : focus === "reels"
+          ? "3. FORMATO: OBRIGATORIAMENTE 'reel'. Todas as 5 ideias DEVEM ser vídeos curtos/reels gravados na bancada de assistência."
+          : "3. FORMATO: Escolha entre 'reel', 'carousel' e 'story'.";
+
     const prompt = `Gere 5 ideias de conteúdo irresistíveis para o Instagram da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT).
 
 FOCO ATUAL: ${focusPrompts[focus]}
@@ -379,7 +425,7 @@ PILARES DISPONÍVEIS: ${pillarList || "Manutenção, Upgrades, Vendas, Dicas, Ba
 Siga rigorosamente a metodologia Ootto Content Skills (trend-spotter, viral-hook-writer, reel-scripter):
 1. TÍTULO / GANCHO (0-3s): Menos de 12 palavras, falado, quebra de padrão, chamativo, sem jargões enfadonhos.
 2. TEXTO NA TELA: 3 a 5 palavras em caixa alta para a legenda visual inicial.
-3. FORMATO: Escolha entre 'reel', 'carousel', 'story'.
+${formatRule}
 4. EMOTIONAL ANGLE: O trabalho emocional (ex: Alívio de gasto, Medo de queimar, Curiosidade técnica, Prova de autoridade).
 5. VIRAL POTENTIAL: Estimativa (ex: 'Viral', 'Alta Retenção', 'Conversão WhatsApp').
 6. TREND REASON: O que torna este tema quente no momento.
@@ -396,7 +442,7 @@ Siga rigorosamente a metodologia Ootto Content Skills (trend-spotter, viral-hook
             type: "object",
             properties: {
               title: { type: "string" },
-              format: { type: "string", enum: ["reel", "carousel", "story", "post"] },
+              format: { type: "string", enum: allowedFormats },
               pillar: { type: "string" },
               onScreenText: { type: "string" },
               emotionalAngle: { type: "string" },
