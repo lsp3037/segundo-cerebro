@@ -176,6 +176,7 @@ export type ContentHypeFocus = "todos" | "reels" | "carrosseis" | "calor_cuiaba"
 export type AgentSuggestionView = AgentSuggestion & {
   test: boolean;
   onScreenText?: string;
+  coverHeadline?: string;
   emotionalAngle?: string;
   viralPotential?: string;
   trendReason?: string;
@@ -409,13 +410,131 @@ export async function getAgentSuggestions(params?: {
       venda_notebooks: "Revenda de notebooks seminovos revisados com garantia e procedência na Trust Care versus comprar notebooks novos básicos caros.",
     };
 
-    const allowedFormats = focus === "carrosseis" ? ["carousel"] : focus === "reels" ? ["reel"] : ["reel", "carousel", "story"];
-    const formatRule =
-      focus === "carrosseis"
-        ? "3. FORMATO: OBRIGATORIAMENTE 'carousel'. Todas as 5 ideias DEVEM ser carrosséis educativos ou comparativos slide a slide. NENHUM reel deve ser gerado."
-        : focus === "reels"
-          ? "3. FORMATO: OBRIGATORIAMENTE 'reel'. Todas as 5 ideias DEVEM ser vídeos curtos/reels gravados na bancada de assistência."
-          : "3. FORMATO: Escolha entre 'reel', 'carousel' e 'story'.";
+    const isCarousel = focus === "carrosseis";
+    const isReel = focus === "reels";
+
+    if (isCarousel) {
+      // Metodologia estrita da Skill carousel-builder (Ootto)
+      const carouselPrompt = `Você é o Carousel Writer da Trust Care em Cuiabá-MT, aplicando estritamente a skill Ootto "carousel-builder".
+FOCO: CARROSSÉIS educativos e comparativos técnicos diretos (ex: SSD vs HD, Quando vale a pena upgrade vs comprar notebook novo).
+PILARES DISPONÍVEIS: ${pillarList || "Upgrades, Manutenção, Dicas, Prevenção"}
+
+Gere 5 carrosséis estratégicos completos seguindo as regras da skill carousel-builder:
+- SLIDE 1 (Capa / Scroll-stopper): Headline de capa magnética com MENOS DE 8 PALAVRAS.
+- SLIDES 2-N: Uma ideia por slide (linha em negrito + 1 ou 2 linhas explicativas + nota visual do que mostrar no slide).
+- PENÚLTIMO SLIDE: Resumo ou checklist limpo que as pessoas tiram print e salvam na galeria.
+- ÚLTIMO SLIDE: Chamada para ação única (CTA no WhatsApp ou Direct da Trust Care em Cuiabá).
+
+PROIBIDO: Não mencione segundos, não invente "gancho falado (0-3s)", não use "texto na tela (0-3s)". Isto é um post de CARROSSEL de imagens estáticas.`;
+
+      const carouselSchema = {
+        type: "object",
+        properties: {
+          suggestions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                format: { type: "string", enum: ["carousel"] },
+                pillar: { type: "string" },
+                coverHeadline: { type: "string" },
+                emotionalAngle: { type: "string" },
+                viralPotential: { type: "string" },
+                trendReason: { type: "string" },
+                slides: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      slideNumber: { type: "integer" },
+                      role: { type: "string", enum: ["capa", "conteudo", "checklist", "cta"] },
+                      headline: { type: "string" },
+                      supportingText: { type: "string" },
+                      visualNote: { type: "string" },
+                    },
+                    required: ["slideNumber", "role", "headline", "visualNote"],
+                  },
+                },
+                cta: { type: "string" },
+              },
+              required: [
+                "title",
+                "format",
+                "pillar",
+                "coverHeadline",
+                "emotionalAngle",
+                "viralPotential",
+                "trendReason",
+                "slides",
+                "cta",
+              ],
+            },
+          },
+        },
+        required: ["suggestions"],
+      };
+
+      const response = await ai.generateJson<{
+        suggestions: Array<{
+          title: string;
+          format: "carousel";
+          pillar: string;
+          coverHeadline: string;
+          emotionalAngle: string;
+          viralPotential: string;
+          trendReason: string;
+          slides: Array<{
+            slideNumber: number;
+            role: "capa" | "conteudo" | "checklist" | "cta";
+            headline: string;
+            supportingText?: string;
+            visualNote: string;
+          }>;
+          cta: string;
+        }>;
+      }>({
+        system:
+          "Você é o Carousel Writer da Trust Care em Cuiabá-MT, aplicando estritamente a skill carousel-builder do Ootto. Você NUNCA usa termos de vídeo/Reel para carrosséis.",
+        prompt: carouselPrompt,
+        schema: carouselSchema,
+      });
+
+      const suggestions: AgentSuggestionView[] = (response.suggestions ?? []).map((s, idx) => ({
+        ref: `ai-ootto-carousel-${Date.now()}-${idx}`,
+        title: s.title,
+        format: "carousel",
+        pillar: s.pillar,
+        coverHeadline: s.coverHeadline,
+        emotionalAngle: s.emotionalAngle,
+        viralPotential: s.viralPotential,
+        trendReason: s.trendReason,
+        notes: [
+          `🎯 Ângulo: ${s.emotionalAngle} (${s.viralPotential})`,
+          `🔥 Por que está em alta: ${s.trendReason}`,
+          `🖼️ Capa (Slide 1): "${s.coverHeadline}"`,
+          `📊 Roteiro Slide a Slide (Skill carousel-builder):\n` +
+            (s.slides || [])
+              .map(
+                (sl) =>
+                  `Slide ${sl.slideNumber} [${sl.role.toUpperCase()}]: ${sl.headline}${
+                    sl.supportingText ? `\n   ${sl.supportingText}` : ""
+                  }\n   🎨 Visual: ${sl.visualNote}`,
+              )
+              .join("\n\n"),
+          `👉 CTA Final: ${s.cta}`,
+        ].join("\n\n"),
+        test: false,
+      }));
+
+      return ok(suggestions.length > 0 ? suggestions : FALLBACK_OOTTO_IDEAS.carrosseis);
+    }
+
+    // Para Reels e outros formatos
+    const allowedFormats = isReel ? ["reel"] : ["reel", "carousel", "story"];
+    const formatRule = isReel
+      ? "3. FORMATO: OBRIGATORIAMENTE 'reel'. Todas as 5 ideias DEVEM ser vídeos curtos/reels gravados na bancada de assistência."
+      : "3. FORMATO: Escolha entre 'reel', 'carousel' e 'story'.";
 
     const prompt = `Gere 5 ideias de conteúdo irresistíveis para o Instagram da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT).
 
@@ -430,7 +549,7 @@ ${formatRule}
 5. VIRAL POTENTIAL: Estimativa (ex: 'Viral', 'Alta Retenção', 'Conversão WhatsApp').
 6. TREND REASON: O que torna este tema quente no momento.
 7. HOOK SPOKEN: A frase falada exata dos primeiros 3 segundos.
-8. STRUCTURE SUMMARY: Roteiro conciso de retenção (passo a passo das cenas ou slides).
+8. STRUCTURE SUMMARY: Roteiro conciso de retenção de bancada.
 9. CTA: Chamada direta para o WhatsApp ou Direct da Trust Care em Cuiabá.`;
 
     const schema = {

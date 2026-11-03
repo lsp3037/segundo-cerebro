@@ -232,8 +232,20 @@ export function AgentSuggestionsDialog({
                       </Button>
                     </div>
 
-                    {/* Texto na tela (Gancho visual dos primeiros 3s) */}
-                    {s.onScreenText && (
+                    {/* Capa do Carrossel (Skill carousel-builder) */}
+                    {s.format === "carousel" && s.coverHeadline && (
+                      <div className="flex items-center gap-2 rounded bg-muted/50 px-2.5 py-1 text-xs">
+                        <span className="text-muted-foreground font-medium shrink-0">
+                          🖼️ Capa (Slide 1):
+                        </span>
+                        <code className="text-xs font-semibold text-primary">
+                          "{s.coverHeadline}"
+                        </code>
+                      </div>
+                    )}
+
+                    {/* Texto na tela para Reels (Skill viral-hook-writer) */}
+                    {s.format !== "carousel" && s.onScreenText && (
                       <div className="flex items-center gap-2 rounded bg-muted/50 px-2.5 py-1 text-xs">
                         <span className="text-muted-foreground font-medium shrink-0">
                           Texto na tela (0-3s):
@@ -254,12 +266,14 @@ export function AgentSuggestionsDialog({
                         {isExpanded ? (
                           <>
                             <ChevronUpIcon className="size-3" />
-                            Ocultar roteiro e ângulo
+                            Ocultar roteiro
                           </>
                         ) : (
                           <>
                             <ChevronDownIcon className="size-3" />
-                            Ver roteiro de retenção & CTA
+                            {s.format === "carousel"
+                              ? "Ver estrutura slide a slide (carousel-builder) & CTA"
+                              : "Ver roteiro de retenção de bancada & CTA"}
                           </>
                         )}
                       </button>
