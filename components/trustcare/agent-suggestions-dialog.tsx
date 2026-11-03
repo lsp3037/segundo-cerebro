@@ -59,6 +59,7 @@ export function AgentSuggestionsDialog({
   const [focus, setFocus] = useState<ContentHypeFocus>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [addingRef, setAddingRef] = useState<string | null>(null);
 
   const fetchFocus = useCallback(
     async (selectedFocus: ContentHypeFocus, force = false) => {
@@ -206,19 +207,31 @@ export function AgentSuggestionsDialog({
                       <Button
                         size="sm"
                         variant={isAdded ? "ghost" : "default"}
-                        disabled={isAdded}
+                        disabled={isAdded || addingRef === s.ref}
                         onClick={async () => {
-                          const success = await onAdd(s);
-                          if (success) {
-                            setAdded((prev) => new Set(prev).add(s.ref));
+                          try {
+                            setAddingRef(s.ref);
+                            const success = await onAdd(s);
+                            if (success) {
+                              setAdded((prev) => new Set(prev).add(s.ref));
+                            }
+                          } catch (err) {
+                            toast.error((err as Error).message || "Erro ao adicionar");
+                          } finally {
+                            setAddingRef(null);
                           }
                         }}
                         className={cn(
-                          "shrink-0 h-8 gap-1.5 text-xs font-medium",
+                          "shrink-0 h-8 gap-1.5 text-xs font-medium cursor-pointer",
                           isAdded && "text-emerald-500 hover:text-emerald-500",
                         )}
                       >
-                        {isAdded ? (
+                        {addingRef === s.ref ? (
+                          <>
+                            <RefreshCwIcon className="size-3.5 animate-spin" />
+                            Adicionando…
+                          </>
+                        ) : isAdded ? (
                           <>
                             <CheckIcon className="size-3.5" />
                             Adicionada

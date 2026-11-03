@@ -72,6 +72,7 @@ export function ContentIdeasBoard({
             return false;
           }
           list.setItems((items) => [result.data, ...items]);
+          toast.success("Ideia adicionada ao quadro!");
           return true;
         }}
       />
@@ -166,6 +167,7 @@ export function ContentIdeasBoard({
             return false;
           }
           list.setItems((items) => [result.data, ...items]);
+          toast.success("Ideia adicionada ao quadro!");
           return true;
         }}
       />

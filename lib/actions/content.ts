@@ -87,13 +87,22 @@ const ideaFields = z
 export type ContentIdeaInput = z.input<typeof ideaFields>;
 
 export async function createContentIdea(input: ContentIdeaInput): Promise<ActionResult<Tables<"content_ideas">>> {
-  await getCurrentUser();
+  const user = await getCurrentUser();
   const parsed = ideaFields.required({ title: true }).safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const supabase = await createClient();
-  const { data, error } = await supabase.from("content_ideas").insert(parsed.data).select("*").single();
-  if (error) return fail("Não foi possível criar a ideia.");
+  const insertPayload = {
+    ...parsed.data,
+    user_id: user.id,
+    status: parsed.data.status ?? "idea",
+  };
+
+  const { data, error } = await supabase.from("content_ideas").insert(insertPayload).select("*").single();
+  if (error) {
+    console.error("createContentIdea error details:", error);
+    return fail(`Erro ao salvar no banco: ${error.message}`);
+  }
   revalidatePath("/", "layout");
   return ok(data);
 }
@@ -285,58 +294,55 @@ const FALLBACK_OOTTO_IDEAS: Record<ContentHypeFocus, AgentSuggestionView[]> = {
   carrosseis: [
     {
       ref: "ootto-carrossel-1",
-      title: "Guia definitivo: Vale a pena fazer upgrade no seu notebook em 2026?",
+      title: "Notebook velho tem salvação? A conta dos 30% para não gastar R$ 3.800",
       format: "carousel",
       pillar: "Upgrades",
-      onScreenText: "UPGRADE OU PC NOVO?",
+      coverHeadline: "NOTEBOOK LENTO: A CONTA DOS 30%",
       emotionalAngle: "Decisão Racional & Economia",
       viralPotential: "Extrema Taxa de Salvos",
-      trendReason: "Dúvida número 1 de quem tem um computador lento e não quer tomar prejuízo comprando outro.",
+      trendReason: "Preços abusivos de notebooks básicos novos (R$ 3.500+) versus custo-benefício comprovado de upgrade.",
       notes: [
-        "🎯 Ângulo: Matriz de decisão prática para o cliente.",
-        "🔥 Por que está em alta: Guia prático que a pessoa salva para consultar antes de gastar dinheiro.",
-        "🗣️ Gancho Falado: 'O passo a passo para saber se o seu notebook merece upgrade ou se já deu o tempo dele.'",
-        "📺 Texto na Tela: 'UPGRADE OU PC NOVO?'",
-        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: Capa com comparativo visual de notebook 2020 vs novo.\n- Slide 2: Quando VALE a pena (processador Core i3/i5/i7 a partir da 6ª geração, carcaça boa).\n- Slide 3: Quando NÃO vale a pena (processador soldado Celeron/Atom muito antigo).\n- Slide 4: O combo perfeito Trust Care: SSD NVMe + 16GB RAM + Limpeza térmica profunda.\n- Slide 5: Garantia e atendimento em Cuiabá.",
-        "👉 CTA: 'Comente o processador do seu notebook que dizemos se vale a pena!'",
+        "🎯 Ângulo: Matriz de decisão financeira objetiva (Skill carousel-builder).",
+        "🔥 Por que está em alta: Em 2026, com notebooks novos caros e frágeis, o consumidor inteligente opta por upgrade.",
+        "🖼️ Capa (Slide 1): 'NOTEBOOK LENTO: A CONTA DOS 30%'",
+        "📊 Estrutura Slide a Slide (Skill carousel-builder):\nSlide 1 [CAPA]: Notebook velho tem salvação? A regra matemática dos 30% que as lojas escondem.\n   🎨 Visual: Foto de notebook antigo robusto ao lado de um novo com etiqueta de R$ 3.800.\n\nSlide 2 [CONTEUDO]: A Regra dos 30%\n   Se o upgrade completo (SSD NVMe + RAM + Pasta Térmica) custar até 30% de um novo equivalente, é irracional comprar outro.\n   Investimento Trust Care: ~R$ 480 vs R$ 3.500 na loja. Economia real: mais de R$ 3.000 no bolso.\n   🎨 Visual: Gráfico de barras simples comparando R$ 480 vs R$ 3.500.\n\nSlide 3 [CONTEUDO]: Onde o seu notebook está estrangulado\n   O processador (Core i5 ou Ryzen) ainda tem sobra de força. O que trava tudo é o HD mecânico a 100% no Windows e memória de canal simples.\n   🎨 Visual: Print do Gerenciador de Tarefas com disco a 100% em vermelho.\n\nSlide 4 [CONTEUDO]: A transformação no cronômetro\n   Com HD antigo: 1m50s para ligar e 40s para abrir o Word.\n   Com SSD NVMe Gen3/Gen4 na bancada da Trust Care: 8 segundos para ligar e clique instantâneo.\n   🎨 Visual: Cronômetros comparativos lado a lado.\n\nSlide 5 [CHECKLIST]: Quando NÃO vale a pena\n   Processador soldado Celeron/Atom muito antigo ou carcaça/tela totalmente destruídas. Seja honesto com seu bolso.\n   🎨 Visual: Tabela de decisão rápida para print.\n\nSlide 6 [CTA]: Descubra se o seu vale a pena\n   Envie uma foto ou o modelo exato do seu notebook no WhatsApp da Trust Care para avaliação sem compromisso.",
+        "👉 CTA Final: 'Mande o modelo do seu notebook no WhatsApp da Trust Care para avaliarmos.'",
       ].join("\n\n"),
       test: false,
     },
     {
       ref: "ootto-carrossel-2",
-      title: "SSD SATA vs SSD NVMe M.2: Qual a real diferença no seu dia a dia?",
+      title: "SSD SATA vs SSD NVMe Gen4: O que você precisa saber antes de comprar",
       format: "carousel",
       pillar: "Dicas",
-      onScreenText: "SATA VS NVME: QUAL ESCOLHER?",
-      emotionalAngle: "Educação & Clareza",
-      viralPotential: "Alta Taxa de Salvos",
-      trendReason: "Confusão frequente do cliente entre os tipos de SSD e medo de comprar peça incompatível.",
+      coverHeadline: "SATA VS NVME: NÃO ERRE A PEÇA",
+      emotionalAngle: "Educação Técnica & Evitar Prejuízo",
+      viralPotential: "Altíssimo Salvamento",
+      trendReason: "Erros comuns de clientes comprando SSDs incompatíveis em marketplaces e sofrendo perda de desempenho.",
       notes: [
-        "🎯 Ângulo: Desmistificando hardware sem complicação.",
-        "🔥 Por que está em alta: Muita gente compra SSD incompatível pela internet e perde dinheiro.",
-        "🗣️ Gancho Falado: 'Você sabe qual SSD o seu notebook realmente aceita?'",
-        "📺 Texto na Tela: 'SATA VS NVME: QUAL ESCOLHER?'",
-        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: Foto lado a lado de um SSD SATA de 2.5\" e um NVMe fininho.\n- Slide 2: Velocidades reais na prática (500 MB/s vs 3.500 MB/s).\n- Slide 3: Quem sente a diferença (abertura de programas pesados vs uso básico).\n- Slide 4: O maior perigo: comprar sem saber se a sua placa-mãe tem o slot M.2 correto.\n- Slide 5: Como a Trust Care escolhe o modelo 100% compatível com a sua máquina.",
-        "👉 CTA: 'Ficou na dúvida? Mande o modelo do seu PC que verificamos a compatibilidade de graça.'",
+        "🎯 Ângulo: Guia anti-erro na compra de peças (Skill carousel-builder).",
+        "🔥 Por que está em alta: Alta busca por compatibilidade de slots M.2 e medo de comprar peça errada.",
+        "🖼️ Capa (Slide 1): 'SATA VS NVME: NÃO ERRE A PEÇA'",
+        "📊 Estrutura Slide a Slide (Skill carousel-builder):\nSlide 1 [CAPA]: SSD SATA vs SSD NVMe: Qual o seu notebook realmente aceita sem travar?\n   🎨 Visual: Foto macro no laboratório comparando o SSD 2.5\" com o pente NVMe M.2.\n\nSlide 2 [CONTEUDO]: A diferença física e visual\n   SATA: Parece um HD fininho de 2.5\" com cabos. Máximo de 550 MB/s.\n   NVMe: Formato 'chiclete' que vai parafusado direto no slot M.2 da placa. Até 3.500+ MB/s.\n   🎨 Visual: Destaque no encaixe do conector M.2 com chave B ou M.\n\nSlide 3 [CONTEUDO]: O perigo dos marketplaces\n   Muitas placas-mãe têm o slot M.2, mas ele é apenas SATA (não aceita NVMe) ou PCIe limitado. Se comprar errado, não reconhece na BIOS.\n   🎨 Visual: Alerta de erro 'No Bootable Device'.\n\nSlide 4 [CHECKLIST]: O que a Trust Care recomenda\n   Para trabalho/estudo: SSD NVMe Kingston/Crucial de 500GB a 1TB com garantia nacional de 3 a 5 anos.\n   🎨 Visual: Tabela comparativa com marcas confiáveis vs marcas genéricas perigosas.\n\nSlide 5 [CTA]: Verificação gratuita de compatibilidade\n   Mande o modelo exato da sua máquina no WhatsApp que a gente checa a placa-mãe para você.",
+        "👉 CTA Final: 'Salve este post para consultar quando for escolher seu SSD.'",
       ].join("\n\n"),
       test: false,
     },
     {
       ref: "ootto-carrossel-3",
-      title: "5 sinais silenciosos de que o seu computador está prestes a pifar",
+      title: "42°C em Cuiabá: 4 sinais de que seu notebook está em perigo térmico",
       format: "carousel",
       pillar: "Prevenção",
-      onScreenText: "SEU PC VAI QUEIMAR?",
-      emotionalAngle: "Alerta & Prevenção",
-      viralPotential: "Altíssimo Compartilhamento",
-      trendReason: "Prevenção de prejuízo: consertar antes de queimar sai até 80% mais barato.",
+      coverHeadline: "42°C: SEU NOTEBOOK AGUENTA?",
+      emotionalAngle: "Alerta & Urgência Hiperlocal",
+      viralPotential: "Extrema Viralização Regional",
+      trendReason: "Onda de calor e seca em Cuiabá fazendo notebooks desligarem sozinhos durante o trabalho.",
       notes: [
-        "🎯 Ângulo: Diagnóstico precoce em casa.",
-        "🔥 Por que está em alta: Quase todo mundo ignora pequenos travamentos até o computador não ligar mais.",
-        "🗣️ Gancho Falado: 'Se o seu notebook tem pelo menos 2 desses sintomas, desligue agora.'",
-        "📺 Texto na Tela: 'SEU PC VAI QUEIMAR?'",
-        "📋 Estrutura & Retenção (Slide a Slide):\n- Slide 1: '5 avisos que seu computador dá antes de parar de ligar.'\n- Slide 2: Sinal 1: A ventoinha parece uma turbina de avião o tempo todo.\n- Slide 3: Sinal 2: O teclado ou a base ficam pelando em poucos minutos.\n- Slide 4: Sinal 3: Travamentos aleatórios ao abrir várias abas no navegador.\n- Slide 5: Sinal 4: Luz de HD/SSD piscando sem parar.\n- Slide 6: A solução preventiva na Trust Care antes de precisar trocar a placa.",
-        "👉 CTA: 'Quantos desses sintomas a sua máquina tem hoje? Conte nos comentários.'",
+        "🎯 Ângulo: Choque térmico e proteção de patrimônio em Cuiabá (Skill carousel-builder).",
+        "🔥 Por que está em alta: No calor de Cuiabá, notebooks sem manutenção preventiva atingem 95°C em minutos.",
+        "🖼️ Capa (Slide 1): '42°C: SEU NOTEBOOK AGUENTA?'",
+        "📊 Estrutura Slide a Slide (Skill carousel-builder):\nSlide 1 [CAPA]: 42°C na sombra em Cuiabá: 4 sinais silenciosos de que seu notebook está pedindo socorro.\n   🎨 Visual: Imagem dramática com termômetro de Cuiabá e notebook na bancada.\n\nSlide 2 [CONTEUDO]: 1. Cooler em modo turbina o tempo todo\n   Se a ventoinha não para de girar no máximo mesmo só com o navegador aberto, a poeira de terra seca de MT já bloqueou as aletas.\n   🎨 Visual: Close no dissipador entupido com manta de poeira.\n\nSlide 3 [CONTEUDO]: 2. Teclado pelando e lentidão repentina (Throttling)\n   Para não queimar, o processador derruba a velocidade de 3.0 GHz para 0.79 GHz. É por isso que tudo trava.\n   🎨 Visual: Gráfico de temperatura em 92°C com clock do processador despencando.\n\nSlide 4 [CONTEUDO]: 3. Pasta térmica petrificada\n   A pasta original de fábrica seca em menos de 1 ano no clima de Cuiabá e vira uma camada isolante de calor.\n   🎨 Visual: Pasta térmica ressecada parecendo giz quebradiço.\n\nSlide 5 [CHECKLIST]: Prevenção que salva sua placa-mãe\n   Limpeza química profunda do cooler + troca de composto térmico de alto rendimento a cada 6 a 12 meses.\n   🎨 Visual: Antes e depois satisfatório da placa limpa.\n\nSlide 6 [CTA]: Não espere o notebook desligar no meio do trabalho\n   Agende sua manutenção preventiva pelo WhatsApp da Trust Care.",
+        "👉 CTA Final: 'Seu notebook esquenta muito? Mande uma mensagem e agende sua revisão preventiva.'",
       ].join("\n\n"),
       test: false,
     },
@@ -414,18 +420,23 @@ export async function getAgentSuggestions(params?: {
     const isReel = focus === "reels";
 
     if (isCarousel) {
-      // Metodologia estrita da Skill carousel-builder (Ootto)
-      const carouselPrompt = `Você é o Carousel Writer da Trust Care em Cuiabá-MT, aplicando estritamente a skill Ootto "carousel-builder".
-FOCO: CARROSSÉIS educativos e comparativos técnicos diretos (ex: SSD vs HD, Quando vale a pena upgrade vs comprar notebook novo).
-PILARES DISPONÍVEIS: ${pillarList || "Upgrades, Manutenção, Dicas, Prevenção"}
+      // Metodologia estrita da Skill carousel-builder (Ootto) com hiper-especificidade e anti-genérico
+      const carouselPrompt = `Você é o Estrategista Sênior de Carrosséis da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT), aplicando estritamente a skill Ootto "carousel-builder".
+FOCO: CARROSSÉIS educativos, de quebra de objeções e comparativos técnicos de alto valor.
+PILARES DISPONÍVEIS: ${pillarList || "Upgrades, Manutenção, Dicas, Prevenção, Vendas"}
 
-Gere 5 carrosséis estratégicos completos seguindo as regras da skill carousel-builder:
-- SLIDE 1 (Capa / Scroll-stopper): Headline de capa magnética com MENOS DE 8 PALAVRAS.
-- SLIDES 2-N: Uma ideia por slide (linha em negrito + 1 ou 2 linhas explicativas + nota visual do que mostrar no slide).
-- PENÚLTIMO SLIDE: Resumo ou checklist limpo que as pessoas tiram print e salvam na galeria.
-- ÚLTIMO SLIDE: Chamada para ação única (CTA no WhatsApp ou Direct da Trust Care em Cuiabá).
+DIRETRIZES DE ALTA PRECISÃO (ANTI-GENÉRICO):
+1. ANCORAGEM REAL (ANO ATUAL: 2026): Nunca use anos passados como presentes.
+2. DADOS E NÚMEROS REAIS: Use números concretos (ex: R$ 380 vs R$ 3.800 de um notebook novo; tempo de boot caindo de 1m45s para 8s; processador em thermal throttling caindo de 3.2 GHz para 0.79 GHz).
+3. CONTEXTO HIPERLOCAL DE CUIABÁ: Calor de 42°C, poeira de terra seca de MT asfixiando o cooler, pasta térmica ressecada virando pedra.
+4. COMPONENTES REAIS: SSD NVMe Gen3/Gen4, memórias RAM DDR4/DDR5 em dual-channel, pasta térmica de alta condutividade térmica, notebooks corporativos robustos (Dell Latitude, ThinkPad).
+5. ESTRUTURA DOS SLIDES (Skill carousel-builder):
+   - SLIDE 1 (Capa / Scroll-stopper): Headline audaciosa e magnética com MENOS DE 8 PALAVRAS. Ex: "ECONOMIZOU R$ 3.100 NÃO COMPRANDO NOVO", "A REGRA DOS 30% PARA UPGRADE".
+   - SLIDES 2-N (Conteúdo denso e didático): Uma ideia por slide com headline em negrito, 2 a 3 linhas de explicação técnica simples e nota visual cirúrgica.
+   - PENÚLTIMO SLIDE: Resumo visual, checklist ou tabela comparativa que a pessoa tira print para salvar na galeria.
+   - ÚLTIMO SLIDE: Chamada de ação única para o WhatsApp ou Direct da Trust Care em Cuiabá.
 
-PROIBIDO: Não mencione segundos, não invente "gancho falado (0-3s)", não use "texto na tela (0-3s)". Isto é um post de CARROSSEL de imagens estáticas.`;
+PROIBIDO: Não mencione termos de vídeo/Reel ("segundos", "gancho falado 0-3s", "texto na tela 0-3s"). Isto é um post de CARROSSEL de imagens.`;
 
       const carouselSchema = {
         type: "object",
@@ -536,21 +547,23 @@ PROIBIDO: Não mencione segundos, não invente "gancho falado (0-3s)", não use 
       ? "3. FORMATO: OBRIGATORIAMENTE 'reel'. Todas as 5 ideias DEVEM ser vídeos curtos/reels gravados na bancada de assistência."
       : "3. FORMATO: Escolha entre 'reel', 'carousel' e 'story'.";
 
-    const prompt = `Gere 5 ideias de conteúdo irresistíveis para o Instagram da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT).
+    const prompt = `Gere 5 ideias de conteúdo irresistíveis e hiper-específicas para o Instagram da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT).
 
 FOCO ATUAL: ${focusPrompts[focus]}
 PILARES DISPONÍVEIS: ${pillarList || "Manutenção, Upgrades, Vendas, Dicas, Bastidores"}
 
-Siga rigorosamente a metodologia Ootto Content Skills (trend-spotter, viral-hook-writer, reel-scripter):
-1. TÍTULO / GANCHO (0-3s): Menos de 12 palavras, falado, quebra de padrão, chamativo, sem jargões enfadonhos.
-2. TEXTO NA TELA: 3 a 5 palavras em caixa alta para a legenda visual inicial.
+DIRETRIZES DE ALTA PRECISÃO (ANTI-GENÉRICO & SKILLS OOTTO):
+1. ANCORAGEM REAL (2026): Proibido citar anos passados como presentes.
+2. NÚMEROS E PEÇAS CONCRETAS: Fale de valores em R$ (economia de R$ 2.500 vs notebook novo), temperaturas de Cuiabá (42°C+), componentes reais (SSD NVMe Kingston/Crucial, memória DDR4, pasta térmica de alta viscosidade, placas com capacitor em curto na linha de 19V).
+3. TÍTULO / GANCHO (0-3s): Menos de 12 palavras, falado, quebra de padrão violenta, sem clichês.
+4. TEXTO NA TELA: 3 a 5 palavras em caixa alta para a legenda visual inicial impactante.
 ${formatRule}
-4. EMOTIONAL ANGLE: O trabalho emocional (ex: Alívio de gasto, Medo de queimar, Curiosidade técnica, Prova de autoridade).
-5. VIRAL POTENTIAL: Estimativa (ex: 'Viral', 'Alta Retenção', 'Conversão WhatsApp').
-6. TREND REASON: O que torna este tema quente no momento.
-7. HOOK SPOKEN: A frase falada exata dos primeiros 3 segundos.
-8. STRUCTURE SUMMARY: Roteiro conciso de retenção de bancada.
-9. CTA: Chamada direta para o WhatsApp ou Direct da Trust Care em Cuiabá.`;
+5. EMOTIONAL ANGLE: O trabalho emocional (ex: Alívio de gasto, Medo de queimar, Curiosidade técnica, Prova de autoridade).
+6. VIRAL POTENTIAL: Estimativa real ('Viral', 'Alta Retenção', 'Conversão WhatsApp').
+7. TREND REASON: O que torna este tema quente e urgente no momento.
+8. HOOK SPOKEN: A frase falada exata dos primeiros 3 segundos.
+9. STRUCTURE SUMMARY: Roteiro conciso de retenção de bancada com o passo a passo da gravação.
+10. CTA: Chamada direta para o WhatsApp da Trust Care em Cuiabá.`;
 
     const schema = {
       type: "object",
