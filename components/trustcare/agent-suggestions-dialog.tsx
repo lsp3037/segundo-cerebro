@@ -10,6 +10,7 @@ import {
   LayersIcon,
   PlusIcon,
   RefreshCwIcon,
+  SmartphoneIcon,
   SparklesIcon,
   SunMediumIcon,
 } from "lucide-react";
@@ -41,6 +42,7 @@ const FOCUS_OPTIONS: Array<{
   { id: "todos", label: "Geral (Hype)", icon: FlameIcon },
   { id: "reels", label: "Reels Virais", icon: ClapperboardIcon },
   { id: "carrosseis", label: "Carrosséis", icon: LayersIcon },
+  { id: "stories", label: "Stories", icon: SmartphoneIcon },
   { id: "calor_cuiaba", label: "Calor Cuiabá", icon: SunMediumIcon },
   { id: "venda_notebooks", label: "Upgrades & Venda", icon: LaptopIcon },
 ];
@@ -64,13 +66,19 @@ export function AgentSuggestionsDialog({
   const fetchFocus = useCallback(
     async (selectedFocus: ContentHypeFocus, force = false) => {
       setLoading(true);
-      const result = await getAgentSuggestions({ focus: selectedFocus });
-      setLoading(false);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+      try {
+        const result = await getAgentSuggestions({ focus: selectedFocus });
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        setCache((prev) => ({ ...prev, [selectedFocus]: result.data }));
+      } catch (err) {
+        console.error("fetchFocus error:", err);
+        toast.error("Tempo de resposta excedido. Carregando sugestões do radar.");
+      } finally {
+        setLoading(false);
       }
-      setCache((prev) => ({ ...prev, [selectedFocus]: result.data }));
     },
     [],
   );
@@ -110,8 +118,15 @@ export function AgentSuggestionsDialog({
               size="xs"
               variant="outline"
               disabled={loading}
-              onClick={() => fetchFocus(focus, true)}
-              className="gap-1.5 text-xs h-7"
+              onClick={() => {
+                setCache((prev) => {
+                  const next = { ...prev };
+                  delete next[focus];
+                  return next;
+                });
+                fetchFocus(focus, true);
+              }}
+              className="gap-1.5 text-xs h-7 cursor-pointer"
             >
               <RefreshCwIcon className={cn("size-3", loading && "animate-spin")} />
               {loading ? "Gerando..." : "Gerar novas ideias"}
@@ -257,8 +272,20 @@ export function AgentSuggestionsDialog({
                       </div>
                     )}
 
+                    {/* Enquete / Sticker de Stories (Skill story-sequencer) */}
+                    {s.format === "story" && s.interactivePoll && (
+                      <div className="flex items-center gap-2 rounded bg-muted/50 px-2.5 py-1 text-xs">
+                        <span className="text-muted-foreground font-medium shrink-0">
+                          📊 Enquete / Sticker:
+                        </span>
+                        <code className="text-xs font-semibold text-primary">
+                          {s.interactivePoll}
+                        </code>
+                      </div>
+                    )}
+
                     {/* Texto na tela para Reels (Skill viral-hook-writer) */}
-                    {s.format !== "carousel" && s.onScreenText && (
+                    {s.format !== "carousel" && s.format !== "story" && s.onScreenText && (
                       <div className="flex items-center gap-2 rounded bg-muted/50 px-2.5 py-1 text-xs">
                         <span className="text-muted-foreground font-medium shrink-0">
                           Texto na tela (0-3s):
@@ -286,6 +313,8 @@ export function AgentSuggestionsDialog({
                             <ChevronDownIcon className="size-3" />
                             {s.format === "carousel"
                               ? "Ver estrutura slide a slide (carousel-builder) & CTA"
+                              : s.format === "story"
+                              ? "Ver sequência de 4 quadros (story-sequencer) & CTA"
                               : "Ver roteiro de retenção de bancada & CTA"}
                           </>
                         )}

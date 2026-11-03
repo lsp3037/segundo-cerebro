@@ -180,16 +180,29 @@ export async function trashContent(kind: "content_ideas" | "publications", itemI
 // Agente de Marketing & Sugestões de Conteúdo (Metodologia Ootto Content Skills)
 // ---------------------------------------------------------------------------
 
-export type ContentHypeFocus = "todos" | "reels" | "carrosseis" | "calor_cuiaba" | "venda_notebooks";
+export type ContentHypeFocus = "todos" | "reels" | "carrosseis" | "stories" | "calor_cuiaba" | "venda_notebooks";
 
 export type AgentSuggestionView = AgentSuggestion & {
   test: boolean;
   onScreenText?: string;
   coverHeadline?: string;
+  interactivePoll?: string;
   emotionalAngle?: string;
   viralPotential?: string;
   trendReason?: string;
 };
+
+async function withTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Timeout ao consultar IA")), ms);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    clearTimeout(timer!);
+  }
+}
 
 const FALLBACK_OOTTO_IDEAS: Record<ContentHypeFocus, AgentSuggestionView[]> = {
   todos: [
@@ -347,6 +360,62 @@ const FALLBACK_OOTTO_IDEAS: Record<ContentHypeFocus, AgentSuggestionView[]> = {
       test: false,
     },
   ],
+  stories: [
+    {
+      ref: "ootto-stories-1",
+      title: "O teste do ar-condicionado: Seu notebook só roda bem no quarto gelado?",
+      format: "story",
+      pillar: "Manutenção",
+      interactivePoll: "Enquete: Seu note trava fora do ar-condicionado? (Sim! / Roda de boa)",
+      emotionalAngle: "Identificação Regional & Alerta Térmico",
+      viralPotential: "Alto Engajamento & Respostas de Story",
+      trendReason: "No calor de Cuiabá, centenas de profissionais só conseguem trabalhar com ar-condicionado no 18°C.",
+      notes: [
+        "🎯 Ângulo: Teste prático do ar-condicionado em Cuiabá (Skill story-sequencer).",
+        "🔥 Por que funciona nos Stories: Enquete inicial de sim/não aquece o algoritmo do Instagram e gera identificação imediata.",
+        "📊 Sticker Interativo: Enquete no Quadro 1: 'Seu notebook só roda liso no ar-condicionado?' [Sim, ferve] vs [Roda de boa]",
+        "📱 Sequência de 4 Quadros (Skill story-sequencer):\n\nQuadro 1 [GANCHO & ENQUETE]:\n   'O teste do ar-condicionado em Cuiabá: Seu notebook começa a travar ou queimar sua perna se você sai do ar gelado?'\n   🔘 Enquete: [Sim, ferve!] / [Roda de boa]\n   🎬 Filmagem: Vídeo de 4s mostrando o termômetro ou ar-condicionado e o notebook com cooler zumbindo.\n\nQuadro 2 [SINTOMA REAL]:\n   'Se você marcou sim, não é frescura do notebook: a pasta térmica secou e o cooler virou um tapete de poeira da nossa terra seca.'\n   🎬 Filmagem: Foto de bancada com seta apontando para a grade do cooler entupida com 'feltro' de poeira.\n\nQuadro 3 [PROVA TÉCNICA]:\n   'Olha o que a gente acabou de tirar desse Dell Inspiron aqui na bancada da Trust Care. Pasta térmica original ressecada que virou pedra!'\n   🎬 Filmagem: Vídeo curto de 5s com espátula raspando a pasta seca de fábrica e mostrando a limpeza química.\n\nQuadro 4 [THE TAP / CTA]:\n   'A limpeza preventiva sai por uma fração do preço de consertar uma placa queimada. Toque no sticker aqui embaixo e agende a sua para esta semana!'\n   🔘 Sticker: Link / Caixa 'Agendar no WhatsApp'",
+        "👉 CTA Final: 'Toque no sticker de link para agendar sua preventiva na Trust Care.'",
+      ].join("\n\n"),
+      test: false,
+    },
+    {
+      ref: "ootto-stories-2",
+      title: "R$ 450 vs R$ 3.800: Você jogaria este notebook no lixo?",
+      format: "story",
+      pillar: "Upgrades",
+      interactivePoll: "Enquete: Gastar R$ 4.000 em um novo ou R$ 450 no seu? (Novo / Upgrade)",
+      emotionalAngle: "Alívio Financeiro & Decisão Racional",
+      viralPotential: "Alta Conversão de Directs",
+      trendReason: "Dilema diário do consumidor: gastar muito num notebook novo frágil ou revitalizar a máquina atual.",
+      notes: [
+        "🎯 Ângulo: Economia real de R$ 3.000+ com upgrade na bancada (Skill story-sequencer).",
+        "🔥 Por que funciona nos Stories: Contraste numérico brutal que faz o seguidor pensar antes de gastar.",
+        "📊 Sticker Interativo: Enquete no Quadro 1: 'Gastar R$ 4.000 num novo ou R$ 450 pro seu voar?'",
+        "📱 Sequência de 4 Quadros (Skill story-sequencer):\n\nQuadro 1 [GANCHO & ENQUETE]:\n   'Você prefere gastar R$ 4.000 em um notebook novo de plástico ou investir R$ 450 pro seu atual voar mais rápido que novo?'\n   🔘 Enquete: [Gastar 4 mil] / [Investir 450 e salvar]\n   🎬 Filmagem: Foto segurando um SSD NVMe e pente de memória ao lado de um notebook corporativo.\n\nQuadro 2 [O SINTOMA]:\n   'Esse cliente ia jogar fora esse ThinkPad porque demorava 2 minutos para abrir o Windows. O diagnóstico? Placa 100% perfeita, o gargalo era só o HD mecânico antigo.'\n   🎬 Filmagem: Vídeo de 4s mostrando o disco a 100% no Gerenciador de Tarefas.\n\nQuadro 3 [A TRANSFORMAÇÃO]:\n   'Colocamos SSD NVMe Kingston + 8GB RAM e limpeza química. Tempo de inicialização: caiu de 2 minutos para 8 segundos!'\n   🎬 Filmagem: Vídeo acelerado apertando o botão de ligar e a máquina entrando na área de trabalho instantaneamente.\n\nQuadro 4 [THE TAP / CAIXINHA]:\n   'Quer saber se o seu modelo ainda compensa o upgrade? Deixe o modelo dele aqui na caixinha que eu respondo hoje!'\n   🔘 Sticker: Caixinha de perguntas 'Qual o modelo do seu note?'",
+        "👉 CTA Final: 'Deixe o modelo do seu aparelho na caixinha de perguntas para avaliarmos.'",
+      ].join("\n\n"),
+      test: false,
+    },
+    {
+      ref: "ootto-stories-3",
+      title: "Alerta de bancada: Touchpad levantando ou duro de clicar?",
+      format: "story",
+      pillar: "Prevenção",
+      interactivePoll: "Enquete: O clique do seu touchpad está normal ou duro? (Normal / Estranho)",
+      emotionalAngle: "Urgência & Prevenção de Danos Físicos",
+      viralPotential: "Geração Imediata de Mensagens",
+      trendReason: "Baterias de íon de lítio estufam no calor de Cuiabá e quebram a carcaça de notebooks de clientes desavisados.",
+      notes: [
+        "🎯 Ângulo: Alerta de segurança de bancada contra bateria estufada (Skill story-sequencer).",
+        "🔥 Por que funciona nos Stories: O seguidor olha para o próprio notebook na hora para checar o touchpad.",
+        "📊 Sticker Interativo: Enquete no Quadro 1: 'O clique do touchpad do seu notebook está macio ou parece travado?'",
+        "📱 Sequência de 4 Quadros (Skill story-sequencer):\n\nQuadro 1 [GANCHO & ENQUETE]:\n   'Alerta rápido da bancada: o touchpad do seu notebook começou a ficar duro de clicar ou parece que tá levantando?'\n   🔘 Enquete: [Tá macio] / [Parece que estufou!]\n   🎬 Filmagem: Foto de perfil em ângulo rasante mostrando um touchpad levemente saltado da carcaça.\n\nQuadro 2 [O PERIGO]:\n   'Não force o clique! Isso acontece quando a bateria interna estufa por excesso de calor e pressão, empurrando o trackpad por baixo.'\n   🎬 Filmagem: Foto de alerta com a bateria parecendo uma almofada inflada dentro do chassi.\n\nQuadro 3 [A SOLUÇÃO]:\n   'Se você continuar usando, a carcaça racha e o touchpad quebra. Aqui na Trust Care removemos a bateria estufada com segurança e instalamos uma nova com garantia.'\n   🎬 Filmagem: Vídeo de 4s mostrando a peça nova sendo parafusada no alinhamento perfeito.\n\nQuadro 4 [THE TAP / DIRECT]:\n   'Acha que sua bateria estufou? Mande uma foto de lado no nosso direct que avaliamos na hora pra você.'\n   🔘 Sticker: Link / Direct 'Enviar foto no Direct'",
+        "👉 CTA Final: 'Mande uma foto no direct da Trust Care para checarmos sua bateria com segurança.'",
+      ].join("\n\n"),
+      test: false,
+    },
+  ],
   calor_cuiaba: [
     {
       ref: "ootto-cuiaba-1",
@@ -412,17 +481,142 @@ export async function getAgentSuggestions(params?: {
       todos: "Tendências no hype de informática, manutenção preventiva de computadores, upgrades de SSD/RAM e notebooks seminovos.",
       reels: "REELS de bancada de alta retenção (vídeo curto com ganchos visuais em 3s, defeito curioso, antes/depois, satisfatório).",
       carrosseis: "CARROSSÉIS educativos e comparativos técnicos diretos (ex: SSD vs HD, Quando vale a pena upgrade vs comprar notebook novo).",
+      stories: "SEQUÊNCIAS DE STORIES (4 quadros) com enquetes interativas, dores de calor/lentidão de Cuiabá e direcionamento para Direct/WhatsApp.",
       calor_cuiaba: "Problemas causados pelo calor extremo de Cuiabá (40°C+) e poeira: superaquecimento, travamentos, pasta térmica ressecada e prevenção.",
       venda_notebooks: "Revenda de notebooks seminovos revisados com garantia e procedência na Trust Care versus comprar notebooks novos básicos caros.",
     };
 
     const isCarousel = focus === "carrosseis";
+    const isStory = focus === "stories";
     const isReel = focus === "reels";
+
+    if (isStory) {
+      // Metodologia estrita da Skill story-sequencer (Ootto) com arco de 4 quadros e enquetes reais
+      const storyPrompt = `Você é o Estrategista de Stories da Trust Care (assistência e revenda de notebooks em Cuiabá-MT), aplicando estritamente a skill Ootto "story-sequencer".
+FOCO: 3 SEQUÊNCIAS DE STORIES (4 quadros por sequência) que constroem um arco narrativo de alta retenção e geram votos na enquete e mensagens no WhatsApp/Direct.
+PILARES DISPONÍVEIS: ${pillarList || "Manutenção, Upgrades, Prevenção, Vendas, Dicas"}
+
+DIRETRIZES DE ALTA PRECISÃO (ANTI-GENÉRICO & OOTTO):
+1. ANCORAGEM REAL (2026): Proibido citar anos passados como presentes.
+2. DADOS E NÚMEROS REAIS DE CUIABÁ: 42°C de calor, poeira avermelhada de MT nos coolers, pasta térmica de fábrica ressecada virando pedra, economia de R$ 3.000 em upgrades, baterias estufadas.
+3. ESTRUTURA ESTRITA DE 4 QUADROS (Skill story-sequencer):
+   - QUADRO 1 (Gancho & Interação): Frase curta provocativa + Enquete com as opções exatas de votação.
+   - QUADRO 2 (Sintoma Real / Problema): Dor real vivida pelo cliente, com nota visual de bastidor.
+   - QUADRO 3 (Prova Técnica de Bancada): Demonstração visual de autoridade da Trust Care (multímetro, pasta térmica nova, SSD NVMe).
+   - QUADRO 4 (The Tap / CTA Único): Apenas UMA chamada no sticker de link, caixinha ou WhatsApp.
+4. TEXTO CURTO E DINÂMICO: Frases diretas para leitura rápida de stories.
+5. NOTA VISUAL DE FILMAGEM (What to shoot): Descreva exatamente o que filmar/fotografar na bancada.`;
+
+      const storySchema = {
+        type: "object",
+        properties: {
+          suggestions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                format: { type: "string", enum: ["story"] },
+                pillar: { type: "string" },
+                interactivePoll: { type: "string" },
+                emotionalAngle: { type: "string" },
+                viralPotential: { type: "string" },
+                trendReason: { type: "string" },
+                frames: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      frameNumber: { type: "integer" },
+                      role: { type: "string", enum: ["gancho_enquete", "sintoma", "solucao", "cta"] },
+                      text: { type: "string" },
+                      interactiveElement: { type: "string" },
+                      shootNote: { type: "string" },
+                    },
+                    required: ["frameNumber", "role", "text", "interactiveElement", "shootNote"],
+                  },
+                },
+                cta: { type: "string" },
+              },
+              required: [
+                "title",
+                "format",
+                "pillar",
+                "interactivePoll",
+                "emotionalAngle",
+                "viralPotential",
+                "trendReason",
+                "frames",
+                "cta",
+              ],
+            },
+          },
+        },
+        required: ["suggestions"],
+      };
+
+      const response = await withTimeout(
+        ai.generateJson<{
+          suggestions: Array<{
+            title: string;
+            format: "story";
+            pillar: string;
+            interactivePoll: string;
+            emotionalAngle: string;
+            viralPotential: string;
+            trendReason: string;
+            frames: Array<{
+              frameNumber: number;
+              role: string;
+              text: string;
+              interactiveElement: string;
+              shootNote: string;
+            }>;
+            cta: string;
+          }>;
+        }>({
+          system:
+            "Você é o Story Sequencer da Trust Care em Cuiabá-MT, aplicando estritamente a skill story-sequencer do Ootto.",
+          prompt: storyPrompt,
+          schema: storySchema,
+        }),
+        12000,
+      );
+
+      const suggestions: AgentSuggestionView[] = (response.suggestions ?? []).map((s, idx) => ({
+        ref: `ai-ootto-story-${Date.now()}-${idx}`,
+        title: s.title,
+        format: "story",
+        pillar: s.pillar,
+        interactivePoll: s.interactivePoll,
+        emotionalAngle: s.emotionalAngle,
+        viralPotential: s.viralPotential,
+        trendReason: s.trendReason,
+        notes: [
+          `🎯 Ângulo: ${s.emotionalAngle} (${s.viralPotential})`,
+          `🔥 Por que funciona nos Stories: ${s.trendReason}`,
+          `📊 Sticker Interativo: ${s.interactivePoll}`,
+          `📱 Sequência de 4 Quadros (Skill story-sequencer):\n\n` +
+            (s.frames || [])
+              .map(
+                (fr) =>
+                  `Quadro ${fr.frameNumber} [${fr.role.toUpperCase()}]:\n   "${fr.text}"\n   🔘 Sticker/Elemento: ${
+                    fr.interactiveElement
+                  }\n   🎬 Filmagem: ${fr.shootNote}`,
+              )
+              .join("\n\n"),
+          `👉 CTA Final: ${s.cta}`,
+        ].join("\n\n"),
+        test: false,
+      }));
+
+      return ok(suggestions.length > 0 ? suggestions : FALLBACK_OOTTO_IDEAS.stories);
+    }
 
     if (isCarousel) {
       // Metodologia estrita da Skill carousel-builder (Ootto) com hiper-especificidade e anti-genérico
       const carouselPrompt = `Você é o Estrategista Sênior de Carrosséis da Trust Care (assistência técnica e revenda de notebooks em Cuiabá-MT), aplicando estritamente a skill Ootto "carousel-builder".
-FOCO: CARROSSÉIS educativos, de quebra de objeções e comparativos técnicos de alto valor.
+FOCO: 3 CARROSSÉIS educativos, de quebra de objeções e comparativos técnicos de alto valor.
 PILARES DISPONÍVEIS: ${pillarList || "Upgrades, Manutenção, Dicas, Prevenção, Vendas"}
 
 DIRETRIZES DE ALTA PRECISÃO (ANTI-GENÉRICO):
@@ -486,30 +680,33 @@ PROIBIDO: Não mencione termos de vídeo/Reel ("segundos", "gancho falado 0-3s",
         required: ["suggestions"],
       };
 
-      const response = await ai.generateJson<{
-        suggestions: Array<{
-          title: string;
-          format: "carousel";
-          pillar: string;
-          coverHeadline: string;
-          emotionalAngle: string;
-          viralPotential: string;
-          trendReason: string;
-          slides: Array<{
-            slideNumber: number;
-            role: "capa" | "conteudo" | "checklist" | "cta";
-            headline: string;
-            supportingText?: string;
-            visualNote: string;
+      const response = await withTimeout(
+        ai.generateJson<{
+          suggestions: Array<{
+            title: string;
+            format: "carousel";
+            pillar: string;
+            coverHeadline: string;
+            emotionalAngle: string;
+            viralPotential: string;
+            trendReason: string;
+            slides: Array<{
+              slideNumber: number;
+              role: "capa" | "conteudo" | "checklist" | "cta";
+              headline: string;
+              supportingText?: string;
+              visualNote: string;
+            }>;
+            cta: string;
           }>;
-          cta: string;
-        }>;
-      }>({
-        system:
-          "Você é o Carousel Writer da Trust Care em Cuiabá-MT, aplicando estritamente a skill carousel-builder do Ootto. Você NUNCA usa termos de vídeo/Reel para carrosséis.",
-        prompt: carouselPrompt,
-        schema: carouselSchema,
-      });
+        }>({
+          system:
+            "Você é o Carousel Writer da Trust Care em Cuiabá-MT, aplicando estritamente a skill carousel-builder do Ootto. Você NUNCA usa termos de vídeo/Reel para carrosséis.",
+          prompt: carouselPrompt,
+          schema: carouselSchema,
+        }),
+        12000,
+      );
 
       const suggestions: AgentSuggestionView[] = (response.suggestions ?? []).map((s, idx) => ({
         ref: `ai-ootto-carousel-${Date.now()}-${idx}`,
@@ -601,25 +798,28 @@ ${formatRule}
       required: ["suggestions"],
     };
 
-    const response = await ai.generateJson<{
-      suggestions: Array<{
-        title: string;
-        format: "reel" | "carousel" | "story" | "post";
-        pillar: string;
-        onScreenText: string;
-        emotionalAngle: string;
-        viralPotential: string;
-        trendReason: string;
-        hookSpoken: string;
-        structureSummary: string;
-        cta: string;
-      }>;
-    }>({
-      system:
-        "Você é o Estrategista Chefe de Conteúdo Viral da Trust Care em Cuiabá-MT. Você domina as técnicas dos criadores que mais crescem organicamente no Instagram, usando a metodologia Ootto Content Skills.",
-      prompt,
-      schema,
-    });
+    const response = await withTimeout(
+      ai.generateJson<{
+        suggestions: Array<{
+          title: string;
+          format: "reel" | "carousel" | "story" | "post";
+          pillar: string;
+          onScreenText: string;
+          emotionalAngle: string;
+          viralPotential: string;
+          trendReason: string;
+          hookSpoken: string;
+          structureSummary: string;
+          cta: string;
+        }>;
+      }>({
+        system:
+          "Você é o Estrategista Chefe de Conteúdo Viral da Trust Care em Cuiabá-MT. Você domina as técnicas dos criadores que mais crescem organicamente no Instagram, usando a metodologia Ootto Content Skills.",
+        prompt,
+        schema,
+      }),
+      12000,
+    );
 
     const suggestions: AgentSuggestionView[] = (response.suggestions ?? []).map((s, idx) => ({
       ref: `ai-ootto-${Date.now()}-${idx}`,
