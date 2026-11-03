@@ -152,7 +152,7 @@ export function ContentIdeasBoard({
         open={agentOpen}
         onOpenChange={setAgentOpen}
         onAdd={async (sug) => {
-          const pillar = pillars.find((p) => p.name === sug.pillar);
+          const pillar = pillars.find((p) => p.name.trim().toLowerCase() === sug.pillar?.trim().toLowerCase());
           const result = await createContentIdea({
             title: sug.title,
             notes: sug.notes,
