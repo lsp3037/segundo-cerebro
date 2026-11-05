@@ -48,9 +48,9 @@ export function Topbar({
         <MenuIcon />
       </Button>
 
-      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 2xl:w-[15.25rem]">
+      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 xl:w-[15.25rem]">
         <BrainMark className="size-5" />
-        <span className="hidden text-sm font-semibold tracking-tight 2xl:inline">Segundo Cérebro</span>
+        <span className="hidden text-sm font-semibold tracking-tight xl:inline">Segundo Cérebro</span>
       </Link>
 
       <nav aria-label="Seções" className="no-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
@@ -66,13 +66,13 @@ export function Topbar({
               className={cn(
                 "relative flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm transition-colors",
                 active
-                  ? "bg-accent font-medium text-foreground"
+                  ? "bg-accent font-semibold text-foreground shadow-2xs"
                   : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
               )}
             >
               <Icon name={tab.icon} className="size-3.5" />
-              {/* Em telas menores só a aba atual mostra o nome; as outras ficam só com o ícone. */}
-              <span className={active ? undefined : "hidden 2xl:inline"}>{tab.label}</span>
+              {/* No celular/telas pequenas só a aba ativa mostra o texto; a partir de tablets e laptops todas mostram o nome */}
+              <span className={active ? "font-semibold" : "hidden md:inline"}>{tab.label}</span>
             </Link>
           );
         })}

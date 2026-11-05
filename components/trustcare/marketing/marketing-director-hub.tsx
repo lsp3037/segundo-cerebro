@@ -75,52 +75,58 @@ export function MarketingDirectorHub({
   return (
     <div className="space-y-6 px-4 py-4 md:px-6">
       {/* Header Executivo da Diretoria de Marketing */}
-      <div className="rounded-2xl border bg-gradient-to-r from-card via-card to-orange-500/10 p-5 md:p-6 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="flex size-9 items-center justify-center rounded-xl bg-orange-600 text-white shadow-sm">
-                <MegaphoneIcon className="size-5" />
-              </span>
-              <div>
-                <h2 className="text-xl md:text-2xl font-bold tracking-tight">
-                  Diretoria de Marketing • Trust Care
+      <div className="rounded-2xl border bg-card p-5 md:p-6 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 font-bold">
+              <MegaphoneIcon className="size-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+                  Diretoria de Marketing
                 </h2>
-                <p className="text-xs text-muted-foreground">
-                  Central de crescimento: roteirização de alta conversão, testes de ângulos e tráfego Meta Ads em Cuiabá.
-                </p>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded-full">
+                  Trust Care
+                </span>
               </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Roteirização de alta conversão, testes de ângulos e tráfego Meta Ads em Cuiabá.
+              </p>
             </div>
           </div>
 
-          {/* Cards de Resumo Rápido no Header */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-xl border bg-background/80 backdrop-blur-xs px-3.5 py-2 text-left shadow-2xs">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground block">
+          {/* KPIs Executivos com tipografia expressiva e sem ruído de caixilhos */}
+          <div className="flex flex-wrap items-center gap-5 sm:gap-8 divide-x divide-border/60">
+            <div className="space-y-0.5">
+              <span className="text-[11px] font-medium text-muted-foreground block">
                 Campanhas Ativas
               </span>
-              <span className="text-sm font-extrabold text-foreground flex items-center gap-1.5">
+              <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                {executiveHeader.activeCampaignsCount} ativas
-              </span>
+                <span>{executiveHeader.activeCampaignsCount}</span>
+                <span className="text-xs font-normal text-muted-foreground">no ar</span>
+              </div>
             </div>
 
-            <div className="rounded-xl border bg-background/80 backdrop-blur-xs px-3.5 py-2 text-left shadow-2xs">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                Orçamento Diário Ativo
+            <div className="pl-5 sm:pl-8 space-y-0.5">
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                Orçamento Diário
               </span>
-              <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
-                {formatCentsToBrl(executiveHeader.totalDailyBudgetCents)}/dia
-              </span>
+              <div className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                {formatCentsToBrl(executiveHeader.totalDailyBudgetCents)}
+                <span className="text-xs font-normal text-muted-foreground">/dia</span>
+              </div>
             </div>
 
-            <div className="rounded-xl border bg-background/80 backdrop-blur-xs px-3.5 py-2 text-left shadow-2xs">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground block">
-                Ângulos Vencedores
+            <div className="pl-5 sm:pl-8 space-y-0.5">
+              <span className="text-[11px] font-medium text-muted-foreground block">
+                Ângulos Validados
               </span>
-              <span className="text-sm font-extrabold text-orange-600 dark:text-orange-400">
-                🏆 {executiveHeader.winnerAnglesCount} validados
-              </span>
+              <div className="text-xl sm:text-2xl font-bold tracking-tight text-orange-600 dark:text-orange-400 flex items-center gap-1.5">
+                <span>🏆 {executiveHeader.winnerAnglesCount}</span>
+                <span className="text-xs font-normal text-muted-foreground">vencedores</span>
+              </div>
             </div>
           </div>
         </div>

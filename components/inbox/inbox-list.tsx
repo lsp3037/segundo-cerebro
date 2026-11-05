@@ -1,6 +1,6 @@
 "use client";
 
-import { ArchiveIcon, ExternalLinkIcon, InboxIcon, MoreHorizontalIcon, SendIcon, Trash2Icon, WandIcon } from "lucide-react";
+import { ArchiveIcon, ExternalLinkIcon, InboxIcon, MoreHorizontalIcon, PlusIcon, SendIcon, Trash2Icon, WandIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import {
 import { setInboxStatus, trashInboxItem } from "@/lib/actions/inbox";
 import { formatDateTime } from "@/lib/dates";
 import type { Tables } from "@/lib/supabase/database.types";
+import { CaptureDialog } from "./capture-dialog";
 import { ConvertDialog } from "./convert-dialog";
 
 type Item = Tables<"inbox_items">;
@@ -26,6 +27,7 @@ export function InboxList({ initialItems, aiConfigured }: { initialItems: Item[]
     setItems(initialItems);
   }
   const [converting, setConverting] = useState<Item | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
 
   function drop(id: string) {
     setItems((list) => list.filter((i) => i.id !== id));
@@ -55,13 +57,29 @@ export function InboxList({ initialItems, aiConfigured }: { initialItems: Item[]
 
   if (items.length === 0) {
     return (
-      <div className="mx-4 my-8 rounded-xl border border-dashed px-6 py-12 text-center md:mx-6">
-        <InboxIcon className="mx-auto size-6 text-muted-foreground" />
-        <p className="mt-3 text-sm font-medium">Caixa de Entrada vazia</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Use <strong>Capturar</strong> (ou <kbd className="font-mono">Alt+N</kbd>) para jogar algo aqui.
-        </p>
-      </div>
+      <>
+        <div className="mx-4 my-8 rounded-2xl border border-dashed px-6 py-12 text-center md:mx-6 space-y-3 bg-card/50">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <InboxIcon className="size-6" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-foreground">Caixa de Entrada limpa e organizada</p>
+            <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
+              Teve uma ideia, viu um link ou recebeu uma demanda? Guarde agora e organize depois.
+            </p>
+          </div>
+          <div className="pt-2">
+            <Button onClick={() => setCaptureOpen(true)} className="gap-2 cursor-pointer shadow-xs">
+              <PlusIcon className="size-4" />
+              <span>Capturar agora</span>
+              <kbd className="hidden sm:inline-block rounded bg-primary-foreground/20 px-1.5 py-0.5 text-[10px] font-mono font-medium">
+                Alt+N
+              </kbd>
+            </Button>
+          </div>
+        </div>
+        <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
+      </>
     );
   }
 

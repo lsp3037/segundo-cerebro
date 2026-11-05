@@ -64,14 +64,14 @@ export function TasksBoard({
       {views.length > 1 && <ViewSwitcher views={views} current={view} />}
 
       <div className={cn("mt-4", aside && "grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]")}>
-        <div className="min-w-0">
+        <div className="min-w-0 order-2 xl:order-1">
           {view === "hoje" && <TodayView {...props} />}
           {view === "semana" && <WeekView {...props} />}
           {view === "mes" && <MonthView {...props} />}
           {view === "lista" && <ListView {...props} />}
           {view === "kanban" && <TasksKanban {...props} />}
         </div>
-        {aside && <div className="space-y-6">{aside}</div>}
+        {aside && <div className="space-y-4 xl:space-y-6 order-1 xl:order-2">{aside}</div>}
       </div>
 
       <TaskSheet task={openTask} list={list} onClose={() => setOpenId(null)} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { PlusIcon } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 
 import { CaptureDialog } from "@/components/inbox/capture-dialog";
@@ -83,6 +84,16 @@ export function AppShell({
           onCapture={() => setCaptureOpen(true)}
         />
         <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
+
+        {/* Botão de ação flutuante (FAB) exclusivo no mobile: captura rápida com o polegar */}
+        <button
+          type="button"
+          onClick={() => setCaptureOpen(true)}
+          aria-label="Capturar na Caixa de Entrada"
+          className="fixed right-4 bottom-5 z-40 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden cursor-pointer"
+        >
+          <PlusIcon className="size-6 stroke-[2.5]" />
+        </button>
       </div>
     </WorkspaceProvider>
   );

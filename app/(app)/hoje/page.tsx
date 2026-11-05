@@ -62,7 +62,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
         defaultAreaId={defaultArea.id}
         aside={
           view === "hoje" ? (
-            <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3.5">
               <TodayAgenda occurrences={todayEvents} areas={areas} connected={calendars.some((c) => c.sync_enabled)} />
               <HabitsToday
                 habits={habits}
@@ -72,7 +72,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
               />
               <Link
                 href="/entrada"
-                className="flex items-center gap-3 rounded-xl border px-4 py-3 text-sm hover:bg-accent/50"
+                className="flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm hover:bg-accent/50 sm:col-span-2 xl:col-span-1"
               >
                 <InboxIcon className="size-4 text-muted-foreground" />
                 <span className="flex-1">Caixa de Entrada</span>
@@ -80,7 +80,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
                   {inboxCount > 0 ? `${inboxCount} para organizar` : "vazia"}
                 </span>
               </Link>
-            </>
+            </div>
           ) : undefined
         }
       />
