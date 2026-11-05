@@ -92,40 +92,44 @@ const DEFAULT_PAYMENT_METHODS: Array<{
 
 // Garante que o usuário possua categorias e métodos de pagamento padrão
 export async function ensureDefaultFinanceData(userId: string): Promise<void> {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const { data: existingCats } = await supabase
-    .from("finance_categories")
-    .select("id")
-    .eq("user_id", userId)
-    .limit(1);
+    const { data: existingCats } = await supabase
+      .from("finance_categories")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
 
-  if (!existingCats || existingCats.length === 0) {
-    const toInsert = DEFAULT_CATEGORIES.map((c) => ({
-      user_id: userId,
-      ledger: c.ledger,
-      kind: c.kind,
-      name: c.name,
-      color: c.color,
-      sort_order: c.sort_order,
-    }));
-    await supabase.from("finance_categories").insert(toInsert);
-  }
+    if (!existingCats || existingCats.length === 0) {
+      const toInsert = DEFAULT_CATEGORIES.map((c) => ({
+        user_id: userId,
+        ledger: c.ledger,
+        kind: c.kind,
+        name: c.name,
+        color: c.color,
+        sort_order: c.sort_order,
+      }));
+      await supabase.from("finance_categories").insert(toInsert);
+    }
 
-  const { data: existingMethods } = await supabase
-    .from("payment_methods")
-    .select("id")
-    .eq("user_id", userId)
-    .limit(1);
+    const { data: existingMethods } = await supabase
+      .from("payment_methods")
+      .select("id")
+      .eq("user_id", userId)
+      .limit(1);
 
-  if (!existingMethods || existingMethods.length === 0) {
-    const toInsert = DEFAULT_PAYMENT_METHODS.map((m) => ({
-      user_id: userId,
-      name: m.name,
-      type: m.type,
-      active: true,
-    }));
-    await supabase.from("payment_methods").insert(toInsert);
+    if (!existingMethods || existingMethods.length === 0) {
+      const toInsert = DEFAULT_PAYMENT_METHODS.map((m) => ({
+        user_id: userId,
+        name: m.name,
+        type: m.type,
+        active: true,
+      }));
+      await supabase.from("payment_methods").insert(toInsert);
+    }
+  } catch (err) {
+    console.error("ensureDefaultFinanceData error:", err);
   }
 }
 
@@ -173,12 +177,7 @@ export async function getTransactions(params?: {
 
   let query = supabase
     .from("transactions")
-    .select(`
-      id, user_id, ledger, kind, amount_cents, date, description, notes, category_id, payment_method_id, notebook_id, created_at, updated_at, deleted_at,
-      category:finance_categories(name, color),
-      payment_method:payment_methods(name, type),
-      notebook:notebooks(model, brand)
-    `)
+    .select("id, user_id, ledger, kind, amount_cents, date, description, notes, category_id, payment_method_id, notebook_id, created_at, updated_at, deleted_at")
     .is("deleted_at", null)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
@@ -188,9 +187,7 @@ export async function getTransactions(params?: {
   }
 
   if (params?.month) {
-    // Formato YYYY-MM
     const start = `${params.month}-01`;
-    // Fim do mês (aproximado seguro usando 31 dias)
     const end = `${params.month}-31`;
     query = query.gte("date", start).lte("date", end);
   }
@@ -217,10 +214,25 @@ export async function getTransactions(params?: {
     query = query.limit(1000);
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
+  const [txRes, catsRes, methodsRes, notebooksRes] = await Promise.all([
+    query,
+    supabase.from("finance_categories").select("id, name, color"),
+    supabase.from("payment_methods").select("id, name, type"),
+    supabase.from("notebooks").select("id, model, brand"),
+  ]);
 
-  return (data as unknown as Transaction[]) ?? [];
+  if (txRes.error) throw txRes.error;
+
+  const catsMap = new Map((catsRes.data ?? []).map((c) => [c.id, c]));
+  const methodsMap = new Map((methodsRes.data ?? []).map((m) => [m.id, m]));
+  const notebooksMap = new Map((notebooksRes.data ?? []).map((n) => [n.id, n]));
+
+  return (txRes.data ?? []).map((t) => ({
+    ...t,
+    category: t.category_id ? catsMap.get(t.category_id) ?? null : null,
+    payment_method: t.payment_method_id ? methodsMap.get(t.payment_method_id) ?? null : null,
+    notebook: t.notebook_id ? notebooksMap.get(t.notebook_id) ?? null : null,
+  })) as Transaction[];
 }
 
 export async function getNotebooks(params?: {
@@ -230,10 +242,7 @@ export async function getNotebooks(params?: {
 
   let query = supabase
     .from("notebooks")
-    .select(`
-      id, user_id, brand, model, specs, status, notes, created_at, updated_at, deleted_at,
-      profit_data:notebook_profit(income_cents, expense_cents, profit_cents)
-    `)
+    .select("id, user_id, brand, model, specs, status, notes, created_at, updated_at, deleted_at")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -241,12 +250,26 @@ export async function getNotebooks(params?: {
     query = query.eq("status", params.status);
   }
 
-  const { data, error } = await query;
-  if (error) throw error;
+  const [notebooksRes, profitRes] = await Promise.all([
+    query,
+    supabase.from("notebook_profit").select("notebook_id, income_cents, expense_cents, profit_cents"),
+  ]);
 
-  return (data ?? []).map((n) => {
-    // profit_data vem como objeto ou array da relação da view
-    const pData = Array.isArray(n.profit_data) ? n.profit_data[0] : n.profit_data;
+  if (notebooksRes.error) throw notebooksRes.error;
+
+  const profitMap = new Map<
+    string,
+    { income_cents: number | null; expense_cents: number | null; profit_cents: number | null }
+  >();
+
+  for (const p of profitRes.data ?? []) {
+    if (p.notebook_id) {
+      profitMap.set(p.notebook_id, p);
+    }
+  }
+
+  return (notebooksRes.data ?? []).map((n) => {
+    const pData = profitMap.get(n.id);
     return {
       id: n.id,
       user_id: n.user_id,
@@ -271,13 +294,10 @@ export async function getFinanceSummary(params?: {
 }): Promise<FinanceSummary> {
   const supabase = await createClient();
 
-  // 1. Busca transações do período
+  // 1. Busca transações do período e categorias
   let query = supabase
     .from("transactions")
-    .select(`
-      id, kind, amount_cents, date, ledger, category_id,
-      category:finance_categories(name, color)
-    `)
+    .select("id, kind, amount_cents, date, ledger, category_id")
     .is("deleted_at", null);
 
   if (params?.ledger && params.ledger !== "all") {
@@ -290,8 +310,15 @@ export async function getFinanceSummary(params?: {
     query = query.gte("date", start).lte("date", end);
   }
 
-  const { data: transactions, error } = await query;
-  if (error) throw error;
+  const [txRes, catsRes] = await Promise.all([
+    query,
+    supabase.from("finance_categories").select("id, name, color"),
+  ]);
+
+  if (txRes.error) throw txRes.error;
+
+  const transactions = txRes.data ?? [];
+  const catsMap = new Map((catsRes.data ?? []).map((c) => [c.id, c]));
 
   let totalIncomeCents = 0;
   let totalExpenseCents = 0;
@@ -300,7 +327,7 @@ export async function getFinanceSummary(params?: {
     { categoryId: string | null; name: string; color: string | null; kind: "income" | "expense"; totalCents: number }
   >();
 
-  for (const t of transactions ?? []) {
+  for (const t of transactions) {
     const amount = t.amount_cents || 0;
     if (t.kind === "income") {
       totalIncomeCents += amount;
@@ -308,7 +335,7 @@ export async function getFinanceSummary(params?: {
       totalExpenseCents += amount;
     }
 
-    const catObj = Array.isArray(t.category) ? t.category[0] : t.category;
+    const catObj = t.category_id ? catsMap.get(t.category_id) : null;
     const catId = t.category_id || "sem_categoria";
     const catName = catObj?.name || (t.kind === "income" ? "Outras Entradas" : "Outras Despesas");
     const catColor = catObj?.color || "#94a3b8";
@@ -398,7 +425,7 @@ export async function getFinanceSummary(params?: {
     totalExpenseCents,
     netBalanceCents,
     profitMarginPercent: Number(profitMarginPercent.toFixed(1)),
-    transactionCount: transactions?.length ?? 0,
+    transactionCount: transactions.length,
     monthlyTrend,
     categoriesBreakdown,
   };
