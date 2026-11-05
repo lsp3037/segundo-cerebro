@@ -1,22 +1,63 @@
 import type { Metadata } from "next";
 
-import { TabPage } from "@/components/tab-page";
+import { FinanceDashboard } from "@/components/finance/finance-dashboard";
+import { getCurrentUser } from "@/lib/auth";
 import { getAreaFilter } from "@/lib/data/area-filter";
+import {
+  ensureDefaultFinanceData,
+  getFinanceCategories,
+  getFinanceSummary,
+  getNotebooks,
+  getPaymentMethods,
+  getTransactions,
+} from "@/lib/data/finance";
+import { todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
-const tab = TABS[6];
+const tab = TABS[7];
 
 export const metadata: Metadata = { title: tab.label };
 
 export default async function Page(props: PageProps<"/financas">) {
+  const user = await getCurrentUser();
+  await ensureDefaultFinanceData(user.id);
+
+  const searchParams = await props.searchParams;
   const area = await getAreaFilter(props.searchParams);
 
+  // Mês padrão: Mês atual em Cuiabá (ex: "2026-11")
+  const currentMonth =
+    typeof searchParams.m === "string" && /^\d{4}-\d{2}$/.test(searchParams.m)
+      ? searchParams.m
+      : todayIso().slice(0, 7);
+
+  // Ledger padrão
+  let currentLedger: "all" | "pessoal" | "trustcare" = "all";
+  if (searchParams.ledger === "pessoal" || searchParams.ledger === "trustcare") {
+    currentLedger = searchParams.ledger;
+  } else if (area?.slug === "pessoal") {
+    currentLedger = "pessoal";
+  } else if (area?.slug === "trustcare" || area?.slug === "profissional") {
+    currentLedger = "trustcare";
+  }
+
+  const [summary, transactions, notebooks, categories, paymentMethods] = await Promise.all([
+    getFinanceSummary({ ledger: currentLedger, month: currentMonth }),
+    getTransactions({ ledger: currentLedger, month: currentMonth }),
+    getNotebooks(),
+    getFinanceCategories(),
+    getPaymentMethods(),
+  ]);
+
   return (
-    <TabPage
-      tab={tab}
-      area={area}
-      description="Pessoal e Trust Care."
-      items={["Entradas e saídas pessoais e da Trust Care", "Lucro por notebook comprado e revendido", "Resumo mensal com gráfico"]}
+    <FinanceDashboard
+      initialSummary={summary}
+      initialTransactions={transactions}
+      initialNotebooks={notebooks}
+      categories={categories}
+      paymentMethods={paymentMethods}
+      currentMonth={currentMonth}
+      currentLedger={currentLedger}
     />
   );
 }

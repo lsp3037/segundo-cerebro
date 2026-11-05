@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { HabitsManager } from "@/components/habits/habits-manager";
+import { FinanceDashboard } from "@/components/finance/finance-dashboard";
 import { IdeasBoard } from "@/components/ideas/ideas-board";
 import { LearningBoard } from "@/components/learning/learning-board";
 import { LgpdNotice } from "@/components/lgpd-notice";
@@ -19,6 +20,15 @@ import { ReplyAssistant } from "@/components/trustcare/reply-assistant";
 import { ShortcutsBoard } from "@/components/trustcare/shortcuts-board";
 import { MarketingDirectorHub } from "@/components/trustcare/marketing/marketing-director-hub";
 import { isAiConfigured } from "@/lib/ai";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  ensureDefaultFinanceData,
+  getFinanceCategories,
+  getFinanceSummary,
+  getNotebooks,
+  getPaymentMethods,
+  getTransactions,
+} from "@/lib/data/finance";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getMarketingCampaigns, getCampaignAngles, getMetaAdsMetrics, getMarketingContentScripts } from "@/lib/data/marketing";
@@ -148,6 +158,46 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           initialAngles={angles}
           initialMetrics={metrics}
           initialScripts={scripts}
+        />
+      );
+      break;
+    }
+    case "finance": {
+      const searchParams = (await props.searchParams) as {
+        m?: string;
+        ledger?: string;
+        tab?: string;
+      };
+      const user = await getCurrentUser();
+      await ensureDefaultFinanceData(user.id);
+
+      const folderConfig = folder.config as { ledger?: "pessoal" | "trustcare" } | null;
+      const targetLedger: "all" | "pessoal" | "trustcare" =
+        (searchParams.ledger as "all" | "pessoal" | "trustcare") || folderConfig?.ledger || "all";
+
+      const currentMonth =
+        typeof searchParams.m === "string" && /^\d{4}-\d{2}$/.test(searchParams.m)
+          ? searchParams.m
+          : todayIso().slice(0, 7);
+
+      const [summary, transactions, notebooks, categories, paymentMethods] = await Promise.all([
+        getFinanceSummary({ ledger: targetLedger, month: currentMonth }),
+        getTransactions({ ledger: targetLedger, month: currentMonth }),
+        getNotebooks(),
+        getFinanceCategories(),
+        getPaymentMethods(),
+      ]);
+
+      content = (
+        <FinanceDashboard
+          initialSummary={summary}
+          initialTransactions={transactions}
+          initialNotebooks={notebooks}
+          categories={categories}
+          paymentMethods={paymentMethods}
+          currentMonth={currentMonth}
+          currentLedger={targetLedger}
+          baseFolderId={folder.id}
         />
       );
       break;
