@@ -42,6 +42,18 @@ export type FinanceSummary = {
   }>;
 };
 
+// Retorna o primeiro e o último dia válido de um mês no formato YYYY-MM
+function getMonthRange(monthStr: string): { start: string; end: string } {
+  const [yearStr, monthNumStr] = monthStr.split("-");
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthNumStr, 10);
+  const lastDay = new Date(year, month, 0).getDate();
+  return {
+    start: `${yearStr}-${monthNumStr}-01`,
+    end: `${yearStr}-${monthNumStr}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
 // Categorias padrão para seed automático
 const DEFAULT_CATEGORIES: Array<{
   ledger: "pessoal" | "trustcare";
@@ -187,8 +199,7 @@ export async function getTransactions(params?: {
   }
 
   if (params?.month) {
-    const start = `${params.month}-01`;
-    const end = `${params.month}-31`;
+    const { start, end } = getMonthRange(params.month);
     query = query.gte("date", start).lte("date", end);
   }
 
@@ -305,8 +316,7 @@ export async function getFinanceSummary(params?: {
   }
 
   if (params?.month) {
-    const start = `${params.month}-01`;
-    const end = `${params.month}-31`;
+    const { start, end } = getMonthRange(params.month);
     query = query.gte("date", start).lte("date", end);
   }
 
