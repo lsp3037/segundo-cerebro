@@ -7,6 +7,8 @@ Related:: [[MOC]], [[2026-11-02-ootto-content-skills-integration]], [[Segundo-Ce
 - Contexto de marca centralizado na skill `trustcare-content-context` (pilares, voz, regras de formato), carregada antes de qualquer skill de conteúdo.
 - Pilares sugeridos (a validar): Bancada/antes e depois · Upgrade vale mais que trocar · Calor e poeira de Cuiabá · Seminovo revisado · Confiança e bastidores.
 
+- Tema SSD está saturado no perfil da Trust Care (Luan, 03/11): evitar como assunto central; carrossel de 04/11 foi reescrito sem SSD.
+
 ## Context / facts to remember
 - Repositório de origem: github.com/Ootto-AI/claude-content-skills (MIT). 54 skills instaladas (humanizer já existia na conta, não foi sobrescrita).
 - Premissas do calendário a confirmar: 4 posts/semana (2 Reels, 1 Carrossel, 1 Stories), postagem às 18h, meta = leads no WhatsApp.
