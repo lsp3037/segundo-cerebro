@@ -268,6 +268,37 @@ export async function createFinanceCategory(input: CategoryInput): Promise<Actio
   return ok(data);
 }
 
+export async function updateFinanceCategory(
+  categoryId: string,
+  patch: Partial<CategoryInput>
+): Promise<ActionResult<Tables<"finance_categories">>> {
+  const user = await getCurrentUser();
+  if (!id.safeParse(categoryId).success) return fail("Categoria inválida.");
+
+  const parsed = categorySchema.partial().safeParse(patch);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_categories")
+    .update({
+      ...parsed.data,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", categoryId)
+    .eq("user_id", user.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("updateFinanceCategory error:", error);
+    return fail("Não foi possível atualizar a categoria.");
+  }
+
+  revalidatePath("/", "layout");
+  return ok(data);
+}
+
 export async function trashFinanceCategory(categoryId: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   if (!id.safeParse(categoryId).success) return fail("Categoria inválida.");

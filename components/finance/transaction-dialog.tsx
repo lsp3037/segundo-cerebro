@@ -235,8 +235,8 @@ export function TransactionDialog({
               id="tx-description"
               placeholder={
                 kind === "income"
-                  ? "Ex: Manutenção Dell Inspiron, Salário SES-MT"
-                  : "Ex: Compra de SSD 480GB, Mercado da semana"
+                  ? "Ex: Salário mensal, Rendimento de aluguel, Manutenção"
+                  : "Ex: Supermercado do mês, Aluguel/Condomínio, Combustível"
               }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -258,7 +258,7 @@ export function TransactionDialog({
                     : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
                 }`}
               >
-                Pessoal (Luan)
+                Pessoal / Familiar
               </button>
               <button
                 type="button"

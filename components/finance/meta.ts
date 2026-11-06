@@ -16,13 +16,13 @@ export type NotebookStatus = "bought" | "repair" | "for_sale" | "sold";
 
 export const LEDGER_LABELS: Record<LedgerType, string> = {
   all: "Visão Consolidada",
-  pessoal: "Pessoal (Luan)",
+  pessoal: "Pessoal / Familiar",
   trustcare: "Trust Care (Empresa)",
 };
 
 export const LEDGER_BADGES: Record<"pessoal" | "trustcare", { label: string; className: string }> = {
   pessoal: {
-    label: "Pessoal",
+    label: "Pessoal / Familiar",
     className: "border-violet-500/30 bg-violet-500/10 text-violet-400",
   },
   trustcare: {

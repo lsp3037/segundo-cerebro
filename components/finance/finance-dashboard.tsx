@@ -12,6 +12,7 @@ import {
   PlusIcon,
   ReceiptTextIcon,
   RotateCcwIcon,
+  TagIcon,
   WalletIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ import type {
 } from "@/lib/data/finance";
 import { todayIso } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
+import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
 import { LEDGER_LABELS, type LedgerType } from "./meta";
 import { MetricsCards } from "./metrics-cards";
@@ -71,6 +73,7 @@ export function FinanceDashboard({
 
   const [nbDialogOpen, setNbDialogOpen] = useState(false);
   const [nbToEdit, setNbToEdit] = useState<Notebook | null>(null);
+  const [catDialogOpen, setCatDialogOpen] = useState(false);
 
   // Mês atual real em Cuiabá
   const realCurrentMonth = todayIso().slice(0, 7);
@@ -180,7 +183,7 @@ export function FinanceDashboard({
                 {ldg === "all"
                   ? "Consolidado Geral"
                   : ldg === "pessoal"
-                    ? "Pessoal (Luan)"
+                    ? "Pessoal & Familiar"
                     : "Trust Care"}
               </button>
             );
@@ -228,6 +231,17 @@ export function FinanceDashboard({
               Mês Atual
             </Button>
           )}
+
+          {/* Gerenciar Categorias */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCatDialogOpen(true)}
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <TagIcon className="size-3.5" />
+            Categorias
+          </Button>
 
           {/* Botões de Ação Primária */}
           {(currentLedger === "all" || currentLedger === "trustcare") && (
@@ -363,6 +377,13 @@ export function FinanceDashboard({
         categories={categories}
         paymentMethods={paymentMethods}
         notebookToEdit={nbToEdit}
+      />
+
+      <CategoriesDialog
+        open={catDialogOpen}
+        onOpenChange={setCatDialogOpen}
+        categories={categories}
+        defaultLedger={currentLedger === "trustcare" ? "trustcare" : "pessoal"}
       />
     </div>
   );

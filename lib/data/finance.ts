@@ -55,26 +55,32 @@ function getMonthRange(monthStr: string): { start: string; end: string } {
 }
 
 // Categorias padrão para seed automático
-const DEFAULT_CATEGORIES: Array<{
+export const DEFAULT_CATEGORIES: Array<{
   ledger: "pessoal" | "trustcare";
   kind: "income" | "expense";
   name: string;
   color: string;
   sort_order: number;
 }> = [
-  // Pessoal - Receitas
-  { ledger: "pessoal", kind: "income", name: "Salário SES-MT", color: "#10b981", sort_order: 1 },
-  { ledger: "pessoal", kind: "income", name: "Bolsa / Mestrado", color: "#3b82f6", sort_order: 2 },
-  { ledger: "pessoal", kind: "income", name: "Outras Entradas", color: "#6b7280", sort_order: 3 },
+  // Pessoal / Familiar - Receitas (Entradas)
+  { ledger: "pessoal", kind: "income", name: "Salário", color: "#10b981", sort_order: 1 },
+  { ledger: "pessoal", kind: "income", name: "Aluguel", color: "#059669", sort_order: 2 },
+  { ledger: "pessoal", kind: "income", name: "Dividendos & Investimentos", color: "#3b82f6", sort_order: 3 },
+  { ledger: "pessoal", kind: "income", name: "Pró-labore & Serviços", color: "#06b6d4", sort_order: 4 },
+  { ledger: "pessoal", kind: "income", name: "Benefícios & Bonificações", color: "#8b5cf6", sort_order: 5 },
+  { ledger: "pessoal", kind: "income", name: "Outras Entradas", color: "#6b7280", sort_order: 6 },
 
-  // Pessoal - Despesas
-  { ledger: "pessoal", kind: "expense", name: "Moradia & Contas", color: "#ef4444", sort_order: 1 },
-  { ledger: "pessoal", kind: "expense", name: "Alimentação & Mercado", color: "#f97316", sort_order: 2 },
-  { ledger: "pessoal", kind: "expense", name: "Transporte & Combustível", color: "#eab308", sort_order: 3 },
-  { ledger: "pessoal", kind: "expense", name: "Saúde & Farmácia", color: "#ec4899", sort_order: 4 },
-  { ledger: "pessoal", kind: "expense", name: "Educação & Livros", color: "#8b5cf6", sort_order: 5 },
-  { ledger: "pessoal", kind: "expense", name: "Lazer & Assinaturas", color: "#06b6d4", sort_order: 6 },
-  { ledger: "pessoal", kind: "expense", name: "Outras Despesas", color: "#6b7280", sort_order: 7 },
+  // Pessoal / Familiar - Despesas (Saídas)
+  { ledger: "pessoal", kind: "expense", name: "Moradia (Aluguel/Condomínio)", color: "#ef4444", sort_order: 1 },
+  { ledger: "pessoal", kind: "expense", name: "Contas de Consumo (Luz/Água/Net)", color: "#f97316", sort_order: 2 },
+  { ledger: "pessoal", kind: "expense", name: "Alimentação & Mercado", color: "#f59e0b", sort_order: 3 },
+  { ledger: "pessoal", kind: "expense", name: "Transporte & Veículo", color: "#eab308", sort_order: 4 },
+  { ledger: "pessoal", kind: "expense", name: "Saúde & Farmácia", color: "#ec4899", sort_order: 5 },
+  { ledger: "pessoal", kind: "expense", name: "Família & Educação", color: "#8b5cf6", sort_order: 6 },
+  { ledger: "pessoal", kind: "expense", name: "Lazer & Assinaturas", color: "#06b6d4", sort_order: 7 },
+  { ledger: "pessoal", kind: "expense", name: "Compras & Vestuário", color: "#a855f7", sort_order: 8 },
+  { ledger: "pessoal", kind: "expense", name: "Investimentos & Reserva", color: "#10b981", sort_order: 9 },
+  { ledger: "pessoal", kind: "expense", name: "Outras Despesas", color: "#6b7280", sort_order: 10 },
 
   // Trust Care - Receitas
   { ledger: "trustcare", kind: "income", name: "Serviços & Manutenção", color: "#10b981", sort_order: 1 },
@@ -107,38 +113,66 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
   try {
     const supabase = await createClient();
 
+    // 1. Busca todas as categorias existentes do usuário (ativas)
     const { data: existingCats } = await supabase
       .from("finance_categories")
-      .select("id")
+      .select("id, name, ledger, kind")
       .eq("user_id", userId)
-      .limit(1);
+      .is("deleted_at", null);
 
-    if (!existingCats || existingCats.length === 0) {
-      const toInsert = DEFAULT_CATEGORIES.map((c) => ({
-        user_id: userId,
-        ledger: c.ledger,
-        kind: c.kind,
-        name: c.name,
-        color: c.color,
-        sort_order: c.sort_order,
-      }));
+    const existingList = existingCats ?? [];
+    const existingNames = new Set(existingList.map((c) => `${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`));
+
+    // Se existia "Salário SES-MT", renomeia para "Salário"
+    const sesCat = existingList.find((c) => c.name.toLowerCase().includes("salário ses-mt"));
+    if (sesCat) {
+      await supabase
+        .from("finance_categories")
+        .update({ name: "Salário" })
+        .eq("id", sesCat.id);
+      existingNames.add(`${sesCat.ledger}:${sesCat.kind}:salário`);
+    }
+
+    // Se existia "Bolsa / Mestrado", renomeia para "Dividendos & Investimentos" ou adiciona
+    const bolsaCat = existingList.find((c) => c.name.toLowerCase().includes("bolsa / mestrado"));
+    if (bolsaCat) {
+      await supabase
+        .from("finance_categories")
+        .update({ name: "Bolsa & Estudos" })
+        .eq("id", bolsaCat.id);
+      existingNames.add(`${bolsaCat.ledger}:${bolsaCat.kind}:bolsa & estudos`);
+    }
+
+    // Insere qualquer categoria padrão que ainda não exista para o usuário
+    const toInsert = DEFAULT_CATEGORIES.filter(
+      (c) => !existingNames.has(`${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`)
+    ).map((c) => ({
+      user_id: userId,
+      ledger: c.ledger,
+      kind: c.kind,
+      name: c.name,
+      color: c.color,
+      sort_order: c.sort_order,
+    }));
+
+    if (toInsert.length > 0) {
       await supabase.from("finance_categories").insert(toInsert);
     }
 
+    // Métodos de pagamento
     const { data: existingMethods } = await supabase
       .from("payment_methods")
-      .select("id")
-      .eq("user_id", userId)
-      .limit(1);
+      .select("id, name")
+      .eq("user_id", userId);
 
     if (!existingMethods || existingMethods.length === 0) {
-      const toInsert = DEFAULT_PAYMENT_METHODS.map((m) => ({
+      const methodsToInsert = DEFAULT_PAYMENT_METHODS.map((m) => ({
         user_id: userId,
         name: m.name,
         type: m.type,
         active: true,
       }));
-      await supabase.from("payment_methods").insert(toInsert);
+      await supabase.from("payment_methods").insert(methodsToInsert);
     }
   } catch (err) {
     console.error("ensureDefaultFinanceData error:", err);
