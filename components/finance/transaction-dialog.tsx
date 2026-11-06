@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowDownRightIcon, ArrowUpRightIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -80,8 +80,20 @@ export function TransactionDialog({
     }
   }, [transactionToEdit, defaultLedger, open]);
 
-  // Filtra categorias pelo ledger e kind selecionados
-  const filteredCategories = categories.filter((c) => c.ledger === ledger && c.kind === kind);
+  // Filtra categorias pelo ledger e kind selecionados (garantindo unicidade)
+  const filteredCategories = useMemo(() => {
+    const list = categories.filter((c) => c.ledger === ledger && c.kind === kind);
+    const seen = new Set<string>();
+    const unique: FinanceCategory[] = [];
+    for (const c of list) {
+      const key = c.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(c);
+      }
+    }
+    return unique;
+  }, [categories, ledger, kind]);
 
   // Notebooks elegíveis (todos ativos no estoque ou recentemente vendidos)
   const availableNotebooks = notebooks.filter((n) => !n.deleted_at);

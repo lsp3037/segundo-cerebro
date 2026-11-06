@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Loader2Icon, PencilIcon, PlusIcon, TagIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -63,9 +63,21 @@ export function CategoriesDialog({
   const [name, setName] = useState("");
   const [color, setColor] = useState("#10b981");
 
-  const filteredCategories = categories.filter(
-    (c) => c.ledger === activeLedger && c.kind === activeKind && !c.deleted_at
-  );
+  const filteredCategories = useMemo(() => {
+    const list = categories.filter(
+      (c) => c.ledger === activeLedger && c.kind === activeKind && !c.deleted_at
+    );
+    const seen = new Set<string>();
+    const unique: FinanceCategory[] = [];
+    for (const item of list) {
+      const key = item.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }, [categories, activeLedger, activeKind]);
 
   const handleStartEdit = (cat: FinanceCategory) => {
     setEditingCategory(cat);

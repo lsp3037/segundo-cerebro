@@ -108,12 +108,66 @@ const DEFAULT_PAYMENT_METHODS: Array<{
   { name: "Boleto", type: "boleto" },
 ];
 
-// Garante que o usuário possua categorias e métodos de pagamento padrão
+// Limpa e unifica categorias duplicadas no banco de dados, remapeando transações para a categoria canônica
+export async function cleanupDuplicateCategories(userId: string): Promise<void> {
+  try {
+    const supabase = await createClient();
+
+    const { data: allCats } = await supabase
+      .from("finance_categories")
+      .select("id, ledger, kind, name, created_at")
+      .eq("user_id", userId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true });
+
+    if (!allCats || allCats.length === 0) return;
+
+    const seen = new Map<string, string>(); // key -> canonicalId
+    const toDeleteIds: string[] = [];
+    const remappings: Array<{ oldId: string; newId: string }> = [];
+
+    for (const cat of allCats) {
+      const key = `${cat.ledger}:${cat.kind}:${cat.name.trim().toLowerCase()}`;
+      if (seen.has(key)) {
+        const canonicalId = seen.get(key)!;
+        toDeleteIds.push(cat.id);
+        remappings.push({ oldId: cat.id, newId: canonicalId });
+      } else {
+        seen.set(key, cat.id);
+      }
+    }
+
+    // Remapeia transações que usavam as categorias duplicadas
+    for (const { oldId, newId } of remappings) {
+      await supabase
+        .from("transactions")
+        .update({ category_id: newId })
+        .eq("category_id", oldId)
+        .eq("user_id", userId);
+    }
+
+    // Exclui fisicamente as categorias duplicadas
+    if (toDeleteIds.length > 0) {
+      await supabase
+        .from("finance_categories")
+        .delete()
+        .in("id", toDeleteIds)
+        .eq("user_id", userId);
+    }
+  } catch (err) {
+    console.error("cleanupDuplicateCategories error:", err);
+  }
+}
+
+// Garante que o usuário possua categorias e métodos de pagamento padrão (sem duplicar)
 export async function ensureDefaultFinanceData(userId: string): Promise<void> {
   try {
     const supabase = await createClient();
 
-    // 1. Busca todas as categorias existentes do usuário (ativas)
+    // 1. Limpa duplicidades existentes primeiro
+    await cleanupDuplicateCategories(userId);
+
+    // 2. Busca todas as categorias existentes do usuário (ativas)
     const { data: existingCats } = await supabase
       .from("finance_categories")
       .select("id, name, ledger, kind")
@@ -123,39 +177,16 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
     const existingList = existingCats ?? [];
     const existingNames = new Set(existingList.map((c) => `${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`));
 
-    // Se existia "Salário SES-MT", renomeia para "Salário"
-    const sesCat = existingList.find((c) => c.name.toLowerCase().includes("salário ses-mt"));
-    if (sesCat) {
-      await supabase
-        .from("finance_categories")
-        .update({ name: "Salário" })
-        .eq("id", sesCat.id);
-      existingNames.add(`${sesCat.ledger}:${sesCat.kind}:salário`);
-    }
-
-    // Se existia "Bolsa / Mestrado", renomeia para "Dividendos & Investimentos" ou adiciona
-    const bolsaCat = existingList.find((c) => c.name.toLowerCase().includes("bolsa / mestrado"));
-    if (bolsaCat) {
-      await supabase
-        .from("finance_categories")
-        .update({ name: "Bolsa & Estudos" })
-        .eq("id", bolsaCat.id);
-      existingNames.add(`${bolsaCat.ledger}:${bolsaCat.kind}:bolsa & estudos`);
-    }
-
-    // Insere qualquer categoria padrão que ainda não exista para o usuário
-    const toInsert = DEFAULT_CATEGORIES.filter(
-      (c) => !existingNames.has(`${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`)
-    ).map((c) => ({
-      user_id: userId,
-      ledger: c.ledger,
-      kind: c.kind,
-      name: c.name,
-      color: c.color,
-      sort_order: c.sort_order,
-    }));
-
-    if (toInsert.length > 0) {
+    // Se já existem categorias, só adiciona as que realmente faltam se a lista estiver muito vazia
+    if (existingList.length === 0) {
+      const toInsert = DEFAULT_CATEGORIES.map((c) => ({
+        user_id: userId,
+        ledger: c.ledger,
+        kind: c.kind,
+        name: c.name,
+        color: c.color,
+        sort_order: c.sort_order,
+      }));
       await supabase.from("finance_categories").insert(toInsert);
     }
 
@@ -195,7 +226,20 @@ export async function getFinanceCategories(ledger?: "pessoal" | "trustcare" | "a
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  // Deduplica em memória por chave (ledger + kind + name) para garantia absoluta de 0 repetições na UI
+  const uniqueCats: FinanceCategory[] = [];
+  const seenKeys = new Set<string>();
+
+  for (const cat of data ?? []) {
+    const key = `${cat.ledger}:${cat.kind}:${cat.name.trim().toLowerCase()}`;
+    if (!seenKeys.has(key)) {
+      seenKeys.add(key);
+      uniqueCats.push(cat);
+    }
+  }
+
+  return uniqueCats;
 }
 
 export async function getPaymentMethods(): Promise<PaymentMethod[]> {
