@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { TabPage } from "@/components/tab-page";
-import { getAreaFilter } from "@/lib/data/area-filter";
+import { WeeklyReviewDashboard } from "@/components/review/weekly-review-dashboard";
+import { getWeeklyReviewData } from "@/lib/data/weekly-review";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[7];
@@ -9,14 +9,13 @@ const tab = TABS[7];
 export const metadata: Metadata = { title: tab.label };
 
 export default async function Page(props: PageProps<"/revisao">) {
-  const area = await getAreaFilter(props.searchParams);
+  const searchParams = await props.searchParams;
+  const weekStart =
+    typeof searchParams.w === "string" && /^\d{4}-\d{2}-\d{2}$/.test(searchParams.w)
+      ? searchParams.w
+      : undefined;
 
-  return (
-    <TabPage
-      tab={tab}
-      area={area}
-      description="O fechamento da semana, todo domingo."
-      items={["Checklist guiado: Caixa de Entrada, atrasadas, próxima semana, agenda, conteúdo e finanças", "Histórico das revisões com anotações"]}
-    />
-  );
+  const data = await getWeeklyReviewData(weekStart);
+
+  return <WeeklyReviewDashboard initialData={data} />;
 }

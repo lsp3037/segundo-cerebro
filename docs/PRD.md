@@ -153,7 +153,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2. Núcleo | Tarefas, hábitos, Caixa de Entrada, Conhecimento, Aprender, Ideias, busca | ✅ 2026-11-01 |
 | 3. Agenda | Google Agenda nas duas contas, duas vias | ✅ 2026-11-01 |
 | 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | ✅ 2026-11-01 |
-| 5. Finanças e Revisão Semanal | | ⏳ aguardando aprovação |
+| 5. Finanças e Revisão Semanal | Fluxo de caixa, revenda de notebooks, importador OFX e revisão guiada | ✅ 2026-11-09 |
 | 6. Extras | Telegram, busca com IA, Agente de Marketing real, PWA | ⏳ |
 
 ## 9. Decisões de produto tomadas

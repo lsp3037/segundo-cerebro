@@ -1,6 +1,6 @@
 # Segundo Cérebro: plano técnico e diário de decisões
 
-> Status (2026-11-01): **Fases 1 a 4 concluídas**; Fase 5 aguardando aprovação. As seções 1 a 4 são a proposta inicial (com a estrutura de pastas atualizada); as seções 5 em diante registram respostas e entregas.
+> Status (2026-11-09): **Fases 1 a 5 concluídas**; Fase 6 (Extras: Telegram, PWA e Busca com IA) a seguir. As seções 1 a 4 são a proposta inicial (com a estrutura de pastas atualizada); as seções 5 em diante registram respostas e entregas.
 > Fonte: [`especificacao-original.md`](especificacao-original.md). O "o quê" e o "porquê" estão no [`PRD.md`](PRD.md); o dia a dia, no [`OPERACAO.md`](OPERACAO.md).
 
 ---
