@@ -1,0 +1,3 @@
+# Lançamento financeiro direto para peças de notebooks de revenda
+
+Decidimos que os custos de peças e upgrades instalados em notebooks de revenda da Trust Care serão registrados exclusivamente como despesas financeiras diretas vinculadas ao notebook no Segundo Cérebro (`transactions.notebook_id`), sem integração de API ou baixa de estoque no sistema de gestão de assistência técnica da Trust Care. Essa separação preserva a autonomia e agilidade da bancada de revenda, evita acoplamento desnecessário com o banco de O.S. de clientes e elimina a complexidade de manter sincronização bidirecional de inventário físico.

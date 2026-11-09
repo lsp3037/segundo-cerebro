@@ -257,3 +257,26 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **Fluxos de Atendimento** (5 sugeridos) e **Assistente de Respostas**: aceita tanto texto quanto prints/capturas do WhatsApp (`Ctrl+V`, arrastar e upload de fotos). A IA (Gemini Vision multimodal) analisa o print diretamente, extrai o sintoma/problema do cliente, cruza com o Repositório da Empresa e gera respostas prontas no tom de voz do Luan, exibindo as imagens salvas no histórico. Se enviado como texto puro, mantém o mascaramento prévio por `lib/mask.ts`.
 - **Diretoria de Marketing (2026-11-02)**: Hub completo sob a Trust Care integrando: (1) Planejador de Conteúdo para Reels, Stories (4 atos) e Carrosséis (slide a slide) com auxílio de IA; (2) Linha do tempo de Campanhas com orçamentos em centavos e Matriz de Ângulos de copy/anúncios; (3) Analisador Meta Ads com KPIs de tráfego, conexão MCP e diagnósticos consultivos gerados por IA.
 - Alerta para o projeto do Gerenciador (fora deste repositório): a tabela `order_status_transitions` está sem RLS no Supabase "Trust Care".
+
+---
+
+## 10. Plano da Fase 5: Finanças e Controle de Notebooks da Trust Care (2026-11-09)
+
+> Definido e alinhado via `/grill-with-docs` com GLOSSARY.md e ADRs 0001 e 0002.
+> O app foca na gestão do fluxo de caixa e no controle ponta a ponta dos notebooks de revenda da Trust Care, adicionando importação de extratos bancários locais via OFX.
+
+### 10.1 Decisões e Modelo de Domínio
+1. **Notebooks de Revenda**: Ativos próprios de estoque para compra, reforma e revenda com margem (separados das O.S. de clientes da assistência técnica).
+2. **Peças e Insumos**: Lançamentos financeiros diretos vinculados ao notebook (`transactions.notebook_id`), sem chamada de API para o sistema da Trust Care (ver ADR 0002).
+3. **Preço Pretendido e Vitrine**: Campo `asking_price_cents` para cálculo de margem esperada na bancada e indicador de "Dias em Estoque" (com alerta de capital parado após 30 dias).
+4. **Fechamento de Venda e Pós-Venda**: Modal dedicado de venda com registro do comprador, contato, garantia de balcão (padrão 90 dias), data, valor bruto e taxa da maquininha de cartão. Custos pós-venda (garantia acionada) abatem a margem real do aparelho.
+5. **Importador de Extrato Bancário (OFX)**: Leitor local de arquivos `.ofx` no servidor Next.js sem envio para modelos de IA externos (`ai_enabled = false`), com anti-duplicação por `FITID`, correspondência com lançamentos manuais já existentes e aprendizado automático de categorias via `finance_rules` (ver ADR 0001).
+6. **Ledger e Salários**: Salário da SES e gastos pessoais ficam em `pessoal`. Retiradas da Trust Care para uso pessoal são transferências internas (pró-labore), sem inflar o consolidado.
+
+### 10.2 Etapas de Implementação (1 commit por etapa)
+1. **Migration e Tipos**: Adicionar `asking_price_cents`, `buyer_name`, `buyer_contact`, `warranty_days`, `sold_at`, `machine_fee_cents` em `public.notebooks`; adicionar `bank_fitid` em `public.transactions`; criar tabela `finance_rules` com RLS e policies; atualizar `lib/supabase/database.types.ts`.
+2. **Ciclo de Vida de Notebooks**: Implementar preço anunciado, dias em estoque (alerta >30 dias), modal de venda com taxa de maquininha e comprador, e suporte a despesas de garantia pós-venda no `NotebooksTracker`.
+3. **Parser e Motor de Extrato OFX**: Criar utilitário TypeScript de parsing local de `.ofx` (SGML/XML) extraindo `FITID`, data, valor em centavos e descrição, com lógica de correspondência com lançamentos existentes.
+4. **Interface de Importação e Regras**: Desenvolver modal/gaveta de importação de extrato bancário com prévia interativa, auto-categorização via `finance_rules`, salvamento em lote e aprendizado de regras.
+5. **Revisão Semanal**: Implementar a tela `/revisao` com o checklist guiado de domingo integrando tarefas pendentes, Caixa de Entrada e o resumo financeiro da semana.
+

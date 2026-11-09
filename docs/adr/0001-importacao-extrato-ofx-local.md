@@ -1,0 +1,3 @@
+# Importação de extratos bancários via OFX com processamento local seguro
+
+Decidimos implementar a conciliação e entrada de transações bancárias através do upload e parsing de arquivos no padrão OFX (`.ofx`), executando o processamento e a pré-categorização de forma estritamente local no servidor Next.js, utilizando o identificador único da transação bancária (`FITID`) como chave de anti-duplicação. Rejeitamos o uso de APIs pagas de Open Finance (como Pluggy/Belvo) pelo custo recorrente desnecessário para uso individual e vetamos o envio do extrato para modelos de linguagem externos (LLMs) em conformidade com a trava de IA da área de Finanças (`ai_enabled = false`) e os princípios de sigilo de dados financeiros.

@@ -555,6 +555,47 @@ export type Database = {
           },
         ]
       }
+      finance_rules: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          ledger: string
+          pattern: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          ledger: string
+          pattern: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          ledger?: string
+          pattern?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       folders: {
         Row: {
           area_id: string
@@ -1116,40 +1157,58 @@ export type Database = {
       }
       notebooks: {
         Row: {
+          asking_price_cents: number | null
           brand: string | null
+          buyer_contact: string | null
+          buyer_name: string | null
           created_at: string
           deleted_at: string | null
           id: string
+          machine_fee_cents: number
           model: string
           notes: string | null
+          sold_at: string | null
           specs: string | null
           status: string
           updated_at: string
           user_id: string
+          warranty_days: number
         }
         Insert: {
+          asking_price_cents?: number | null
           brand?: string | null
+          buyer_contact?: string | null
+          buyer_name?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
+          machine_fee_cents?: number
           model: string
           notes?: string | null
+          sold_at?: string | null
           specs?: string | null
           status?: string
           updated_at?: string
           user_id?: string
+          warranty_days?: number
         }
         Update: {
+          asking_price_cents?: number | null
           brand?: string | null
+          buyer_contact?: string | null
+          buyer_name?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
+          machine_fee_cents?: number
           model?: string
           notes?: string | null
+          sold_at?: string | null
           specs?: string | null
           status?: string
           updated_at?: string
           user_id?: string
+          warranty_days?: number
         }
         Relationships: []
       }
@@ -1704,6 +1763,7 @@ export type Database = {
       transactions: {
         Row: {
           amount_cents: number
+          bank_fitid: string | null
           category_id: string | null
           created_at: string
           date: string
@@ -1720,6 +1780,7 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          bank_fitid?: string | null
           category_id?: string | null
           created_at?: string
           date: string
@@ -1736,6 +1797,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          bank_fitid?: string | null
           category_id?: string | null
           created_at?: string
           date?: string

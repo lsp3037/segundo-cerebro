@@ -331,7 +331,7 @@ export async function getNotebooks(params?: {
 
   let query = supabase
     .from("notebooks")
-    .select("id, user_id, brand, model, specs, status, notes, created_at, updated_at, deleted_at")
+    .select("*")
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
@@ -360,16 +360,7 @@ export async function getNotebooks(params?: {
   return (notebooksRes.data ?? []).map((n) => {
     const pData = profitMap.get(n.id);
     return {
-      id: n.id,
-      user_id: n.user_id,
-      brand: n.brand,
-      model: n.model,
-      specs: n.specs,
-      status: n.status,
-      notes: n.notes,
-      created_at: n.created_at,
-      updated_at: n.updated_at,
-      deleted_at: n.deleted_at,
+      ...n,
       income_cents: pData?.income_cents ?? 0,
       expense_cents: pData?.expense_cents ?? 0,
       profit_cents: pData?.profit_cents ?? 0,
