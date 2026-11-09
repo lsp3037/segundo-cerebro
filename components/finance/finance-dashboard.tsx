@@ -7,6 +7,7 @@ import {
   ArrowRightIcon,
   BarChart3Icon,
   CalendarIcon,
+  FileSpreadsheetIcon,
   LaptopIcon,
   PieChartIcon,
   PlusIcon,
@@ -32,6 +33,7 @@ import { MetricsCards } from "./metrics-cards";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
+import { OfxImportDialog } from "./ofx-import-dialog";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
@@ -78,6 +80,7 @@ export function FinanceDashboard({
   const [nbToEdit, setNbToEdit] = useState<Notebook | null>(null);
   const [saleDialogOpen, setSaleDialogOpen] = useState(false);
   const [nbToSell, setNbToSell] = useState<Notebook | null>(null);
+  const [ofxDialogOpen, setOfxDialogOpen] = useState(false);
   const [catDialogOpen, setCatDialogOpen] = useState(false);
 
   // Mês atual real em Cuiabá
@@ -237,6 +240,17 @@ export function FinanceDashboard({
               Mês Atual
             </Button>
           )}
+
+          {/* Importar Extrato OFX */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOfxDialogOpen(true)}
+            className="h-8 gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+          >
+            <FileSpreadsheetIcon className="size-3.5" />
+            Importar Extrato (.OFX)
+          </Button>
 
           {/* Gerenciar Categorias */}
           <Button
@@ -398,6 +412,14 @@ export function FinanceDashboard({
         onOpenChange={setSaleDialogOpen}
         notebook={nbToSell}
         paymentMethods={paymentMethods}
+      />
+
+      <OfxImportDialog
+        open={ofxDialogOpen}
+        onOpenChange={setOfxDialogOpen}
+        categories={categories}
+        paymentMethods={paymentMethods}
+        defaultLedger={currentLedger === "trustcare" ? "trustcare" : "pessoal"}
       />
 
       <CategoriesDialog
