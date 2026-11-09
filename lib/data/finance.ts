@@ -11,6 +11,7 @@ export type Transaction = Tables<"transactions"> & {
 
 export type FinanceCategory = Tables<"finance_categories">;
 export type PaymentMethod = Tables<"payment_methods">;
+export type FinanceRule = Tables<"finance_rules">;
 export type Notebook = Tables<"notebooks"> & {
   income_cents?: number | null;
   expense_cents?: number | null;
@@ -251,6 +252,22 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
     .order("name");
 
   if (error) throw error;
+  return data ?? [];
+}
+
+export async function getFinanceRules(ledger?: "pessoal" | "trustcare" | "all"): Promise<FinanceRule[]> {
+  const supabase = await createClient();
+  let query = supabase.from("finance_rules").select("*").order("created_at", { ascending: false });
+
+  if (ledger && ledger !== "all") {
+    query = query.eq("ledger", ledger);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    console.error("getFinanceRules error:", error);
+    return [];
+  }
   return data ?? [];
 }
 
