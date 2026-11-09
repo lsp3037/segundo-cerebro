@@ -29,6 +29,9 @@ interface TransactionDialogProps {
   paymentMethods: PaymentMethod[];
   notebooks: Notebook[];
   defaultLedger?: "pessoal" | "trustcare";
+  defaultNotebookId?: string | null;
+  defaultDescription?: string | null;
+  defaultKind?: "income" | "expense";
   transactionToEdit?: Transaction | null;
   onSuccess?: () => void;
 }
@@ -40,6 +43,9 @@ export function TransactionDialog({
   paymentMethods,
   notebooks,
   defaultLedger = "pessoal",
+  defaultNotebookId,
+  defaultDescription,
+  defaultKind,
   transactionToEdit,
   onSuccess,
 }: TransactionDialogProps) {
@@ -57,6 +63,8 @@ export function TransactionDialog({
 
   // Sincroniza com transactionToEdit ou reseta
   useEffect(() => {
+    if (!open) return;
+
     if (transactionToEdit) {
       setKind(transactionToEdit.kind as "income" | "expense");
       setLedger(transactionToEdit.ledger as "pessoal" | "trustcare");
@@ -68,17 +76,17 @@ export function TransactionDialog({
       setNotebookId(transactionToEdit.notebook_id ?? "");
       setNotes(transactionToEdit.notes ?? "");
     } else {
-      setKind("expense");
-      setLedger(defaultLedger);
+      setKind(defaultKind ?? "expense");
+      setLedger(defaultNotebookId ? "trustcare" : defaultLedger);
       setAmountStr("");
-      setDescription("");
+      setDescription(defaultDescription ?? "");
       setDate(todayIso());
       setCategoryId("");
       setPaymentMethodId("");
-      setNotebookId("");
+      setNotebookId(defaultNotebookId ?? "");
       setNotes("");
     }
-  }, [transactionToEdit, defaultLedger, open]);
+  }, [transactionToEdit, defaultLedger, defaultNotebookId, defaultDescription, defaultKind, open]);
 
   // Filtra categorias pelo ledger e kind selecionados (garantindo unicidade)
   const filteredCategories = useMemo(() => {

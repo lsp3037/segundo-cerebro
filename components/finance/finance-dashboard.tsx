@@ -32,6 +32,7 @@ import { MetricsCards } from "./metrics-cards";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
+import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
 
@@ -70,9 +71,13 @@ export function FinanceDashboard({
   const [txDefaultLedger, setTxDefaultLedger] = useState<"pessoal" | "trustcare">(
     currentLedger === "trustcare" ? "trustcare" : "pessoal"
   );
+  const [txDefaultNotebookId, setTxDefaultNotebookId] = useState<string | null>(null);
+  const [txDefaultDescription, setTxDefaultDescription] = useState<string | null>(null);
 
   const [nbDialogOpen, setNbDialogOpen] = useState(false);
   const [nbToEdit, setNbToEdit] = useState<Notebook | null>(null);
+  const [saleDialogOpen, setSaleDialogOpen] = useState(false);
+  const [nbToSell, setNbToSell] = useState<Notebook | null>(null);
   const [catDialogOpen, setCatDialogOpen] = useState(false);
 
   // Mês atual real em Cuiabá
@@ -139,16 +144,17 @@ export function FinanceDashboard({
     setTxDialogOpen(true);
   };
 
-  const handleAddCostToNotebook = (nb: Notebook) => {
+  const handleAddCostToNotebook = (nb: Notebook, defaultDescription?: string) => {
     setTxToEdit(null);
     setTxDefaultLedger("trustcare");
+    setTxDefaultNotebookId(nb.id);
+    setTxDefaultDescription(defaultDescription || `Peça / Upgrade ${nb.brand ? `${nb.brand} ` : ""}${nb.model}`);
     setTxDialogOpen(true);
   };
 
   const handleRecordSale = (nb: Notebook) => {
-    setTxToEdit(null);
-    setTxDefaultLedger("trustcare");
-    setTxDialogOpen(true);
+    setNbToSell(nb);
+    setSaleDialogOpen(true);
   };
 
   const handleOpenNewNotebook = () => {
@@ -363,11 +369,19 @@ export function FinanceDashboard({
       {/* Diálogos */}
       <TransactionDialog
         open={txDialogOpen}
-        onOpenChange={setTxDialogOpen}
+        onOpenChange={(open) => {
+          setTxDialogOpen(open);
+          if (!open) {
+            setTxDefaultNotebookId(null);
+            setTxDefaultDescription(null);
+          }
+        }}
         categories={categories}
         paymentMethods={paymentMethods}
         notebooks={initialNotebooks}
         defaultLedger={txDefaultLedger}
+        defaultNotebookId={txDefaultNotebookId}
+        defaultDescription={txDefaultDescription}
         transactionToEdit={txToEdit}
       />
 
@@ -377,6 +391,13 @@ export function FinanceDashboard({
         categories={categories}
         paymentMethods={paymentMethods}
         notebookToEdit={nbToEdit}
+      />
+
+      <SaleNotebookDialog
+        open={saleDialogOpen}
+        onOpenChange={setSaleDialogOpen}
+        notebook={nbToSell}
+        paymentMethods={paymentMethods}
       />
 
       <CategoriesDialog

@@ -2,14 +2,17 @@
 
 import { useMemo, useState, useTransition } from "react";
 import {
+  AlertTriangleIcon,
   ArrowUpRightIcon,
   CheckCircle2Icon,
+  ClockIcon,
   CoinsIcon,
   LaptopIcon,
   MoreVerticalIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
+  ShieldCheckIcon,
   ShoppingBagIcon,
   Trash2Icon,
   WrenchIcon,
@@ -19,7 +22,6 @@ import { toast } from "sonner";
 import { trashNotebook, updateNotebook } from "@/lib/actions/finance";
 import type { FinanceCategory, Notebook, PaymentMethod } from "@/lib/data/finance";
 import { formatCentsToBrl, formatProfitMargin } from "@/lib/money";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,7 +39,7 @@ interface NotebooksTrackerProps {
   paymentMethods: PaymentMethod[];
   onNewNotebook: () => void;
   onEditNotebook: (nb: Notebook) => void;
-  onAddCostToNotebook: (nb: Notebook) => void;
+  onAddCostToNotebook: (nb: Notebook, defaultDescription?: string) => void;
   onRecordSale: (nb: Notebook) => void;
 }
 
@@ -50,7 +52,7 @@ export function NotebooksTracker({
   onAddCostToNotebook,
   onRecordSale,
 }: NotebooksTrackerProps) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<NotebookStatus | "all">("all");
   const [search, setSearch] = useState("");
 
@@ -60,6 +62,9 @@ export function NotebooksTracker({
     let capitalInvestedInStockCents = 0;
     let totalRealizedProfitCents = 0;
     let totalSoldIncomeCents = 0;
+    let staleCount = 0;
+
+    const now = Date.now();
 
     for (const nb of notebooks) {
       const expenses = nb.expense_cents ?? 0;
@@ -72,6 +77,10 @@ export function NotebooksTracker({
       } else {
         inStockCount += 1;
         capitalInvestedInStockCents += expenses;
+
+        const createdTime = new Date(nb.created_at).getTime();
+        const days = Math.floor((now - createdTime) / (1000 * 60 * 60 * 24));
+        if (days > 30) staleCount += 1;
       }
     }
 
@@ -82,6 +91,7 @@ export function NotebooksTracker({
       capitalInvestedInStockCents,
       totalRealizedProfitCents,
       marginStr,
+      staleCount,
     };
   }, [notebooks]);
 
@@ -95,7 +105,8 @@ export function NotebooksTracker({
         const matchBrand = nb.brand?.toLowerCase().includes(q) ?? false;
         const matchSpecs = nb.specs?.toLowerCase().includes(q) ?? false;
         const matchNotes = nb.notes?.toLowerCase().includes(q) ?? false;
-        if (!matchModel && !matchBrand && !matchSpecs && !matchNotes) return false;
+        const matchBuyer = nb.buyer_name?.toLowerCase().includes(q) ?? false;
+        if (!matchModel && !matchBrand && !matchSpecs && !matchNotes && !matchBuyer) return false;
       }
       return true;
     });
@@ -115,6 +126,11 @@ export function NotebooksTracker({
   };
 
   const handleQuickStatusChange = (nb: Notebook, newStatus: NotebookStatus) => {
+    if (newStatus === "sold") {
+      onRecordSale(nb);
+      return;
+    }
+
     startTransition(async () => {
       const res = await updateNotebook(nb.id, { status: newStatus });
       if (res.ok) {
@@ -134,8 +150,16 @@ export function NotebooksTracker({
             <span>Aparelhos no Estoque</span>
             <LaptopIcon className="size-4 text-cyan-400" />
           </div>
-          <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-foreground tabular-nums">
-            {stats.inStockCount}
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              {stats.inStockCount}
+            </span>
+            {stats.staleCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/30">
+                <AlertTriangleIcon className="size-3" />
+                {stats.staleCount} {stats.staleCount === 1 ? "estagnado" : "estagnados"} (&gt;30d)
+              </span>
+            )}
           </div>
           <p className="mt-0.5 text-[11px] text-muted-foreground">Aguardando reparo ou à venda</p>
         </div>
@@ -180,7 +204,7 @@ export function NotebooksTracker({
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar por marca, modelo, peças..."
+            placeholder="Buscar por marca, modelo, peças ou comprador..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-9 pl-9 text-xs bg-card/60 border-border/70"
@@ -253,6 +277,23 @@ export function NotebooksTracker({
             const profit = nb.profit_cents ?? 0;
             const margin = formatProfitMargin(profit, income);
 
+            // Cálculo de Dias em Estoque
+            const createdTime = new Date(nb.created_at).getTime();
+            const endTime = nb.sold_at ? new Date(nb.sold_at).getTime() : Date.now();
+            const daysInStock = Math.max(0, Math.floor((endTime - createdTime) / (1000 * 60 * 60 * 24)));
+            const isStale = !isSold && daysInStock > 30;
+
+            // Garantia pós-venda
+            let isWarrantyActive = false;
+            let warrantyEndDateStr = "";
+            if (isSold && nb.sold_at) {
+              const warrantyDays = nb.warranty_days ?? 90;
+              const saleDate = new Date(nb.sold_at);
+              const endDate = new Date(saleDate.getTime() + warrantyDays * 86400000);
+              isWarrantyActive = Date.now() <= endDate.getTime();
+              warrantyEndDateStr = endDate.toLocaleDateString("pt-BR", { timeZone: "America/Cuiaba" });
+            }
+
             return (
               <div
                 key={nb.id}
@@ -299,13 +340,15 @@ export function NotebooksTracker({
                             <PencilIcon className="size-3.5" />
                             Editar Dados
                           </DropdownMenuItem>
+
                           <DropdownMenuItem
-                            onClick={() => onAddCostToNotebook(nb)}
+                            onClick={() => onAddCostToNotebook(nb, isSold ? "Peça garantia pós-venda" : undefined)}
                             className="gap-2 cursor-pointer"
                           >
                             <WrenchIcon className="size-3.5 text-amber-400" />
-                            Lançar Custo / Peça
+                            {isSold ? "Lançar Custo de Garantia" : "Lançar Custo / Peça"}
                           </DropdownMenuItem>
+
                           {!isSold && (
                             <DropdownMenuItem
                               onClick={() => onRecordSale(nb)}
@@ -315,6 +358,7 @@ export function NotebooksTracker({
                               Registrar Venda
                             </DropdownMenuItem>
                           )}
+
                           <DropdownMenuSeparator />
                           {/* Troca Rápida de Status */}
                           <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
@@ -350,6 +394,66 @@ export function NotebooksTracker({
                     </p>
                   )}
 
+                  {/* Preço Vitrine e Margem Projetada (quando em estoque) */}
+                  {!isSold && Boolean(nb.asking_price_cents && nb.asking_price_cents > 0) && (
+                    <div className="mt-2.5 flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-950/20 px-2.5 py-1 text-xs">
+                      <span className="text-[11px] text-cyan-300 font-medium">Preço Vitrine:</span>
+                      <div className="flex items-center gap-1 font-mono">
+                        <span className="font-bold text-cyan-400">{formatCentsToBrl(nb.asking_price_cents!)}</span>
+                        <span className="text-[10px] text-muted-foreground font-normal">
+                          (Margem est.: {formatProfitMargin(nb.asking_price_cents! - expenses, nb.asking_price_cents!)})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Indicador de Dias em Estoque */}
+                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <ClockIcon className="size-3" />
+                      {isSold ? "Tempo até vender:" : "Dias em estoque:"}
+                    </span>
+                    <span className={`font-mono ${isStale ? "text-amber-400 font-bold" : "text-foreground"}`}>
+                      {daysInStock} {daysInStock === 1 ? "dia" : "dias"}
+                      {isStale && (
+                        <span className="ml-1 inline-flex items-center rounded bg-amber-500/10 px-1 py-0.2 text-[9px] text-amber-400 border border-amber-500/30">
+                          estagnado
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Ficha da Venda (se já vendido) */}
+                  {isSold && (
+                    <div className="mt-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Comprador:</span>
+                        <span className="font-medium text-foreground">{nb.buyer_name || "Não informado"}</span>
+                      </div>
+                      {nb.buyer_contact && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">WhatsApp:</span>
+                          <span className="font-mono text-muted-foreground">{nb.buyer_contact}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <ShieldCheckIcon className="size-3 text-emerald-400" />
+                          Garantia:
+                        </span>
+                        <span className={`font-medium ${isWarrantyActive ? "text-emerald-400" : "text-muted-foreground"}`}>
+                          {nb.warranty_days}d {isWarrantyActive ? `(até ${warrantyEndDateStr})` : "(expirada)"}
+                        </span>
+                      </div>
+                      {Boolean(nb.machine_fee_cents && nb.machine_fee_cents > 0) && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Taxa Cartão:</span>
+                          <span className="font-mono text-rose-400">-{formatCentsToBrl(nb.machine_fee_cents)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Notas / Observações */}
                   {nb.notes && (
                     <div className="mt-2 rounded-md bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground/80 line-clamp-2">
@@ -359,7 +463,7 @@ export function NotebooksTracker({
                 </div>
 
                 {/* Bloco de Economia Unitária (Unit Economics) */}
-                <div className="mt-4 border-t border-border/50 pt-3">
+                <div className="mt-3 border-t border-border/50 pt-2.5">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-[11px] text-muted-foreground">Custo Total:</span>
@@ -401,18 +505,18 @@ export function NotebooksTracker({
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => onAddCostToNotebook(nb)}
+                      onClick={() => onAddCostToNotebook(nb, isSold ? "Peça garantia pós-venda" : undefined)}
                       className="h-7 flex-1 text-[11px] gap-1"
                     >
                       <PlusIcon className="size-3" />
-                      Add Custo
+                      {isSold ? "+ Custo Garantia" : "Add Custo"}
                     </Button>
                     {!isSold ? (
                       <Button
                         type="button"
                         size="sm"
                         onClick={() => onRecordSale(nb)}
-                        className="h-7 flex-1 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700"
+                        className="h-7 flex-1 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
                         <ShoppingBagIcon className="size-3" />
                         Vender

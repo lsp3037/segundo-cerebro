@@ -120,10 +120,16 @@ const notebookSchema = z.object({
   brand: z.string().trim().max(60).nullable().optional(),
   specs: z.string().trim().max(300).nullable().optional(),
   status: z.enum(["bought", "repair", "for_sale", "sold"]).default("bought"),
+  asking_price_cents: z.number().int().min(0).nullable().optional(),
+  buyer_name: z.string().trim().max(120).nullable().optional(),
+  buyer_contact: z.string().trim().max(80).nullable().optional(),
+  warranty_days: z.number().int().min(0).max(1825).default(90).optional(),
+  sold_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida").nullable().optional(),
+  machine_fee_cents: z.number().int().min(0).default(0).optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
 });
 
-export type NotebookInput = z.infer<typeof notebookSchema>;
+export type NotebookInput = z.input<typeof notebookSchema>;
 
 export async function createNotebook(
   input: NotebookInput,
@@ -147,6 +153,8 @@ export async function createNotebook(
       brand: parsed.data.brand ?? null,
       specs: parsed.data.specs ?? null,
       status: parsed.data.status,
+      asking_price_cents: parsed.data.asking_price_cents ?? null,
+      warranty_days: parsed.data.warranty_days ?? 90,
       notes: parsed.data.notes ?? null,
     })
     .select("*")
@@ -159,6 +167,16 @@ export async function createNotebook(
 
   // Se houver valor inicial de compra informado, já cria o lançamento de despesa vinculado
   if (initialPurchase && initialPurchase.amount_cents > 0) {
+    const { data: stockCat } = await supabase
+      .from("finance_categories")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("ledger", "trustcare")
+      .eq("kind", "expense")
+      .ilike("name", "%estoque%")
+      .limit(1)
+      .maybeSingle();
+
     await supabase.from("transactions").insert({
       user_id: user.id,
       ledger: "trustcare",
@@ -166,6 +184,7 @@ export async function createNotebook(
       amount_cents: initialPurchase.amount_cents,
       date: initialPurchase.date,
       description: `Compra notebook ${notebook.brand ? `${notebook.brand} ` : ""}${notebook.model}`,
+      category_id: stockCat?.id ?? null,
       notebook_id: notebook.id,
       payment_method_id: initialPurchase.payment_method_id ?? null,
     });
@@ -204,6 +223,122 @@ export async function updateNotebook(
 
   revalidatePath("/", "layout");
   return ok(data);
+}
+
+const recordSaleSchema = z.object({
+  notebook_id: z.string().uuid("ID de notebook inválido"),
+  sold_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de venda inválida"),
+  sale_amount_cents: z.number().int().positive("Valor de venda deve ser maior que zero"),
+  payment_method_id: z.string().uuid().nullable().optional(),
+  machine_fee_cents: z.number().int().min(0).default(0),
+  buyer_name: z.string().trim().max(120).nullable().optional(),
+  buyer_contact: z.string().trim().max(80).nullable().optional(),
+  warranty_days: z.number().int().min(0).max(1825).default(90),
+  notes: z.string().trim().max(2000).nullable().optional(),
+});
+
+export type RecordSaleInput = z.infer<typeof recordSaleSchema>;
+
+export async function recordNotebookSale(
+  input: RecordSaleInput,
+): Promise<ActionResult<Tables<"notebooks">>> {
+  const user = await getCurrentUser();
+  const parsed = recordSaleSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+
+  const supabase = await createClient();
+
+  // 1. Busca o notebook
+  const { data: nb, error: nbErr } = await supabase
+    .from("notebooks")
+    .select("*")
+    .eq("id", parsed.data.notebook_id)
+    .eq("user_id", user.id)
+    .is("deleted_at", null)
+    .single();
+
+  if (nbErr || !nb) return fail("Notebook não encontrado.");
+
+  // 2. Atualiza os dados de venda no notebook
+  const { data: updatedNotebook, error: updateErr } = await supabase
+    .from("notebooks")
+    .update({
+      status: "sold",
+      sold_at: parsed.data.sold_at,
+      buyer_name: parsed.data.buyer_name || null,
+      buyer_contact: parsed.data.buyer_contact || null,
+      warranty_days: parsed.data.warranty_days,
+      machine_fee_cents: parsed.data.machine_fee_cents,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", nb.id)
+    .eq("user_id", user.id)
+    .select("*")
+    .single();
+
+  if (updateErr || !updatedNotebook) {
+    console.error("recordNotebookSale updateErr:", updateErr);
+    return fail("Não foi possível atualizar o status do notebook.");
+  }
+
+  // 3. Busca categoria de receita "Venda de Notebooks" da Trust Care
+  const { data: saleCat } = await supabase
+    .from("finance_categories")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("ledger", "trustcare")
+    .eq("kind", "income")
+    .ilike("name", "%notebook%")
+    .limit(1)
+    .maybeSingle();
+
+  // 4. Cria o lançamento de receita da venda
+  const nbTitle = nb.brand ? `${nb.brand} ${nb.model}` : nb.model;
+  const warrantyDesc = `Garantia: ${parsed.data.warranty_days} dias`;
+  const buyerDesc = parsed.data.buyer_name ? `Comprador: ${parsed.data.buyer_name}` : "";
+  const saleNotesCombined = [buyerDesc, warrantyDesc, parsed.data.notes].filter(Boolean).join(" | ");
+
+  await supabase.from("transactions").insert({
+    user_id: user.id,
+    ledger: "trustcare",
+    kind: "income",
+    amount_cents: parsed.data.sale_amount_cents,
+    date: parsed.data.sold_at,
+    description: `Venda notebook: ${nbTitle}`,
+    category_id: saleCat?.id ?? null,
+    payment_method_id: parsed.data.payment_method_id ?? null,
+    notebook_id: nb.id,
+    notes: saleNotesCombined || null,
+  });
+
+  // 5. Se houver taxa de maquininha, cria lançamento de despesa financeira vinculado
+  if (parsed.data.machine_fee_cents > 0) {
+    const { data: feeCat } = await supabase
+      .from("finance_categories")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("ledger", "trustcare")
+      .eq("kind", "expense")
+      .ilike("name", "%taxa%")
+      .limit(1)
+      .maybeSingle();
+
+    await supabase.from("transactions").insert({
+      user_id: user.id,
+      ledger: "trustcare",
+      kind: "expense",
+      amount_cents: parsed.data.machine_fee_cents,
+      date: parsed.data.sold_at,
+      description: `Taxa maquininha: ${nbTitle}`,
+      category_id: feeCat?.id ?? null,
+      payment_method_id: parsed.data.payment_method_id ?? null,
+      notebook_id: nb.id,
+      notes: "Taxa de intermediação de cartão sobre a venda",
+    });
+  }
+
+  revalidatePath("/", "layout");
+  return ok(updatedNotebook);
 }
 
 export async function trashNotebook(notebookId: string): Promise<ActionResult> {

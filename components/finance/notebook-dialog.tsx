@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Loader2Icon } from "lucide-react";
+import { DollarSignIcon, LaptopIcon, Loader2Icon, ShieldCheckIcon, UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createNotebook, createTransaction, updateNotebook } from "@/lib/actions/finance";
 import type { FinanceCategory, Notebook, PaymentMethod } from "@/lib/data/finance";
 import { todayIso } from "@/lib/dates";
-import { inputToCents } from "@/lib/money";
+import { centsToInput, inputToCents } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +46,7 @@ export function NotebookDialog({
   const [model, setModel] = useState("");
   const [specs, setSpecs] = useState("");
   const [status, setStatus] = useState<NotebookStatus>("bought");
+  const [askingPriceStr, setAskingPriceStr] = useState("");
   const [notes, setNotes] = useState("");
 
   // Campo de atalho para registrar a compra inicial ao criar novo aparelho
@@ -54,11 +55,14 @@ export function NotebookDialog({
   const [paymentMethodId, setPaymentMethodId] = useState("");
 
   useEffect(() => {
+    if (!open) return;
+
     if (notebookToEdit) {
       setBrand(notebookToEdit.brand ?? "");
       setModel(notebookToEdit.model);
       setSpecs(notebookToEdit.specs ?? "");
       setStatus((notebookToEdit.status as NotebookStatus) || "bought");
+      setAskingPriceStr(notebookToEdit.asking_price_cents ? centsToInput(notebookToEdit.asking_price_cents) : "");
       setNotes(notebookToEdit.notes ?? "");
       setInitialCostStr("");
     } else {
@@ -66,6 +70,7 @@ export function NotebookDialog({
       setModel("");
       setSpecs("");
       setStatus("bought");
+      setAskingPriceStr("");
       setNotes("");
       setInitialCostStr("");
       setPurchaseDate(todayIso());
@@ -82,12 +87,15 @@ export function NotebookDialog({
     }
 
     startTransition(async () => {
+      const askingPriceCents = inputToCents(askingPriceStr);
+
       if (notebookToEdit) {
         const res = await updateNotebook(notebookToEdit.id, {
           brand: brand.trim() || null,
           model: model.trim(),
           specs: specs.trim() || null,
           status,
+          asking_price_cents: askingPriceCents > 0 ? askingPriceCents : null,
           notes: notes.trim() || null,
         });
 
@@ -104,6 +112,7 @@ export function NotebookDialog({
           model: model.trim(),
           specs: specs.trim() || null,
           status,
+          asking_price_cents: askingPriceCents > 0 ? askingPriceCents : null,
           notes: notes.trim() || null,
         });
 
@@ -143,14 +152,18 @@ export function NotebookDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl">
+      <DialogContent className="max-w-lg border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <div className="flex items-center gap-2 text-cyan-400 text-xs font-semibold uppercase tracking-wider">
+            <LaptopIcon className="size-4" />
+            <span>Ativo de Estoque • Trust Care</span>
+          </div>
           <DialogTitle className="text-lg font-semibold">
-            {notebookToEdit ? "Editar Notebook" : "Cadastrar Notebook para Revenda"}
+            {notebookToEdit ? "Editar Notebook de Revenda" : "Cadastrar Notebook para Revenda"}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {notebookToEdit
-              ? "Atualize o status, especificações ou detalhes do aparelho."
+              ? "Atualize o status, preço pretendido de vitrine ou detalhes técnicos do aparelho."
               : "Cadastre um aparelho para acompanhar custos de bancada, upgrades e margem de lucro na venda."}
           </DialogDescription>
         </DialogHeader>
@@ -198,41 +211,87 @@ export function NotebookDialog({
             />
           </div>
 
-          <div>
-            <Label htmlFor="nb-status" className="text-xs font-medium">
-              Status Atual no Ciclo de Revenda
-            </Label>
-            <Select value={status} onValueChange={(val) => setStatus(val as NotebookStatus)}>
-              <SelectTrigger id="nb-status" className="mt-1 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(NOTEBOOK_STATUS_CONFIG) as NotebookStatus[]).map((st) => {
-                  const conf = NOTEBOOK_STATUS_CONFIG[st];
-                  return (
-                    <SelectItem key={st} value={st} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className={`size-2 rounded-full ${conf.dotClass}`} />
-                        {conf.label}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="nb-status" className="text-xs font-medium">
+                Status no Ciclo de Revenda
+              </Label>
+              <Select value={status} onValueChange={(val) => setStatus(val as NotebookStatus)}>
+                <SelectTrigger id="nb-status" className="mt-1 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(NOTEBOOK_STATUS_CONFIG) as NotebookStatus[]).map((st) => {
+                    const conf = NOTEBOOK_STATUS_CONFIG[st];
+                    return (
+                      <SelectItem key={st} value={st} className="text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className={`size-2 rounded-full ${conf.dotClass}`} />
+                          {conf.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="nb-asking" className="text-xs font-medium">
+                Preço Pretendido / Vitrine (R$)
+              </Label>
+              <div className="relative mt-1">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-muted-foreground">
+                  R$
+                </span>
+                <Input
+                  id="nb-asking"
+                  type="text"
+                  placeholder="0,00"
+                  value={askingPriceStr}
+                  onChange={(e) => setAskingPriceStr(e.target.value)}
+                  className="pl-8 text-xs font-mono tabular-nums"
+                />
+              </div>
+            </div>
           </div>
+
+          {/* Dados do comprador se já estiver vendido */}
+          {Boolean(notebookToEdit?.status === "sold" && (notebookToEdit.buyer_name || notebookToEdit.sold_at)) && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3 text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 font-semibold text-emerald-400">
+                <UserIcon className="size-3.5" />
+                <span>Dados do Fechamento de Venda</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-muted-foreground pt-1">
+                <div>
+                  Comprador: <span className="text-foreground font-medium">{notebookToEdit?.buyer_name || "—"}</span>
+                </div>
+                <div>
+                  Contato: <span className="text-foreground font-mono">{notebookToEdit?.buyer_contact || "—"}</span>
+                </div>
+                <div>
+                  Vendido em: <span className="text-foreground font-mono">{notebookToEdit?.sold_at || "—"}</span>
+                </div>
+                <div>
+                  Garantia: <span className="text-foreground font-medium">{notebookToEdit?.warranty_days ?? 90} dias</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Atalho de Aquisição na Criação */}
           {!notebookToEdit && (
             <div className="rounded-xl border border-border/80 bg-muted/20 p-3.5 space-y-3">
-              <div className="text-xs font-medium text-foreground">
-                💰 Custo de Aquisição (Opcional)
+              <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                <DollarSignIcon className="size-3.5 text-amber-400" />
+                <span>Custo Inicial de Aquisição (Opcional)</span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Informe quanto pagou pelo notebook para lançar a despesa de compra automaticamente no fluxo de caixa da Trust Care.
+                Informe quanto pagou pelo aparelho para lançar a compra automaticamente no fluxo de caixa da Trust Care.
               </p>
 
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 <div>
                   <Label htmlFor="nb-cost" className="text-[11px] text-muted-foreground">
                     Valor Pago (R$)
@@ -263,6 +322,24 @@ export function NotebookDialog({
                     onChange={(e) => setPurchaseDate(e.target.value)}
                     className="mt-1 font-mono text-xs h-8"
                   />
+                </div>
+
+                <div>
+                  <Label className="text-[11px] text-muted-foreground">
+                    Meio de Pagamento
+                  </Label>
+                  <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+                    <SelectTrigger className="mt-1 text-xs h-8">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent className="text-xs">
+                      {paymentMethods.map((pm) => (
+                        <SelectItem key={pm.id} value={pm.id}>
+                          {pm.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
