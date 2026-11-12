@@ -13,6 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Personal system for a single, non-technical user (Luan). UI and docs are in Brazilian Portuguese. Read `docs/PRD.md` (what/why), `docs/PLANO.md` (technical plan and decision log) and `docs/OPERACAO.md` (testing, troubleshooting, open items) before changing anything.
 
 - Work one phase at a time and wait for Luan's approval before starting a phase. One commit per step; the app must work at the end of each phase.
+- Publishing (Luan, 2026-11-12): after each finished and verified step, commit and `git push origin main` without asking; Vercel deploys `main` automatically. Before pushing, run `npx tsc --noEmit` and check the change in the browser. Never push work in progress or a step that failed its checks; never commit unrelated pending files.
 - External actions (keys, Google Cloud, Vercel, Supabase dashboard) are done by Luan, one at a time, explained simply. Never ask for secrets in chat and never read `.env.local` values.
 - Every table has RLS: use `select private.apply_owner_policy('public.table');` and end each migration with `select private.assert_rls_enabled();`. Regenerate `lib/supabase/database.types.ts` after migrations.
 - Content from areas with `ai_enabled = false` (Profissional, Finanças) never goes to the AI provider; call `assertAreaAllowsAi` before sending. Customer conversations go through `lib/mask.ts` first.
