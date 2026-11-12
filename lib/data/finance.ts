@@ -80,8 +80,10 @@ export const DEFAULT_CATEGORIES: Array<{
   { ledger: "pessoal", kind: "expense", name: "Família & Educação", color: "#8b5cf6", sort_order: 6 },
   { ledger: "pessoal", kind: "expense", name: "Lazer & Assinaturas", color: "#06b6d4", sort_order: 7 },
   { ledger: "pessoal", kind: "expense", name: "Compras & Vestuário", color: "#a855f7", sort_order: 8 },
-  { ledger: "pessoal", kind: "expense", name: "Investimentos & Reserva", color: "#10b981", sort_order: 9 },
-  { ledger: "pessoal", kind: "expense", name: "Outras Despesas", color: "#6b7280", sort_order: 10 },
+  { ledger: "pessoal", kind: "expense", name: "Dízimo & Ofertas", color: "#14b8a6", sort_order: 9 },
+  { ledger: "pessoal", kind: "expense", name: "Cartões de Crédito", color: "#f43f5e", sort_order: 10 },
+  { ledger: "pessoal", kind: "expense", name: "Investimentos & Reserva", color: "#10b981", sort_order: 11 },
+  { ledger: "pessoal", kind: "expense", name: "Outras Despesas", color: "#6b7280", sort_order: 12 },
 
   // Trust Care - Receitas
   { ledger: "trustcare", kind: "income", name: "Serviços & Manutenção", color: "#10b981", sort_order: 1 },
@@ -178,9 +180,17 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
     const existingList = existingCats ?? [];
     const existingNames = new Set(existingList.map((c) => `${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`));
 
-    // Se já existem categorias, só adiciona as que realmente faltam se a lista estiver muito vazia
-    if (existingList.length === 0) {
-      const toInsert = DEFAULT_CATEGORIES.map((c) => ({
+    const missingDefaults = DEFAULT_CATEGORIES.filter((c) => {
+      if (existingList.length === 0) return true;
+      return (
+        c.ledger === "pessoal" &&
+        (c.name === "Dízimo & Ofertas" || c.name === "Cartões de Crédito") &&
+        !existingNames.has(`${c.ledger}:${c.kind}:${c.name.trim().toLowerCase()}`)
+      );
+    });
+
+    if (missingDefaults.length > 0) {
+      const toInsert = missingDefaults.map((c) => ({
         user_id: userId,
         ledger: c.ledger,
         kind: c.kind,
