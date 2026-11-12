@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "../lib/motion/ui-generation/ui-generation.css";
+@import "../lib/motion/ui-generation/text-image-generation.css";
 
 /* Classes usadas pelos componentes do editor de notas (BlockNote). */
 @source "../node_modules/@blocknote/shadcn";
@@ -118,6 +120,12 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --gen-line: #6f6f6f;
+  --gen-strong: #a3a3a3;
+  --gen-ink: rgba(245, 245, 245, 0.28);
+  --gen-surface: #121215;
+  --gen-text: #f2f2f2;
+  --gen-muted: #8f8f8f;
 }
 
 @layer base {

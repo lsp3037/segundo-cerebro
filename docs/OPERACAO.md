@@ -61,12 +61,12 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
   - [ ] Analisador Meta Ads: visualizar KPIs (Spend, Cliques, CTR, CPC, Leads, CPL); testar botão de sincronização e diagnóstico da IA.
 
 ### Fase 5: Finanças, Pessoal/Familiar e Revisão Semanal
-- [ ] Executar a migration `supabase/migrations/20261112120000_finance_family.sql` no SQL Editor do Supabase.
-- [ ] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
+- [x] Migration `supabase/migrations/20261112120000_finance_family.sql` executada no SQL Editor do Supabase.
+- [ ] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Configurar ▾ → Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
 - [ ] Conferir cálculo automático de `10%` do Dízimo ao alterar Entradas, filtro por Pessoa (`Casa`, `Luan`, `Rayzza`), baixa rápida em 1 clique (`Pagar` ↔ `Pago`) e card **Contas da Semana** em `/hoje`.
-- [ ] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado) e conferir comparativos entre períodos.
-- [ ] Trust Care & Notebooks: alternar para Trust Care, cadastrar notebook com preço de vitrine, registrar venda com garantia/taxa de maquininha e conferir lucro real.
-- [ ] Importador OFX: subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
+- [ ] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado), conferir comparativos entre períodos, distribuição por categoria e testar **Gerar diagnóstico do mês** (resumo local enquanto `ai_enabled = false` em Finanças).
+- [ ] Alternar entre `Pessoal`, `Trust Care` e `Consolidado` (e testar também via `/p/[folderId]` e no celular `390×844`): conferir cabeçalho único sem título duplicado, linhas responsivas de 2 linhas em `Fluxo & Vencimentos` / `Orçamentos`, cadastro de notebook com preço de vitrine e venda com garantia/taxa de maquininha.
+- [ ] Importador OFX (`Configurar ▾ → Importar Extrato (.OFX)`): subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
 - [ ] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo e concluir.
 
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.

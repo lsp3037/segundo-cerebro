@@ -41,6 +41,7 @@ import { ConsolidatedOverview } from "./consolidated-overview";
 import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
 import { HouseholdOverview } from "./household-overview";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
+import { MonthDiagnosticCard } from "./month-diagnostic-card";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
@@ -481,14 +482,26 @@ export function FinanceDashboard({
 
         {/* Tela 4: Relatórios, KPIs & Categorias */}
         {activeTab === "relatorios" && currentLedger === "pessoal" && (
-          <ReportsComparisonsView
-            data={householdData}
-            categoriesBreakdown={initialSummary.categoriesBreakdown}
-            currentMonth={currentMonth}
-          />
+          <div className="space-y-5">
+            <MonthDiagnosticCard
+              month={currentMonth}
+              ledger={currentLedger}
+              member={activeMember}
+            />
+            <ReportsComparisonsView
+              data={householdData}
+              categoriesBreakdown={initialSummary.categoriesBreakdown}
+              currentMonth={currentMonth}
+            />
+          </div>
         )}
         {activeTab === "relatorios" && currentLedger !== "pessoal" && (
           <div className="space-y-5">
+            <MonthDiagnosticCard
+              month={currentMonth}
+              ledger={currentLedger}
+              member={activeMember}
+            />
             <MonthlyChart data={initialSummary.monthlyTrend} currentMonth={currentMonth} />
             <CategoryBreakdown categoriesBreakdown={initialSummary.categoriesBreakdown} />
           </div>
@@ -504,7 +517,6 @@ export function FinanceDashboard({
                 : initialTransactions
             }
             categories={categories}
-            paymentMethods={paymentMethods}
             initialStatusFilter={fluxoStatusFilter}
             onEditTransaction={handleEditTransaction}
             onNewTransaction={() => handleOpenNewTransaction()}

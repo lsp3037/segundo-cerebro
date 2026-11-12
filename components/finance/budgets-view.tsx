@@ -111,80 +111,139 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
             Nenhuma categoria com meta ou gasto neste mês. Clique em <strong>Definir meta</strong> acima.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-border/70 bg-muted/20 text-[11px] font-medium text-muted-foreground">
-                  <th className="py-2.5 pl-4 pr-3">Categoria</th>
-                  <th className="px-3 py-2.5 text-right">Meta mensal</th>
-                  <th className="px-3 py-2.5 text-right">Realizado</th>
-                  <th className="px-3 py-2.5 text-right">Diferença</th>
-                  <th className="w-56 px-3 py-2.5">Consumo</th>
-                  <th className="py-2.5 pl-2 pr-4 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {budgets.map((row) => {
-                  const hasBudget = row.budgetCents !== null && row.budgetCents > 0;
-                  const diff = hasBudget ? row.budgetCents! - row.spentCents : 0;
-                  const pct = hasBudget ? Math.round((row.spentCents / row.budgetCents!) * 1000) / 10 : 0;
-                  const level = hasBudget ? budgetLevel(row.spentCents, row.budgetCents!) : "ok";
-                  const barColor = level === "over" ? "#f43f5e" : level === "warning" ? "#f59e0b" : "#10b981";
-                  const barWidth = pct > 0 ? Math.min(100, Math.max(2, pct)) : 0;
+          <>
+            {/* Mobile (< md): linhas compactas sem overflow horizontal */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {budgets.map((row) => {
+                const hasBudget = row.budgetCents !== null && row.budgetCents > 0;
+                const pct = hasBudget ? Math.round((row.spentCents / row.budgetCents!) * 1000) / 10 : 0;
+                const level = hasBudget ? budgetLevel(row.spentCents, row.budgetCents!) : "ok";
+                const barColor = level === "over" ? "#f43f5e" : level === "warning" ? "#f59e0b" : "#10b981";
+                const barWidth = pct > 0 ? Math.min(100, Math.max(2, pct)) : 0;
 
-                  return (
-                    <tr key={row.categoryId} className="hover:bg-muted/20">
-                      <td className="py-3 pl-4 pr-3 font-medium text-foreground">
-                        <div className="flex items-center gap-2">
-                          <span className="size-2 rounded-full" style={{ backgroundColor: row.color || "#94a3b8" }} />
-                          <span>{row.categoryName}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-right tabular-nums">
-                        {hasBudget ? formatCentsToBrl(row.budgetCents) : <span className="text-muted-foreground">Sem meta</span>}
-                      </td>
-                      <td className={`px-3 py-3 text-right font-medium tabular-nums ${level === "over" ? "text-rose-400" : "text-foreground"}`}>
-                        {formatCentsToBrl(row.spentCents)}
-                      </td>
-                      <td className={`px-3 py-3 text-right tabular-nums ${!hasBudget ? "text-muted-foreground" : diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {hasBudget ? `${diff >= 0 ? "+" : ""}${formatCentsToBrl(diff)}` : "—"}
-                      </td>
-                      <td className="px-3 py-3">
-                        {hasBudget ? (
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-[11px] tabular-nums">
-                              <span className={level === "over" ? "font-medium text-rose-400" : level === "warning" ? "text-amber-400" : "text-muted-foreground"}>
-                                {pct}%{level === "over" ? " (Acima)" : ""}
-                              </span>
-                            </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
-                              <div style={{ width: `${barWidth}%`, backgroundColor: barColor }} className="h-full rounded-full" />
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={() => openModal(row.categoryId, row.spentCents)} className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground hover:underline">
-                            + Definir teto
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-3 pl-2 pr-4 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openModal(row.categoryId, row.budgetCents)}>
-                            <PencilIcon className="size-3" />
+                return (
+                  <div key={row.categoryId} className="space-y-2 px-3.5 py-3 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2 font-medium text-foreground">
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.color || "#94a3b8" }} />
+                        <span className="truncate">{row.categoryName}</span>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="size-8 p-0 text-muted-foreground hover:text-foreground"
+                          onClick={() => openModal(row.categoryId, row.budgetCents)}
+                        >
+                          <PencilIcon className="size-3.5" />
+                        </Button>
+                        {hasBudget && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="size-8 p-0 text-muted-foreground hover:text-rose-400"
+                            onClick={() => handleRemove(row.categoryId)}
+                          >
+                            <Trash2Icon className="size-3.5" />
                           </Button>
-                          {hasBudget && (
-                            <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row.categoryId)}>
-                              <Trash2Icon className="size-3" />
-                            </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-baseline justify-between text-[11px] tabular-nums">
+                      <span className={level === "over" ? "font-medium text-rose-400" : "text-foreground"}>
+                        {formatCentsToBrl(row.spentCents)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {hasBudget ? `de ${formatCentsToBrl(row.budgetCents)} (${pct}%)` : "Sem meta"}
+                      </span>
+                    </div>
+
+                    {hasBudget && (
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div style={{ width: `${barWidth}%`, backgroundColor: barColor }} className="h-full rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-border/70 bg-muted/20 text-[11px] font-medium text-muted-foreground">
+                    <th className="py-2.5 pl-4 pr-3">Categoria</th>
+                    <th className="px-3 py-2.5 text-right">Meta mensal</th>
+                    <th className="px-3 py-2.5 text-right">Realizado</th>
+                    <th className="px-3 py-2.5 text-right">Diferença</th>
+                    <th className="w-56 px-3 py-2.5">Consumo</th>
+                    <th className="py-2.5 pl-2 pr-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {budgets.map((row) => {
+                    const hasBudget = row.budgetCents !== null && row.budgetCents > 0;
+                    const diff = hasBudget ? row.budgetCents! - row.spentCents : 0;
+                    const pct = hasBudget ? Math.round((row.spentCents / row.budgetCents!) * 1000) / 10 : 0;
+                    const level = hasBudget ? budgetLevel(row.spentCents, row.budgetCents!) : "ok";
+                    const barColor = level === "over" ? "#f43f5e" : level === "warning" ? "#f59e0b" : "#10b981";
+                    const barWidth = pct > 0 ? Math.min(100, Math.max(2, pct)) : 0;
+
+                    return (
+                      <tr key={row.categoryId} className="hover:bg-muted/20">
+                        <td className="py-3 pl-4 pr-3 font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <span className="size-2 rounded-full" style={{ backgroundColor: row.color || "#94a3b8" }} />
+                            <span>{row.categoryName}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-right tabular-nums">
+                          {hasBudget ? formatCentsToBrl(row.budgetCents) : <span className="text-muted-foreground">Sem meta</span>}
+                        </td>
+                        <td className={`px-3 py-3 text-right font-medium tabular-nums ${level === "over" ? "text-rose-400" : "text-foreground"}`}>
+                          {formatCentsToBrl(row.spentCents)}
+                        </td>
+                        <td className={`px-3 py-3 text-right tabular-nums ${!hasBudget ? "text-muted-foreground" : diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {hasBudget ? `${diff >= 0 ? "+" : ""}${formatCentsToBrl(diff)}` : "—"}
+                        </td>
+                        <td className="px-3 py-3">
+                          {hasBudget ? (
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px] tabular-nums">
+                                <span className={level === "over" ? "font-medium text-rose-400" : level === "warning" ? "text-amber-400" : "text-muted-foreground"}>
+                                  {pct}%{level === "over" ? " (Acima)" : ""}
+                                </span>
+                              </div>
+                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                                <div style={{ width: `${barWidth}%`, backgroundColor: barColor }} className="h-full rounded-full" />
+                              </div>
+                            </div>
+                          ) : (
+                            <button type="button" onClick={() => openModal(row.categoryId, row.spentCents)} className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground hover:underline">
+                              + Definir teto
+                            </button>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="py-3 pl-2 pr-4 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openModal(row.categoryId, row.budgetCents)}>
+                              <PencilIcon className="size-3" />
+                            </Button>
+                            {hasBudget && (
+                              <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row.categoryId)}>
+                                <Trash2Icon className="size-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

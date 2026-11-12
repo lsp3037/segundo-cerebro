@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { UiGenerationReveal } from "./ui-generation-reveal";
 
 interface RecurringBillsDialogProps {
   open: boolean;
@@ -64,6 +65,7 @@ function RecurringBillsForm({
   const [newDueDay, setNewDueDay] = useState("");
   const [newMember, setNewMember] = useState("Casa");
   const [newCatId, setNewCatId] = useState("");
+  const [bootstrapRevealKey, setBootstrapRevealKey] = useState(0);
 
   const personalCats = categories.filter((c) => c.ledger === "pessoal" && c.kind === newKind);
 
@@ -71,6 +73,9 @@ function RecurringBillsForm({
     startTransition(async () => {
       const res = await bootstrapHouseholdTemplate(currentMonth);
       if (res.ok) {
+        if (res.data.createdCount > 0) {
+          setBootstrapRevealKey((k) => k + 1);
+        }
         toast.success(
           res.data.createdCount > 0
             ? `Modelo carregado (${res.data.createdCount} itens adicionados). Preencha seus valores abaixo!`
@@ -214,7 +219,13 @@ function RecurringBillsForm({
         </form>
       )}
 
-      <div className="flex-1 overflow-y-auto pr-1 divide-y divide-border/40">
+      <UiGenerationReveal
+        triggerKey={bootstrapRevealKey}
+        variant="ui"
+        mode="skeleton"
+        duration={1400}
+        className="flex-1 divide-y divide-border/40 overflow-y-auto pr-1"
+      >
         {bills.length === 0 ? (
           <div className="py-10 text-center text-xs text-muted-foreground">
             Nenhuma conta fixa configurada ainda. Clique em <strong>Carregar Modelo da Planilha</strong> acima para começar em 1 clique.
@@ -264,7 +275,7 @@ function RecurringBillsForm({
             </div>
           ))
         )}
-      </div>
+      </UiGenerationReveal>
 
       <DialogFooter className="pt-2 border-t border-border/50">
         <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>Fechar</Button>
