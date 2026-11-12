@@ -458,7 +458,54 @@ export async function saveRecurringValuesBatch(input: z.infer<typeof bulkValuesS
       .eq("user_id", user.id);
   }
 
-  await ensureMonthBills(user.id, parsed.data.month);
+  await ensureMonthBills(user.id, parsed.data.month, { syncPendingFixed: true });
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+export async function syncMonthTithe(month: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!monthSchema.safeParse(month).success) return fail("Mês inválido.");
+
+  const supabase = await createClient();
+  const { data: existingPercent } = await supabase
+    .from("finance_recurring_bills")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("amount_mode", "percent_of_income")
+    .is("deleted_at", null)
+    .limit(1);
+
+  if (!existingPercent || existingPercent.length === 0) {
+    const { data: titheCat } = await supabase
+      .from("finance_categories")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("ledger", "pessoal")
+      .eq("kind", "expense")
+      .ilike("name", "%dízimo%")
+      .is("deleted_at", null)
+      .limit(1);
+
+    const { error } = await supabase.from("finance_recurring_bills").insert({
+      user_id: user.id,
+      kind: "expense",
+      description: "Dízimo",
+      amount_mode: "percent_of_income",
+      amount_cents: 0,
+      percent_bp: 1000,
+      due_day: null,
+      category_id: titheCat?.[0]?.id ?? null,
+      member_label: "Casa",
+      active: true,
+    });
+    if (error) {
+      console.error("syncMonthTithe error:", error);
+      return fail("Não foi possível ativar o Dízimo automático.");
+    }
+  }
+
+  await ensureMonthBills(user.id, month);
   revalidatePath("/", "layout");
   return ok();
 }

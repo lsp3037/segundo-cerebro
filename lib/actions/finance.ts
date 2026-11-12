@@ -33,6 +33,8 @@ const transactionSchema = z.object({
   account_id: z.string().uuid().nullable().optional(),
   member_label: z.string().trim().max(40).nullable().optional(),
   installment_total: z.number().int().min(2).max(120).optional(),
+  make_recurring: z.boolean().optional(),
+  include_tithe: z.boolean().optional(),
 });
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
@@ -89,6 +91,33 @@ export async function createTransaction(input: TransactionInput): Promise<Action
     return ok(data[0]);
   }
 
+  let createdRecurringBillId: string | null = null;
+  if (d.ledger === "pessoal" && d.make_recurring) {
+    const refIso = d.due_date ?? d.date;
+    const dayNum = Number(refIso.slice(8, 10));
+    const dueDay = Number.isInteger(dayNum) && dayNum >= 1 && dayNum <= 31 ? dayNum : null;
+    const { data: billRow, error: billErr } = await supabase
+      .from("finance_recurring_bills")
+      .insert({
+        user_id: user.id,
+        kind: d.kind,
+        description: d.description,
+        amount_mode: "fixed",
+        amount_cents: d.amount_cents,
+        due_day: dueDay,
+        category_id: d.category_id ?? null,
+        account_id: d.account_id ?? null,
+        member_label: d.member_label ?? null,
+        active: true,
+      })
+      .select("id")
+      .single();
+
+    if (!billErr && billRow) {
+      createdRecurringBillId = billRow.id;
+    }
+  }
+
   const { data, error } = await supabase
     .from("transactions")
     .insert({
@@ -105,6 +134,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
       payment_method_id: d.payment_method_id ?? null,
       account_id: d.account_id ?? null,
       member_label: d.member_label ?? null,
+      recurring_bill_id: createdRecurringBillId,
       notebook_id: d.notebook_id ?? null,
       notes: d.notes ?? null,
     })
@@ -117,6 +147,40 @@ export async function createTransaction(input: TransactionInput): Promise<Action
   }
 
   if (d.ledger === "pessoal" && d.kind === "income") {
+    if (d.include_tithe) {
+      const { data: existingPercent } = await supabase
+        .from("finance_recurring_bills")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("amount_mode", "percent_of_income")
+        .is("deleted_at", null)
+        .limit(1);
+
+      if (!existingPercent || existingPercent.length === 0) {
+        const { data: titheCat } = await supabase
+          .from("finance_categories")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("ledger", "pessoal")
+          .eq("kind", "expense")
+          .ilike("name", "%dízimo%")
+          .is("deleted_at", null)
+          .limit(1);
+
+        await supabase.from("finance_recurring_bills").insert({
+          user_id: user.id,
+          kind: "expense",
+          description: "Dízimo",
+          amount_mode: "percent_of_income",
+          amount_cents: 0,
+          percent_bp: 1000,
+          due_day: null,
+          category_id: titheCat?.[0]?.id ?? null,
+          member_label: "Casa",
+          active: true,
+        });
+      }
+    }
     await ensureMonthBills(user.id, monthKey(d.date));
   }
 
@@ -131,7 +195,10 @@ export async function updateTransaction(
   const user = await getCurrentUser();
   if (!id.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
-  const parsed = transactionSchema.omit({ installment_total: true }).partial().safeParse(patch);
+  const parsed = transactionSchema
+    .omit({ installment_total: true, make_recurring: true, include_tithe: true })
+    .partial()
+    .safeParse(patch);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const supabase = await createClient();

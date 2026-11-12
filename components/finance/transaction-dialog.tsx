@@ -9,7 +9,7 @@ import type { FinanceCategory, Notebook, PaymentMethod } from "@/lib/data/financ
 import type { AccountWithBalance } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
-import { centsToInput, inputToCents } from "@/lib/money";
+import { centsToInput, formatCentsToBrl, inputToCents } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import {
@@ -134,6 +134,8 @@ function TransactionDialogForm({
     () => transactionToEdit?.member_label ?? lastChoices?.memberLabel ?? "Casa",
   );
   const [installments, setInstallments] = useState<string>("1");
+  const [makeRecurring, setMakeRecurring] = useState<boolean>(false);
+  const [includeTithe, setIncludeTithe] = useState<boolean>(true);
   const [notebookId, setNotebookId] = useState<string>(() => transactionToEdit?.notebook_id ?? defaultNotebookId ?? "");
   const [notes, setNotes] = useState(() => transactionToEdit?.notes ?? "");
   // Detalhes começam fechados; abrem sozinhos quando o lançamento já usa algum deles.
@@ -220,6 +222,8 @@ function TransactionDialogForm({
           account_id: resolvedAccountId,
           member_label: resolvedMember,
           installment_total: instCount >= 2 ? instCount : undefined,
+          make_recurring: ledger === "pessoal" && instCount === 1 && makeRecurring ? true : undefined,
+          include_tithe: ledger === "pessoal" && kind === "income" && includeTithe ? true : undefined,
           notebook_id: ledger === "trustcare" && notebookId ? notebookId : null,
           notes: notes.trim() || null,
         });
@@ -238,6 +242,8 @@ function TransactionDialogForm({
 
   const isIncome = kind === "income";
   const isPaid = status === "paid";
+  const liveAmountCents = inputToCents(amountStr);
+  const liveTitheCents = Math.round((liveAmountCents * 1000) / 10000);
   // Até 6 categorias viram atalho; as demais ficam em "Outra categoria".
   // A escolhida sempre aparece como atalho, mesmo vindo da lista.
   const MAX_CHIPS = 6;
@@ -315,6 +321,30 @@ function TransactionDialogForm({
               autoFocus
             />
           </div>
+
+          {ledger === "pessoal" && isIncome && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-emerald-400">Dízimo (10% desta entrada):</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatCentsToBrl(liveTitheCents)}
+                </span>
+              </div>
+              {!transactionToEdit ? (
+                <label className="flex cursor-pointer items-center gap-1.5 text-muted-foreground hover:text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={includeTithe}
+                    onChange={(e) => setIncludeTithe(e.target.checked)}
+                    className="size-3.5 accent-emerald-500"
+                  />
+                  <span>Somar ao Dízimo do mês</span>
+                </label>
+              ) : (
+                <span className="text-muted-foreground">Recalculado no Dízimo do mês</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 2. Com o quê? + categoria em atalhos */}
@@ -425,6 +455,20 @@ function TransactionDialogForm({
               </label>
             )}
           </div>
+
+          {!transactionToEdit && ledger === "pessoal" && Number(installments) === 1 && (
+            <label className="flex cursor-pointer items-center gap-2 pt-1 text-[13px] text-muted-foreground hover:text-foreground">
+              <input
+                type="checkbox"
+                checked={makeRecurring}
+                onChange={(e) => setMakeRecurring(e.target.checked)}
+                className="size-3.5 accent-foreground"
+              />
+              <span>
+                Repetir todo mês <span className="text-xs text-muted-foreground">(conta ou entrada fixa)</span>
+              </span>
+            </label>
+          )}
         </div>
 
         {/* Resumo dos detalhes + abrir/fechar */}

@@ -19,13 +19,13 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
   const scaleMaxCents = peakCents > 0 ? peakCents : 100000;
   const monthsWithData = data.filter((d) => d.incomeCents > 0 || d.expenseCents > 0).length;
 
-  // Com menos de 2 meses lançados não há tendência para mostrar: uma frase no lugar de caixas vazias.
-  if (monthsWithData < 2) {
+  // Sem nenhum dado nos 6 meses, mostra apenas a orientação compacta.
+  if (monthsWithData === 0) {
     return (
       <div className="rounded-lg border border-border bg-card p-4">
         <h3 className="text-sm font-medium text-foreground">Últimos 6 meses</h3>
         <p className="mt-2 text-[13px] text-muted-foreground">
-          O gráfico aparece quando houver pelo menos 2 meses com lançamentos.
+          O gráfico de entradas e saídas aparece assim que houver lançamentos no período.
         </p>
       </div>
     );
@@ -39,8 +39,10 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
             Últimos 6 meses
           </h3>
           <p className="text-xs text-muted-foreground">
-            Quanto entrou e quanto saiu em cada mês
-            {peakCents > 0 ? ` · maior valor ${formatCentsToBrl(peakCents)}` : ""}
+            {monthsWithData === 1
+              ? "Histórico inicial · novos meses entram conforme os lançamentos"
+              : "Entradas e saídas em cada mês"}
+            {peakCents > 0 ? ` · pico ${formatCentsToBrl(peakCents)}` : ""}
           </p>
         </div>
 
@@ -91,7 +93,7 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
                     <span className="tabular-nums">{formatCentsToBrl(point.expenseCents)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1 font-medium">
-                    <span className="text-muted-foreground">Sobrou:</span>
+                    <span className="text-muted-foreground">Saldo:</span>
                     <span
                       className={`tabular-nums ${
                         point.balanceCents >= 0 ? "text-emerald-400" : "text-rose-400"

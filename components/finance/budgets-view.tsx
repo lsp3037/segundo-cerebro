@@ -189,7 +189,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                     <th className="py-2.5 pl-4 pr-3">Categoria</th>
                     <th className="px-3 py-2.5 text-right">Limite</th>
                     <th className="px-3 py-2.5 text-right">Gasto</th>
-                    <th className="px-3 py-2.5 text-right">Sobra</th>
+                    <th className="px-3 py-2.5 text-right">Disponível</th>
                     <th className="w-56 px-3 py-2.5">Usado</th>
                     <th className="py-2.5 pl-2 pr-4 text-right">Ações</th>
                   </tr>

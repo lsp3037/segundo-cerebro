@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
@@ -8,16 +8,24 @@ import {
   ChevronDownIcon,
   ListChecksIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
+import { syncMonthTithe } from "@/lib/actions/finance-family";
+import type { FinanceSummary } from "@/lib/data/finance";
 import type { HouseholdData, HouseholdTransaction } from "@/lib/data/finance-family";
 import { addDays, formatRelativeDay, formatShortDate, todayIso } from "@/lib/dates";
+import { percentOfCents } from "@/lib/finance/household";
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
+import { CategoryBreakdown } from "./category-breakdown";
+import { FinanceKpiStrip } from "./finance-hierarchy";
 import { EmptyMonth, GettingStarted, monthNameLong } from "./getting-started";
+import { MonthlyChart } from "./monthly-chart";
 import { PayCheck, usePayToggle } from "./pay-toggle";
 
 interface HouseholdOverviewProps {
   data: HouseholdData;
+  categoriesBreakdown: FinanceSummary["categoriesBreakdown"];
   onGoToPendingFluxo: () => void;
   onGoToAllFluxo: () => void;
   onOpenRecurringDialog: () => void;
@@ -32,6 +40,7 @@ interface HouseholdOverviewProps {
 
 export function HouseholdOverview({
   data,
+  categoriesBreakdown,
   onGoToPendingFluxo,
   onGoToAllFluxo,
   onOpenRecurringDialog,
@@ -45,6 +54,7 @@ export function HouseholdOverview({
 }: HouseholdOverviewProps) {
   const { isPaid, toggle } = usePayToggle();
   const [showPaid, setShowPaid] = useState(false);
+  const [isSyncingTithe, startSyncTithe] = useTransition();
 
   // Mês sem nenhum lançamento: em vez de uma tela de zeros, mostra o caminho para começar.
   if (data.transactions.length === 0) {
@@ -82,7 +92,7 @@ export function HouseholdOverview({
           {
             id: "entrada",
             title: `Primeira entrada de ${monthName}`,
-            description: "Salário ou outra renda: é a base do Dízimo e da sobra do mês.",
+            description: "Salário ou outra renda: é a base do Dízimo (10%) e do saldo do mês.",
             done: false,
             actionLabel: "Lançar entrada",
             onAction: onNewIncome,
@@ -133,13 +143,54 @@ export function HouseholdOverview({
 
   const creditCards = data.accounts.filter((a) => a.type === "credit_card" && a.monthInvoiceCents > 0);
 
+  // Dízimo (10%): cálculo sobre entradas do mês + status de quitação
+  const percentBills = data.recurringBills.filter((b) => b.amount_mode === "percent_of_income" && b.percent_bp);
+  const titheBp = percentBills[0]?.percent_bp ?? 1000;
+  const titheBillIds = new Set(percentBills.map((b) => b.id));
+  const titheExpectedCents = percentOfCents(data.kpis.incomeCents, titheBp);
+  const titheTxs = expenses.filter(
+    (t) =>
+      (t.recurring_bill_id && titheBillIds.has(t.recurring_bill_id)) ||
+      /^d[íi]zimo/i.test(t.description) ||
+      (t.categoryName?.toLowerCase().includes("dízimo") ?? false),
+  );
+  const tithePaidCents = titheTxs.filter((t) => isPaid(t)).reduce((acc, t) => acc + t.amount_cents, 0);
+  const tithePendingTx = titheTxs.find((t) => !isPaid(t));
+  const titheRemainingCents = Math.max(0, titheExpectedCents - tithePaidCents);
+
+  const handleSyncTithe = () => {
+    startSyncTithe(async () => {
+      const res = await syncMonthTithe(month);
+      if (res.ok) toast.success("Dízimo (10%) atualizado no mês.");
+      else toast.error(res.error);
+    });
+  };
+
   const projected = data.kpis.projectedBalanceCents;
   const answer =
     projected > 0
-      ? { lead: `${monthTitle} deve fechar com`, value: `${formatCentsToBrl(projected)} de sobra`, tone: "text-emerald-400" }
+      ? {
+          lead: `Saldo previsto de ${monthTitle}`,
+          value: formatCentsToBrl(projected),
+          badge: "Superávit",
+          badgeClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+          tone: "text-emerald-400",
+        }
       : projected < 0
-        ? { lead: `${monthTitle} deve fechar no vermelho`, value: `faltam ${formatCentsToBrl(-projected)}`, tone: "text-rose-400" }
-        : { lead: `${monthTitle} deve fechar empatado`, value: formatCentsToBrl(0), tone: "text-foreground" };
+        ? {
+            lead: `Saldo previsto de ${monthTitle}`,
+            value: `-${formatCentsToBrl(-projected)}`,
+            badge: "No vermelho",
+            badgeClass: "border-rose-500/30 bg-rose-500/10 text-rose-400",
+            tone: "text-rose-400",
+          }
+        : {
+            lead: `Saldo previsto de ${monthTitle}`,
+            value: formatCentsToBrl(0),
+            badge: "Equilibrado",
+            badgeClass: "border-border bg-muted/40 text-muted-foreground",
+            tone: "text-foreground",
+          };
 
   // "seg" sozinho é curto demais para ler de relance: vira "seg, 16 nov".
   const relativeDay = (iso: string) => {
@@ -200,16 +251,104 @@ export function HouseholdOverview({
         </div>
       )}
 
-      {/* 1. A resposta do mês, numa frase */}
-      <section aria-labelledby="month-answer">
-        <p id="month-answer" className="text-sm text-muted-foreground">
-          {answer.lead}
-        </p>
-        <p className={`text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl ${answer.tone}`}>{answer.value}</p>
-        <p className="mt-1 text-[13px] text-muted-foreground tabular-nums">
-          Entrou {formatCentsToBrl(data.kpis.incomeCents)} · sai {formatCentsToBrl(data.kpis.expenseCents)}
-          {data.kpis.incomeCents > 0 && <> · guarda {data.kpis.savingsRatePercent}% da renda</>}
-        </p>
+      {/* 1. Saldo previsto do mês + faixa de KPIs (incluindo Dízimo 10% no início) */}
+      <section aria-labelledby="month-answer" className="space-y-4">
+        <div>
+          <p id="month-answer" className="text-sm text-muted-foreground">
+            {answer.lead}
+          </p>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2.5">
+            <p className={`text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl ${answer.tone}`}>
+              {answer.value}
+            </p>
+            <span className={`rounded border px-2 py-0.5 text-xs font-medium ${answer.badgeClass}`}>
+              {answer.badge}
+            </span>
+          </div>
+          <p className="mt-1 text-[13px] text-muted-foreground tabular-nums">
+            Entradas {formatCentsToBrl(data.kpis.incomeCents)} · Saídas {formatCentsToBrl(data.kpis.expenseCents)}
+            {data.kpis.incomeCents > 0 && <> · Taxa de poupança {data.kpis.savingsRatePercent}%</>}
+          </p>
+        </div>
+
+        <FinanceKpiStrip
+          columns={4}
+          items={[
+            {
+              id: "kpi-income",
+              label: "Total de Entradas",
+              value: formatCentsToBrl(data.kpis.incomeCents),
+              tone: data.kpis.incomeCents > 0 ? "positive" : "default",
+              subtext:
+                data.kpis.pendingIncomeCents > 0
+                  ? `Recebido ${formatCentsToBrl(data.kpis.paidIncomeCents)} · A receber ${formatCentsToBrl(data.kpis.pendingIncomeCents)}`
+                  : `${incomes.length} ${incomes.length === 1 ? "entrada lançada" : "entradas lançadas"}`,
+            },
+            {
+              id: "kpi-expense",
+              label: "Total de Saídas",
+              value: formatCentsToBrl(data.kpis.expenseCents),
+              tone: data.kpis.expenseCents > 0 ? "negative" : "default",
+              subtext: `Pago ${formatCentsToBrl(data.kpis.paidExpenseCents)} · Pendente ${formatCentsToBrl(data.kpis.pendingExpenseCents)}`,
+            },
+            {
+              id: "kpi-tithe",
+              label: `Dízimo (${(titheBp / 100).toFixed(0)}%)`,
+              value: formatCentsToBrl(titheExpectedCents),
+              tone:
+                titheExpectedCents === 0
+                  ? "default"
+                  : titheRemainingCents === 0
+                    ? "positive"
+                    : "warning",
+              badge:
+                titheExpectedCents === 0 ? null : titheRemainingCents === 0 ? (
+                  <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-400">
+                    Quitado
+                  </span>
+                ) : (
+                  <span className="rounded border border-amber-500/35 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-amber-400">
+                    Falta {formatCentsToBrl(titheRemainingCents)}
+                  </span>
+                ),
+              subtext:
+                titheExpectedCents === 0
+                  ? "Calculado a cada entrada"
+                  : tithePaidCents > 0 && titheRemainingCents > 0
+                    ? `Pago ${formatCentsToBrl(tithePaidCents)} de ${formatCentsToBrl(titheExpectedCents)}`
+                    : `${(titheBp / 100).toFixed(0)}% sobre ${formatCentsToBrl(data.kpis.incomeCents)}`,
+              action: tithePendingTx ? (
+                <button
+                  type="button"
+                  onClick={() => toggle(tithePendingTx)}
+                  className="cursor-pointer font-medium text-foreground underline underline-offset-2 hover:text-emerald-400"
+                >
+                  Marcar pago
+                </button>
+              ) : titheRemainingCents > 0 ? (
+                <button
+                  type="button"
+                  disabled={isSyncingTithe}
+                  onClick={handleSyncTithe}
+                  className="cursor-pointer font-medium text-amber-400 underline underline-offset-2 hover:text-amber-300 disabled:opacity-50"
+                >
+                  {isSyncingTithe ? "Gerando..." : "Gerar 10%"}
+                </button>
+              ) : undefined,
+            },
+            {
+              id: "kpi-commitment",
+              label: "Comprometimento fixo",
+              value: `${data.kpis.fixedCommitmentPercent}%`,
+              badge: (
+                <span className="rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">
+                  {formatCentsToBrl(data.kpis.dailyBurnCents)}/dia
+                </span>
+              ),
+              subtext: `Fixas ${formatCentsToBrl(data.kpis.fixedExpenseCents)} · Poupança ${data.kpis.savingsRatePercent}%`,
+            },
+          ]}
+        />
       </section>
 
       {/* 2. O que falta pagar */}
@@ -327,21 +466,29 @@ export function HouseholdOverview({
               <p className="py-5 text-center text-[13px] text-muted-foreground">Nenhuma entrada em {monthName}.</p>
             ) : (
               <ul className="mt-2 divide-y divide-border/60">
-                {incomes.map((inc) => (
-                  <li key={inc.id}>
-                    <button
-                      type="button"
-                      onClick={() => onEditTransaction(inc)}
-                      className="flex w-full cursor-pointer items-center justify-between gap-3 py-2 text-left text-[13px] hover:underline"
-                    >
-                      <span className="truncate text-foreground">
-                        {inc.description}
-                        {inc.billStatus !== "paid" && <span className="text-amber-400"> · a receber</span>}
-                      </span>
-                      <span className="shrink-0 tabular-nums text-emerald-400">{formatCentsToBrl(inc.amount_cents)}</span>
-                    </button>
-                  </li>
-                ))}
+                {incomes.map((inc) => {
+                  const incTithe = percentOfCents(inc.amount_cents, titheBp);
+                  return (
+                    <li key={inc.id}>
+                      <button
+                        type="button"
+                        onClick={() => onEditTransaction(inc)}
+                        className="flex w-full cursor-pointer items-center justify-between gap-3 py-2 text-left text-[13px] hover:underline"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-foreground">
+                            {inc.description}
+                            {inc.billStatus !== "paid" && <span className="text-amber-400"> · a receber</span>}
+                          </span>
+                          <span className="block text-xs tabular-nums text-muted-foreground">
+                            Dízimo ({(titheBp / 100).toFixed(0)}%): {formatCentsToBrl(incTithe)}
+                          </span>
+                        </span>
+                        <span className="shrink-0 tabular-nums text-emerald-400">{formatCentsToBrl(inc.amount_cents)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -387,6 +534,16 @@ export function HouseholdOverview({
               </div>
             </section>
           )}
+        </div>
+      </div>
+
+      {/* 4. Gráficos do mês: evolução de 6 meses + distribuição por categoria */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <MonthlyChart data={data.trend} currentMonth={month} />
+        </div>
+        <div className="lg:col-span-5">
+          <CategoryBreakdown categoriesBreakdown={categoriesBreakdown} />
         </div>
       </div>
     </div>

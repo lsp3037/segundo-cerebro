@@ -13,7 +13,7 @@ export type HouseholdTemplateRow = {
 
 export const HOUSEHOLD_TEMPLATE: HouseholdTemplateRow[] = [
   { kind: "income", description: "Salário Luan", dueDay: null, member: "Luan", categoryName: "Salário" },
-  { kind: "income", description: "Bolsa Residência", dueDay: null, member: null, categoryName: "Benefícios & Bonificações" },
+  { kind: "income", description: "Bolsa Residência", dueDay: null, member: "Rayzza", categoryName: "Benefícios & Bonificações" },
   { kind: "income", description: "Trust Care", dueDay: null, member: "Luan", categoryName: "Pró-labore & Serviços" },
   { kind: "income", description: "HSH", dueDay: null, member: null, categoryName: "Pró-labore & Serviços" },
 

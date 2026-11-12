@@ -436,6 +436,7 @@ export function FinanceDashboard({
         {activeTab === "visao" && currentLedger === "pessoal" && (
           <HouseholdOverview
             data={householdData}
+            categoriesBreakdown={initialSummary.categoriesBreakdown}
             onGoToPendingFluxo={() => {
               setFluxoStatusFilter("pending");
               updateParams({ tab: "fluxo" });

@@ -28,7 +28,7 @@ export function ReportsComparisonsView({
         items={[
           {
             id: "savings-rate",
-            label: "Da renda, sobrou",
+            label: "Taxa de poupança",
             value: `${data.kpis.savingsRatePercent}%`,
             tone: data.kpis.savingsRatePercent > 0 ? "positive" : data.kpis.savingsRatePercent < 0 ? "negative" : "default",
             subtext:
@@ -39,7 +39,7 @@ export function ReportsComparisonsView({
                     : `${Math.abs(savDelta)} ${Math.abs(savDelta) === 1 ? "ponto" : "pontos"} a ${savDelta > 0 ? "mais" : "menos"} que no mês passado`}
                 </span>
               ) : (
-                `Sobra prevista: ${formatCentsToBrl(data.kpis.projectedBalanceCents)}`
+                `Saldo previsto: ${formatCentsToBrl(data.kpis.projectedBalanceCents)}`
               ),
           },
           {

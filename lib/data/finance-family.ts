@@ -92,7 +92,11 @@ function monthBounds(month: string) {
 
 // Cria os lançamentos pendentes do mês a partir das contas fixas (só mês atual e futuros)
 // e mantém o Dízimo pendente igual ao percentual das entradas do mês.
-export async function ensureMonthBills(userId: string, month: string): Promise<void> {
+export async function ensureMonthBills(
+  userId: string,
+  month: string,
+  options?: { syncPendingFixed?: boolean },
+): Promise<void> {
   if (month < monthKey(todayIso())) return;
 
   try {
@@ -110,13 +114,15 @@ export async function ensureMonthBills(userId: string, month: string): Promise<v
     const { start, end } = monthBounds(month);
     const { data: existing } = await supabase
       .from("transactions")
-      .select("id, recurring_bill_id, status, amount_cents, deleted_at")
+      .select("id, recurring_bill_id, status, amount_cents, due_date, description, category_id, deleted_at")
       .eq("user_id", userId)
-      .not("recurring_bill_id", "is", null)
       .gte("date", start)
       .lte("date", end);
 
-    const existingByBill = new Map((existing ?? []).map((t) => [t.recurring_bill_id!, t]));
+    const existingList = existing ?? [];
+    const existingByBill = new Map(
+      existingList.filter((t) => t.recurring_bill_id).map((t) => [t.recurring_bill_id!, t]),
+    );
 
     const rowFor = (bill: RecurringBill, amount: number): TablesInsert<"transactions"> => {
       const due = dueDateFor(month, bill.due_day);
@@ -137,10 +143,26 @@ export async function ensureMonthBills(userId: string, month: string): Promise<v
     };
 
     // 1. Contas de valor fixo (entradas primeiro, para o Dízimo usar o total certo)
-    const fixedRows = bills
-      .filter((b) => b.amount_mode === "fixed" && b.amount_cents > 0 && !existingByBill.has(b.id))
+    const fixedBills = bills.filter((b) => b.amount_mode === "fixed" && b.amount_cents > 0);
+    const fixedRows = fixedBills
+      .filter((b) => !existingByBill.has(b.id))
       .map((b) => rowFor(b, b.amount_cents));
     await insertIgnoringDuplicates(fixedRows);
+
+    if (options?.syncPendingFixed) {
+      for (const b of fixedBills) {
+        const cur = existingByBill.get(b.id);
+        if (!cur || cur.deleted_at || cur.status !== "pending") continue;
+        const targetDue = dueDateFor(month, b.due_day);
+        if (cur.amount_cents !== b.amount_cents || cur.due_date !== targetDue) {
+          await supabase
+            .from("transactions")
+            .update({ amount_cents: b.amount_cents, due_date: targetDue, updated_at: new Date().toISOString() })
+            .eq("id", cur.id)
+            .eq("user_id", userId);
+        }
+      }
+    }
 
     // 2. Contas percentuais (Dízimo) sobre as entradas do mês
     const percentBills = bills.filter((b) => b.amount_mode === "percent_of_income" && b.percent_bp);
@@ -158,12 +180,73 @@ export async function ensureMonthBills(userId: string, month: string): Promise<v
     const incomeCents = (incomes ?? []).reduce((acc, t) => acc + t.amount_cents, 0);
 
     for (const bill of percentBills) {
-      const amount = percentOfCents(incomeCents, bill.percent_bp!);
+      const expectedTotal = percentOfCents(incomeCents, bill.percent_bp!);
       const current = existingByBill.get(bill.id);
+      const complementRow = existingList.find(
+        (t) =>
+          !t.deleted_at &&
+          !t.recurring_bill_id &&
+          t.status === "pending" &&
+          t.description === `${bill.description} (complemento)`,
+      );
+
+      // Soma tudo o que já foi pago no mês dessa conta/categoria (ex.: primeiro dízimo já quitado)
+      const paidTitheCents = existingList
+        .filter(
+          (t) =>
+            !t.deleted_at &&
+            t.status === "paid" &&
+            (t.recurring_bill_id === bill.id || t.description === `${bill.description} (complemento)`),
+        )
+        .reduce((acc, t) => acc + t.amount_cents, 0);
+
+      const remaining = Math.max(0, expectedTotal - paidTitheCents);
+
       if (!current) {
-        if (amount > 0) await insertIgnoringDuplicates([rowFor(bill, amount)]);
-      } else if (!current.deleted_at && current.status === "pending" && amount > 0 && current.amount_cents !== amount) {
-        await supabase.from("transactions").update({ amount_cents: amount }).eq("id", current.id).eq("user_id", userId);
+        if (remaining > 0) await insertIgnoringDuplicates([rowFor(bill, remaining)]);
+      } else if (!current.deleted_at && current.status === "pending") {
+        if (remaining > 0) {
+          if (current.amount_cents !== remaining) {
+            await supabase
+              .from("transactions")
+              .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
+              .eq("id", current.id)
+              .eq("user_id", userId);
+          }
+        } else {
+          // Sem entradas suficientes no mês ou já totalmente quitado: remove o pendente vazio.
+          await supabase.from("transactions").delete().eq("id", current.id).eq("user_id", userId);
+        }
+      } else if (!current.deleted_at && current.status === "paid") {
+        // O dízimo principal já foi pago, mas entrou nova receita no mês: cria/atualiza o complemento.
+        if (remaining > 0) {
+          if (complementRow && complementRow.status === "pending") {
+            if (complementRow.amount_cents !== remaining) {
+              await supabase
+                .from("transactions")
+                .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
+                .eq("id", complementRow.id)
+                .eq("user_id", userId);
+            }
+          } else if (!complementRow) {
+            await supabase.from("transactions").insert({
+              user_id: userId,
+              ledger: "pessoal",
+              kind: "expense",
+              amount_cents: remaining,
+              date: dueDateFor(month, bill.due_day) ?? start,
+              due_date: dueDateFor(month, bill.due_day),
+              description: `${bill.description} (complemento)`,
+              category_id: bill.category_id,
+              account_id: bill.account_id,
+              member_label: bill.member_label,
+              recurring_bill_id: null,
+              status: "pending",
+            });
+          }
+        } else if (complementRow && complementRow.status === "pending") {
+          await supabase.from("transactions").delete().eq("id", complementRow.id).eq("user_id", userId);
+        }
       }
     }
   } catch (err) {
