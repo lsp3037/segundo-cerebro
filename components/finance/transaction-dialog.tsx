@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ArrowDownRightIcon, ArrowUpRightIcon, Loader2Icon } from "lucide-react";
+import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createTransaction, updateTransaction } from "@/lib/actions/finance";
@@ -25,6 +25,31 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+const LAST_CHOICES_KEY = "segundo-cerebro:finance-last-choices";
+
+interface LastChoices {
+  memberLabel?: string;
+  accountId?: string;
+  paymentMethodId?: string;
+}
+
+function readLastChoices(): LastChoices | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_CHOICES_KEY);
+    return raw ? (JSON.parse(raw) as LastChoices) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastChoices(choices: LastChoices) {
+  try {
+    window.localStorage.setItem(LAST_CHOICES_KEY, JSON.stringify(choices));
+  } catch {
+    // Sem armazenamento local (aba anônima, por exemplo): só não lembra a escolha.
+  }
+}
+
 interface TransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +69,7 @@ export function TransactionDialog(props: TransactionDialogProps) {
   const formKey = `${props.open}-${props.transactionToEdit?.id ?? "new"}-${props.defaultLedger ?? "pessoal"}-${props.defaultNotebookId ?? ""}`;
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent className="max-w-lg border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg overflow-y-auto border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl">
         <TransactionDialogForm key={formKey} {...props} />
       </DialogContent>
     </Dialog>
@@ -84,12 +109,40 @@ function TransactionDialogForm({
   const [date, setDate] = useState(() => transactionToEdit?.date ?? todayIso());
   const [dueDate, setDueDate] = useState(() => transactionToEdit?.due_date ?? "");
   const [categoryId, setCategoryId] = useState<string>(() => transactionToEdit?.category_id ?? "");
-  const [paymentMethodId, setPaymentMethodId] = useState<string>(() => transactionToEdit?.payment_method_id ?? "");
-  const [accountId, setAccountId] = useState<string>(() => transactionToEdit?.account_id ?? "__none__");
-  const [memberLabel, setMemberLabel] = useState<string>(() => transactionToEdit?.member_label ?? "Casa");
+  // Num lançamento novo, pessoa, banco e forma de pagamento repetem a última escolha.
+  const [lastChoices] = useState<LastChoices | null>(() => {
+    if (transactionToEdit) return null;
+    const saved = readLastChoices();
+    if (!saved) return null;
+    // Ignora escolhas que não existem mais (conta ou forma de pagamento removida).
+    return {
+      memberLabel: saved.memberLabel && (HOUSEHOLD_MEMBERS as readonly string[]).includes(saved.memberLabel) ? saved.memberLabel : undefined,
+      accountId: saved.accountId && accounts.some((a) => a.id === saved.accountId) ? saved.accountId : undefined,
+      paymentMethodId:
+        saved.paymentMethodId && paymentMethods.some((m) => m.id === saved.paymentMethodId)
+          ? saved.paymentMethodId
+          : undefined,
+    };
+  });
+  const [paymentMethodId, setPaymentMethodId] = useState<string>(
+    () => transactionToEdit?.payment_method_id ?? lastChoices?.paymentMethodId ?? "",
+  );
+  const [accountId, setAccountId] = useState<string>(
+    () => transactionToEdit?.account_id ?? lastChoices?.accountId ?? "__none__",
+  );
+  const [memberLabel, setMemberLabel] = useState<string>(
+    () => transactionToEdit?.member_label ?? lastChoices?.memberLabel ?? "Casa",
+  );
   const [installments, setInstallments] = useState<string>("1");
   const [notebookId, setNotebookId] = useState<string>(() => transactionToEdit?.notebook_id ?? defaultNotebookId ?? "");
   const [notes, setNotes] = useState(() => transactionToEdit?.notes ?? "");
+  // Detalhes começam fechados; abrem sozinhos quando o lançamento já usa algum deles.
+  const [showDetails, setShowDetails] = useState(
+    () =>
+      Boolean(defaultNotebookId) ||
+      Boolean(transactionToEdit?.notes || transactionToEdit?.notebook_id) ||
+      (transactionToEdit?.ledger ?? defaultLedger) === "trustcare",
+  );
 
   // Filtra categorias pelo ledger e kind selecionados (garantindo unicidade)
   const filteredCategories = useMemo(() => {
@@ -172,6 +225,7 @@ function TransactionDialogForm({
         });
 
         if (res.ok) {
+          if (ledger === "pessoal") saveLastChoices({ memberLabel, accountId, paymentMethodId });
           toast.success(instCount >= 2 ? `Parcelamento em ${instCount}x registrado!` : "Lançamento registrado!");
           onOpenChange(false);
           onSuccess?.();
@@ -182,221 +236,318 @@ function TransactionDialogForm({
     });
   };
 
+  const isIncome = kind === "income";
+  const isPaid = status === "paid";
+  // Até 6 categorias viram atalho; as demais ficam em "Outra categoria".
+  // A escolhida sempre aparece como atalho, mesmo vindo da lista.
+  const MAX_CHIPS = 6;
+  const chipCategories = filteredCategories.slice(0, MAX_CHIPS);
+  const pickedOutside = filteredCategories.find((c) => c.id === categoryId && !chipCategories.includes(c));
+  if (pickedOutside) chipCategories.push(pickedOutside);
+  const otherCategories = filteredCategories.filter((c) => !chipCategories.includes(c));
+  const selectedAccount = accounts.find((a) => a.id === accountId);
+  const selectedMethod = paymentMethods.find((m) => m.id === paymentMethodId);
+  const summaryParts = [
+    ledger === "pessoal" ? "Pessoal" : "Trust Care",
+    ledger === "pessoal" ? memberLabel : null,
+    selectedAccount?.name ?? selectedMethod?.name ?? null,
+    Number(installments) >= 2 ? `${installments}x` : null,
+  ].filter(Boolean);
+
   return (
     <>
-        <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">
-            {transactionToEdit ? "Editar Lançamento" : "Novo Lançamento"}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            {transactionToEdit
-              ? "Atualize as informações do lançamento financeiro."
-              : "Registre uma entrada ou saída no seu fluxo de caixa."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          {/* Seletor Tipo: Entrada ou Saída */}
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
+      <DialogHeader className="flex-row items-center justify-between gap-3 space-y-0 pr-8">
+        <DialogTitle className="text-lg font-semibold">
+          {transactionToEdit ? "Editar lançamento" : "Novo lançamento"}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Informe quanto, com o quê e se já foi pago. O resto fica em Mais detalhes.
+        </DialogDescription>
+        <div role="radiogroup" aria-label="Tipo" className="inline-flex shrink-0 rounded-lg border border-border bg-muted/30 p-0.5">
+          {(
+            [
+              { id: "expense", label: "Saiu" },
+              { id: "income", label: "Entrou" },
+            ] as const
+          ).map((opt) => (
             <button
+              key={opt.id}
               type="button"
-              onClick={() => setKind("income")}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
-                kind === "income"
-                  ? "border border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-sm"
+              role="radio"
+              aria-checked={kind === opt.id}
+              onClick={() => {
+                setKind(opt.id);
+                setCategoryId("");
+              }}
+              className={`rounded-md px-3 py-1 text-[13px] font-medium transition-colors ${
+                kind === opt.id
+                  ? opt.id === "income"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              <ArrowUpRightIcon className="size-3.5" />
-              Entrada / Receita
+              {opt.label}
             </button>
-            <button
-              type="button"
-              onClick={() => setKind("expense")}
-              className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all ${
-                kind === "expense"
-                  ? "border border-rose-500/40 bg-rose-500/15 text-rose-400 shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <ArrowDownRightIcon className="size-3.5" />
-              Saída / Despesa
-            </button>
-          </div>
+          ))}
+        </div>
+      </DialogHeader>
 
-          {/* Valor (R$) e Data */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="tx-amount" className="text-xs font-medium">
-                Valor (R$) *
-              </Label>
-              <div className="relative mt-1">
-                <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 font-mono text-sm text-muted-foreground">
-                  R$
-                </span>
-                <Input
-                  id="tx-amount"
-                  type="text"
-                  placeholder="0,00"
-                  value={amountStr}
-                  onChange={(e) => setAmountStr(e.target.value)}
-                  className="pl-10 font-mono text-base font-semibold tabular-nums"
-                  required
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="tx-date" className="text-xs font-medium">
-                Data do Pagamento *
-              </Label>
-              <Input
-                id="tx-date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="mt-1 font-mono text-xs"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Descrição */}
-          <div>
-            <Label htmlFor="tx-description" className="text-xs font-medium">
-              Descrição *
-            </Label>
+      <form onSubmit={handleSubmit} className="mt-2 space-y-4">
+        {/* 1. Quanto? */}
+        <div className="space-y-1.5">
+          <Label htmlFor="tx-amount" className="text-[13px] text-muted-foreground">
+            Quanto?
+          </Label>
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 font-mono text-lg text-muted-foreground">
+              R$
+            </span>
             <Input
-              id="tx-description"
-              placeholder={
-                kind === "income"
-                  ? "Ex: Salário mensal, Rendimento de aluguel, Manutenção"
-                  : "Ex: Supermercado do mês, Aluguel/Condomínio, Combustível"
-              }
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1 text-sm"
+              id="tx-amount"
+              type="text"
+              inputMode="decimal"
+              placeholder="0,00"
+              value={amountStr}
+              onChange={(e) => setAmountStr(e.target.value)}
+              className="h-14 pl-12 font-mono text-2xl font-semibold tabular-nums md:text-2xl"
               required
+              autoFocus
             />
           </div>
+        </div>
 
-          {/* Ledger (Pessoal vs Trust Care) */}
-          <div>
-            <Label className="text-xs font-medium">Conta / Destino</Label>
-            <div className="mt-1 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setLedger("pessoal")}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                  ledger === "pessoal"
-                    ? "border-violet-500/40 bg-violet-500/15 text-violet-300"
-                    : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                }`}
-              >
-                Pessoal / Familiar
-              </button>
-              <button
-                type="button"
-                onClick={() => setLedger("trustcare")}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
-                  ledger === "trustcare"
-                    ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-300"
-                    : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                }`}
-              >
-                Trust Care
-              </button>
-            </div>
-          </div>
-
-          {/* Status (Pago vs Pendente) + Vencimento */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs font-medium">Status</Label>
-              <div className="mt-1 grid grid-cols-2 gap-1.5 rounded-lg bg-muted/40 p-1">
-                <button
-                  type="button"
-                  onClick={() => setStatus("paid")}
-                  className={`rounded-md py-1 text-xs font-medium transition-colors ${
-                    status === "paid" ? "bg-emerald-500/20 text-emerald-400 font-semibold" : "text-muted-foreground"
-                  }`}
-                >
-                  Pago
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatus("pending")}
-                  className={`rounded-md py-1 text-xs font-medium transition-colors ${
-                    status === "pending" ? "bg-amber-500/20 text-amber-300 font-semibold" : "text-muted-foreground"
-                  }`}
-                >
-                  Pendente
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="tx-due-date" className="text-xs font-medium">
-                Vencimento (opcional)
-              </Label>
-              <Input
-                id="tx-due-date"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1 font-mono text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Pessoa + Conta / Cartão + Parcelamento (quando Pessoal) */}
-          {ledger === "pessoal" && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div>
-                <Label className="text-xs font-medium">Pessoa / Centro</Label>
-                <Select value={memberLabel} onValueChange={setMemberLabel}>
-                  <SelectTrigger className="mt-1 text-xs">
-                    <SelectValue />
+        {/* 2. Com o quê? + categoria em atalhos */}
+        <div className="space-y-1.5">
+          <Label htmlFor="tx-description" className="text-[13px] text-muted-foreground">
+            {isIncome ? "De onde veio?" : "Com o quê?"}
+          </Label>
+          <Input
+            id="tx-description"
+            placeholder={isIncome ? "Ex.: Salário, venda, reembolso" : "Ex.: Mercado, combustível, farmácia"}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="h-10 text-sm"
+            required
+          />
+          {filteredCategories.length > 0 && (
+            <div role="radiogroup" aria-label="Categoria" className="flex flex-wrap items-center gap-1.5 pt-1">
+              {chipCategories.map((c) => {
+                const selected = categoryId === c.id;
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setCategoryId(selected ? "" : c.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] transition-colors ${
+                      selected
+                        ? "border-foreground/40 bg-muted text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: c.color || "#94a3b8" }} />
+                    {c.name}
+                  </button>
+                );
+              })}
+              {otherCategories.length > 0 && (
+                <Select value="" onValueChange={setCategoryId}>
+                  <SelectTrigger
+                    aria-label="Outra categoria"
+                    className="h-[30px] w-auto gap-1 rounded-full border-dashed px-2.5 text-[12.5px] text-muted-foreground"
+                  >
+                    <SelectValue placeholder="Outra categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    {HOUSEHOLD_MEMBERS.map((m) => (
-                      <SelectItem key={m} value={m} className="text-xs">
-                        {m}
+                    {otherCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="text-[13px]">
+                        {c.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              )}
+            </div>
+          )}
+        </div>
 
-              <div>
-                <Label className="text-xs font-medium">Conta / Cartão</Label>
-                <Select value={accountId} onValueChange={setAccountId}>
-                  <SelectTrigger className="mt-1 text-xs">
-                    <SelectValue placeholder="Nenhum" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__" className="text-xs">Nenhum</SelectItem>
-                    {accounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id} className="text-xs">
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* 3. Já foi pago? -> data do pagamento OU vencimento */}
+        <div className="space-y-1.5">
+          <span id="tx-paid-label" className="text-[13px] font-medium text-muted-foreground">
+            {isIncome ? "Já recebeu?" : "Já foi pago?"}
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div role="radiogroup" aria-labelledby="tx-paid-label" className="inline-flex rounded-lg border border-border bg-muted/30 p-0.5">
+              {(
+                [
+                  { id: "paid", label: "Sim" },
+                  { id: "pending", label: "Ainda não" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={status === opt.id}
+                  onClick={() => setStatus(opt.id)}
+                  className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    status === opt.id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {isPaid ? (
+              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                em
+                <Input
+                  type="date"
+                  aria-label={isIncome ? "Data do recebimento" : "Data do pagamento"}
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-9 w-40 font-mono text-[13px]"
+                  required
+                />
+              </label>
+            ) : (
+              <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                vence em
+                <Input
+                  type="date"
+                  aria-label="Data de vencimento"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="h-9 w-40 font-mono text-[13px]"
+                />
+              </label>
+            )}
+          </div>
+        </div>
 
-              {!transactionToEdit && (
-                <div>
-                  <Label className="text-xs font-medium">Parcelas</Label>
-                  <Select value={installments} onValueChange={setInstallments}>
-                    <SelectTrigger className="mt-1 text-xs">
+        {/* Resumo dos detalhes + abrir/fechar */}
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 text-[13px]">
+          <span className="min-w-0 truncate text-muted-foreground">{summaryParts.join(" · ")}</span>
+          <button
+            type="button"
+            aria-expanded={showDetails}
+            aria-controls="tx-details"
+            onClick={() => setShowDetails((v) => !v)}
+            className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground hover:underline"
+          >
+            {showDetails ? "Menos detalhes" : "Mais detalhes"}
+            <ChevronDownIcon className={`size-3.5 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+
+        {showDetails && (
+          <div id="tx-details" className="space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
+            {/* De quem é */}
+            <div className="space-y-1.5">
+              <span id="tx-ledger-label" className="text-[13px] font-medium text-muted-foreground">
+                De quem é?
+              </span>
+              <div role="radiogroup" aria-labelledby="tx-ledger-label" className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { id: "pessoal", label: "Pessoal / casa" },
+                    { id: "trustcare", label: "Trust Care" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={ledger === opt.id}
+                    onClick={() => {
+                      setLedger(opt.id);
+                      setCategoryId("");
+                    }}
+                    className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors ${
+                      ledger === opt.id
+                        ? "border-foreground/40 bg-muted text-foreground"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {ledger === "pessoal" && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] text-muted-foreground">Pessoa</Label>
+                  <Select value={memberLabel} onValueChange={setMemberLabel}>
+                    <SelectTrigger className="h-9 text-[13px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1" className="text-xs">À vista (1x)</SelectItem>
+                      {HOUSEHOLD_MEMBERS.map((m) => (
+                        <SelectItem key={m} value={m} className="text-[13px]">
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] text-muted-foreground">Banco ou cartão</Label>
+                  <Select value={accountId} onValueChange={setAccountId}>
+                    <SelectTrigger className="h-9 text-[13px]">
+                      <SelectValue placeholder="Nenhum" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__" className="text-[13px]">
+                        Nenhum
+                      </SelectItem>
+                      {accounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id} className="text-[13px]">
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="tx-method" className="text-[13px] text-muted-foreground">
+                  Forma de pagamento
+                </Label>
+                <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+                  <SelectTrigger id="tx-method" className="h-9 text-[13px]">
+                    <SelectValue placeholder="Não informada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map((m) => (
+                      <SelectItem key={m.id} value={m.id} className="text-[13px]">
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {ledger === "pessoal" && !transactionToEdit && (
+                <div className="space-y-1.5">
+                  <Label className="text-[13px] text-muted-foreground">Parcelas</Label>
+                  <Select value={installments} onValueChange={setInstallments}>
+                    <SelectTrigger className="h-9 text-[13px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1" className="text-[13px]">
+                        À vista
+                      </SelectItem>
                       {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map((n) => (
-                        <SelectItem key={n} value={String(n)} className="text-xs">
+                        <SelectItem key={n} value={String(n)} className="text-[13px]">
                           {n}x mensais
                         </SelectItem>
                       ))}
@@ -405,116 +556,72 @@ function TransactionDialogForm({
                 </div>
               )}
             </div>
-          )}
 
-          {/* Categoria e Método de Pagamento */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="tx-category" className="text-xs font-medium">
-                Categoria
-              </Label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger id="tx-category" className="mt-1 text-xs">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2 rounded-full"
-                          style={{ backgroundColor: c.color || "#94a3b8" }}
-                        />
-                        {c.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!isPaid && (
+              <div className="space-y-1.5">
+                <Label htmlFor="tx-date" className="text-[13px] text-muted-foreground">
+                  Data do lançamento (define o mês em que aparece)
+                </Label>
+                <Input
+                  id="tx-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-9 w-44 font-mono text-[13px]"
+                  required
+                />
+              </div>
+            )}
 
-            <div>
-              <Label htmlFor="tx-method" className="text-xs font-medium">
-                Forma de Pagamento
-              </Label>
-              <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
-                <SelectTrigger id="tx-method" className="mt-1 text-xs">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="text-xs">
-                      {m.name}
+            {ledger === "trustcare" && availableNotebooks.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="tx-notebook" className="text-[13px] text-muted-foreground">
+                  É de algum notebook da revenda?
+                </Label>
+                <Select value={notebookId} onValueChange={setNotebookId}>
+                  <SelectTrigger id="tx-notebook" className="h-9 text-[13px]">
+                    <SelectValue placeholder="Não, é um custo ou receita geral" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="" className="text-[13px]">
+                      Não, é um custo ou receita geral
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {availableNotebooks.map((n) => (
+                      <SelectItem key={n.id} value={n.id} className="text-[13px]">
+                        {n.brand ? `${n.brand} ` : ""}
+                        {n.model} {n.specs ? `(${n.specs})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tx-notes" className="text-[13px] text-muted-foreground">
+                Observação
+              </Label>
+              <Textarea
+                id="tx-notes"
+                placeholder="Número do recibo, combinado, detalhe..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="h-16 resize-none text-[13px]"
+              />
             </div>
           </div>
+        )}
 
-          {/* Vínculo com Notebook (Se Trust Care) */}
-          {ledger === "trustcare" && availableNotebooks.length > 0 && (
-            <div className="rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-3">
-              <Label htmlFor="tx-notebook" className="text-xs font-medium text-cyan-300">
-                Vincular a Notebook (Revenda Trust Care)
-              </Label>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Se for compra de peça, upgrade ou venda deste aparelho, vincule para apurar o lucro exato.
-              </p>
-              <Select value={notebookId} onValueChange={setNotebookId}>
-                <SelectTrigger id="tx-notebook" className="mt-1.5 text-xs bg-background/50">
-                  <SelectValue placeholder="Nenhum (custo geral)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="" className="text-xs">
-                    Nenhum (Custo / Receita Geral)
-                  </SelectItem>
-                  {availableNotebooks.map((n) => (
-                    <SelectItem key={n.id} value={n.id} className="text-xs">
-                      {n.brand ? `${n.brand} ` : ""}
-                      {n.model} {n.specs ? `(${n.specs})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Observações */}
-          <div>
-            <Label htmlFor="tx-notes" className="text-xs font-medium text-muted-foreground">
-              Observações (opcional)
-            </Label>
-            <Textarea
-              id="tx-notes"
-              placeholder="Anotações internas, número de recibo, detalhes..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="mt-1 text-xs resize-none h-16"
-            />
-          </div>
-
-          <DialogFooter className="mt-6 flex items-center justify-end gap-2 pt-2 border-t border-border/40">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-              disabled={isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isPending}
-              className={kind === "income" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-            >
-              {isPending && <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />}
-              {transactionToEdit ? "Salvar Alterações" : "Salvar Lançamento"}
-            </Button>
-          </DialogFooter>
-        </form>
+        <DialogFooter className="flex items-center justify-end gap-2 pt-1">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending && <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />}
+            {transactionToEdit ? "Salvar alterações" : isIncome ? "Salvar entrada" : "Salvar gasto"}
+          </Button>
+        </DialogFooter>
+      </form>
     </>
   );
 }

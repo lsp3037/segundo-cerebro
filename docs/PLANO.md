@@ -325,3 +325,9 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **"Desfazer" no lugar de `confirm()`:** exclusões de lançamento, notebook, categoria, conta/cartão e conta fixa mostram aviso de 10 s com "Desfazer" (`restoreFinanceItem` em `lib/actions/finance-restore.ts`, que limpa `deleted_at`). Remover meta de orçamento desfaz regravando o valor anterior.
 - **Correções:** "Ver todas as contas do mês" abre o Fluxo com todos os status; a "próxima" conta do aviso é escolhida por vencimento; resultado zero aparece neutro e sem "+" (`signedResult`).
 - **Bug encontrado nos testes:** `lib/actions/ofx-import.ts` exportava um objeto (`importOfxBatchSchema`) num arquivo `"use server"`, o que derrubava todas as ações do servidor em `/financas` (salvar lançamento falhava). O schema deixou de ser exportado.
+
+## 14. Finanças: lançar em 4 campos e primeira visita (etapa 2 da revisão de usabilidade, 2026-11-12)
+
+- **Janela de lançamento curta (`transaction-dialog.tsx`):** à vista ficam só "Quanto?", "Com o quê?" (com até 6 categorias como atalho e o resto em "Outra categoria") e "Já foi pago?". "Sim" pede a data do pagamento; "Ainda não" pede o vencimento. Destino, pessoa, banco/cartão, forma de pagamento, parcelas, notebook, data do lançamento e observação ficam em "Mais detalhes", resumidos numa linha. "Saiu/Entrou" no cabeçalho; botão diz "Salvar gasto" ou "Salvar entrada".
+- **Última escolha lembrada:** pessoa, banco/cartão e forma de pagamento do último lançamento pessoal ficam salvos no navegador (`localStorage`, chave `segundo-cerebro:finance-last-choices`) e são ignorados se a conta ou forma de pagamento deixar de existir.
+- **Primeira visita (`getting-started.tsx`):** mês sem nenhum lançamento no Pessoal mostra um passo a passo (contas fixas, bancos e cartões, primeira entrada, importar .OFX) em vez de números zerados. Trust Care e Consolidado vazios mostram uma frase e os botões para começar.

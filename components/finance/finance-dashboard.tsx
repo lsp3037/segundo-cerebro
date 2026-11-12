@@ -39,6 +39,7 @@ import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
 import { ConsolidatedOverview } from "./consolidated-overview";
 import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
+import { EmptyMonth, monthNameLong } from "./getting-started";
 import { HouseholdOverview } from "./household-overview";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthDiagnosticCard } from "./month-diagnostic-card";
@@ -95,6 +96,7 @@ export function FinanceDashboard({
   const [txDefaultLedger, setTxDefaultLedger] = useState<"pessoal" | "trustcare">(
     currentLedger === "trustcare" ? "trustcare" : "pessoal"
   );
+  const [txDefaultKind, setTxDefaultKind] = useState<"income" | "expense">("expense");
   const [txDefaultNotebookId, setTxDefaultNotebookId] = useState<string | null>(null);
   const [txDefaultDescription, setTxDefaultDescription] = useState<string | null>(null);
 
@@ -172,9 +174,10 @@ export function FinanceDashboard({
   };
 
   // Handlers para ações diretas
-  const handleOpenNewTransaction = (prefLedger?: "pessoal" | "trustcare") => {
+  const handleOpenNewTransaction = (prefLedger?: "pessoal" | "trustcare", prefKind: "income" | "expense" = "expense") => {
     setTxToEdit(null);
     setTxDefaultLedger(prefLedger || (currentLedger === "trustcare" ? "trustcare" : "pessoal"));
+    setTxDefaultKind(prefKind);
     setTxDialogOpen(true);
   };
 
@@ -424,11 +427,30 @@ export function FinanceDashboard({
             }}
             onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
             onEditTransaction={handleEditTransaction}
+            month={currentMonth}
+            memberFilter={activeMember}
+            onAddAccount={() => updateParams({ tab: "contas" })}
+            onNewIncome={() => handleOpenNewTransaction("pessoal", "income")}
+            onNewExpense={() => handleOpenNewTransaction("pessoal", "expense")}
+            onImportOfx={() => setOfxDialogOpen(true)}
           />
         )}
 
         {/* Resumo Trust Care */}
-        {activeTab === "visao" && currentLedger === "trustcare" && (
+        {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount === 0 && (
+          <EmptyMonth message={`Nenhum lançamento da Trust Care em ${monthNameLong(currentMonth)}.`}>
+            <Button size="sm" onClick={() => handleOpenNewTransaction("trustcare", "income")}>
+              Lançar venda ou serviço
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => handleOpenNewTransaction("trustcare", "expense")}>
+              Lançar custo
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => updateParams({ tab: "notebooks" })}>
+              Ver notebooks
+            </Button>
+          </EmptyMonth>
+        )}
+        {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount > 0 && (
           <div className="space-y-5">
             <FinanceHero
               eyebrow="Resultado Trust Care no mês"
@@ -474,7 +496,14 @@ export function FinanceDashboard({
         )}
 
         {/* Resumo Geral Consolidado (Pessoal + Trust Care) */}
-        {activeTab === "visao" && currentLedger === "all" && (
+        {activeTab === "visao" && currentLedger === "all" && initialSummary.transactionCount === 0 && (
+          <EmptyMonth message={`Nada lançado em ${monthNameLong(currentMonth)}, nem no Pessoal nem na Trust Care.`}>
+            <Button size="sm" onClick={() => handleOpenNewTransaction()}>
+              Lançar gasto ou entrada
+            </Button>
+          </EmptyMonth>
+        )}
+        {activeTab === "visao" && currentLedger === "all" && initialSummary.transactionCount > 0 && (
           <ConsolidatedOverview summary={initialSummary} currentMonth={currentMonth} />
         )}
 
@@ -554,6 +583,7 @@ export function FinanceDashboard({
         notebooks={initialNotebooks}
         accounts={householdData.accounts}
         defaultLedger={txDefaultLedger}
+        defaultKind={txDefaultKind}
         defaultNotebookId={txDefaultNotebookId}
         defaultDescription={txDefaultDescription}
         transactionToEdit={txToEdit}

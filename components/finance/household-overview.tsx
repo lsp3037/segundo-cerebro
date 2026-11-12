@@ -10,6 +10,7 @@ import type { HouseholdData, HouseholdTransaction } from "@/lib/data/finance-fam
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
+import { EmptyMonth, GettingStarted, monthNameLong } from "./getting-started";
 import { PayCheck, usePayToggle } from "./pay-toggle";
 
 interface HouseholdOverviewProps {
@@ -18,6 +19,12 @@ interface HouseholdOverviewProps {
   onGoToAllFluxo: () => void;
   onOpenRecurringDialog: () => void;
   onEditTransaction: (tx: HouseholdTransaction) => void;
+  month: string;
+  memberFilter: string | null;
+  onAddAccount: () => void;
+  onNewIncome: () => void;
+  onNewExpense: () => void;
+  onImportOfx: () => void;
 }
 
 export function HouseholdOverview({
@@ -26,8 +33,68 @@ export function HouseholdOverview({
   onGoToAllFluxo,
   onOpenRecurringDialog,
   onEditTransaction,
+  month,
+  memberFilter,
+  onAddAccount,
+  onNewIncome,
+  onNewExpense,
+  onImportOfx,
 }: HouseholdOverviewProps) {
   const { isPaid, toggle } = usePayToggle();
+
+  // Mês sem nenhum lançamento: em vez de uma tela de zeros, mostra o caminho para começar.
+  if (data.transactions.length === 0) {
+    const monthName = monthNameLong(month);
+    if (memberFilter) {
+      return (
+        <EmptyMonth message={`Nada lançado para ${memberFilter} em ${monthName}.`}>
+          <Button size="sm" onClick={onNewExpense}>
+            Lançar gasto
+          </Button>
+        </EmptyMonth>
+      );
+    }
+    return (
+      <GettingStarted
+        title={`Vamos montar ${monthName}`}
+        description="São três passos rápidos. Os números e gráficos aparecem aqui assim que o primeiro lançamento existir."
+        steps={[
+          {
+            id: "fixas",
+            title: "Contas fixas da casa",
+            description: "Aluguel, energia, internet, plano de saúde e Dízimo (10%) já vêm prontos para ajustar.",
+            done: data.recurringBills.length > 0,
+            actionLabel: "Usar modelo",
+            onAction: onOpenRecurringDialog,
+          },
+          {
+            id: "bancos",
+            title: "Bancos e cartões",
+            description: "Onde o dinheiro fica e quais cartões a casa usa.",
+            done: data.accounts.length > 0,
+            actionLabel: "Adicionar",
+            onAction: onAddAccount,
+          },
+          {
+            id: "entrada",
+            title: `Primeira entrada de ${monthName}`,
+            description: "Salário ou outra renda: é a base do Dízimo e da sobra do mês.",
+            done: false,
+            actionLabel: "Lançar entrada",
+            onAction: onNewIncome,
+          },
+        ]}
+        footer={
+          <>
+            Já tem o extrato do banco?{" "}
+            <button type="button" onClick={onImportOfx} className="cursor-pointer font-medium text-foreground underline underline-offset-2">
+              Importar arquivo .OFX
+            </button>
+          </>
+        }
+      />
+    );
+  }
 
   const expenses = data.transactions.filter((t) => t.kind === "expense");
   const incomes = data.transactions.filter((t) => t.kind === "income");
