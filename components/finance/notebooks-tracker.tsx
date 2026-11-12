@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 
 import { trashNotebook, updateNotebook } from "@/lib/actions/finance";
+import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { Notebook } from "@/lib/data/finance";
 import { formatCentsToBrl, formatProfitMargin } from "@/lib/money";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { FinanceKpiStrip } from "./finance-hierarchy";
+import { toastWithUndo } from "./pay-toggle";
 import { NOTEBOOK_STATUS_CONFIG, type NotebookStatus } from "./meta";
 
 interface NotebooksTrackerProps {
@@ -106,12 +108,10 @@ export function NotebooksTracker({
   }, [notebooks, statusFilter, search]);
 
   const handleDelete = (id: string, name: string) => {
-    if (!confirm(`Deseja enviar o notebook "${name}" para a lixeira?`)) return;
-
     startTransition(async () => {
       const res = await trashNotebook(id);
       if (res.ok) {
-        toast.success("Notebook removido.");
+        toastWithUndo(`${name} foi para a lixeira.`, () => restoreFinanceItem("notebook", id));
       } else {
         toast.error(res.error);
       }

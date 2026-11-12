@@ -10,6 +10,7 @@ import {
   saveRecurringBill,
   saveRecurringValuesBatch,
 } from "@/lib/actions/finance-family";
+import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { FinanceCategory } from "@/lib/data/finance";
 import type { AccountWithBalance, RecurringBill } from "@/lib/data/finance-family";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toastWithUndo } from "./pay-toggle";
 import { UiGenerationReveal } from "./ui-generation-reveal";
 
 interface RecurringBillsDialogProps {
@@ -143,11 +145,11 @@ function RecurringBillsForm({
   };
 
   const handleDelete = (id: string, desc: string) => {
-    if (!confirm(`Remover "${desc}" das contas fixas mensais?`)) return;
     startTransition(async () => {
       const res = await deleteRecurringBill(id);
-      if (res.ok) toast.success("Removido.");
-      else toast.error(res.error);
+      if (res.ok) {
+        toastWithUndo(`${desc} saiu das contas fixas.`, () => restoreFinanceItem("recurring_bill", id));
+      } else toast.error(res.error);
     });
   };
 

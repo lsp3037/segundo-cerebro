@@ -266,7 +266,7 @@ const importBatchItemSchema = z.object({
   rule_pattern: z.string().trim().max(100).optional(),
 });
 
-export const importOfxBatchSchema = z.object({
+const importOfxBatchSchema = z.object({
   ledger: z.enum(["pessoal", "trustcare"]),
   payment_method_id: z.string().uuid().nullable().optional(),
   items: z.array(importBatchItemSchema),

@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { formatCentsToBrl } from "@/lib/money";
+
 export type FinanceTone = "default" | "positive" | "negative" | "warning" | "muted";
 
 const TONE_CLASS: Record<FinanceTone, string> = {
@@ -11,6 +13,14 @@ const TONE_CLASS: Record<FinanceTone, string> = {
   warning: "text-amber-400",
   muted: "text-muted-foreground",
 };
+
+// Resultado com sinal: só leva "+" e verde quando é positivo de verdade; zero fica neutro.
+export function signedResult(cents: number): { value: string; tone: FinanceTone } {
+  const formatted = formatCentsToBrl(cents);
+  if (cents > 0) return { value: `+${formatted}`, tone: "positive" };
+  if (cents < 0) return { value: formatted, tone: "negative" };
+  return { value: formatted, tone: "default" };
+}
 
 interface FinanceHeroProps {
   eyebrow: string;

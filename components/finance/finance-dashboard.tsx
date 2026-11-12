@@ -38,7 +38,7 @@ import { BudgetsView } from "./budgets-view";
 import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
 import { ConsolidatedOverview } from "./consolidated-overview";
-import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
+import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { HouseholdOverview } from "./household-overview";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthDiagnosticCard } from "./month-diagnostic-card";
@@ -418,6 +418,10 @@ export function FinanceDashboard({
               setFluxoStatusFilter("pending");
               updateParams({ tab: "fluxo" });
             }}
+            onGoToAllFluxo={() => {
+              setFluxoStatusFilter("all");
+              updateParams({ tab: "fluxo" });
+            }}
             onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
             onEditTransaction={handleEditTransaction}
           />
@@ -428,8 +432,8 @@ export function FinanceDashboard({
           <div className="space-y-5">
             <FinanceHero
               eyebrow="Resultado Trust Care no mês"
-              value={`${initialSummary.netBalanceCents >= 0 ? "+" : ""}${formatCentsToBrl(initialSummary.netBalanceCents)}`}
-              tone={initialSummary.netBalanceCents >= 0 ? "positive" : "negative"}
+              value={signedResult(initialSummary.netBalanceCents).value}
+              tone={signedResult(initialSummary.netBalanceCents).tone}
               subtitle={
                 <span className="tabular-nums">
                   Entradas {formatCentsToBrl(initialSummary.totalIncomeCents)} − Saídas{" "}

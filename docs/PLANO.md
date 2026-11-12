@@ -318,3 +318,10 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
   - No estado recolhido, as áreas, subpastas (`CollapsedFolderRail`) e `Configurações` exibem apenas ícones centralizados com `<Tooltip side="right">` utilizando o `<TooltipProvider>` raiz do layout.
 
 
+
+## 13. Finanças: segurança dos cliques (etapa 1 da revisão de usabilidade, 2026-11-12)
+
+- **Bolinha de pagar (`components/finance/pay-toggle.tsx`):** na Visão Geral e no Fluxo, a baixa é feita só pela bolinha (`role="checkbox"`). O selo de status virou texto ("vence 16/11", "venceu 05/11", "pago 12/11", "recebido", "a pagar"). Estado otimista com `useOptimistic`; a ação `setTransactionPaid` define o status de forma explícita (não alterna), para o "Desfazer" voltar exatamente ao estado anterior.
+- **"Desfazer" no lugar de `confirm()`:** exclusões de lançamento, notebook, categoria, conta/cartão e conta fixa mostram aviso de 10 s com "Desfazer" (`restoreFinanceItem` em `lib/actions/finance-restore.ts`, que limpa `deleted_at`). Remover meta de orçamento desfaz regravando o valor anterior.
+- **Correções:** "Ver todas as contas do mês" abre o Fluxo com todos os status; a "próxima" conta do aviso é escolhida por vencimento; resultado zero aparece neutro e sem "+" (`signedResult`).
+- **Bug encontrado nos testes:** `lib/actions/ofx-import.ts` exportava um objeto (`importOfxBatchSchema`) num arquivo `"use server"`, o que derrubava todas as ações do servidor em `/financas` (salvar lançamento falhava). O schema deixou de ser exportado.

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FinanceKpiStrip } from "./finance-hierarchy";
+import { toastWithUndo } from "./pay-toggle";
 
 interface BudgetsViewProps {
   budgets: BudgetRow[];
@@ -56,11 +57,21 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
     });
   };
 
-  const handleRemove = (catId: string) => {
+  const handleRemove = (row: BudgetRow) => {
+    const previousCents = row.budgetCents;
     startTransition(async () => {
-      const res = await deleteBudget(catId);
-      if (res.ok) toast.success("Meta removida.");
-      else toast.error(res.error);
+      const res = await deleteBudget(row.categoryId);
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      if (previousCents && previousCents > 0) {
+        toastWithUndo(`Meta de ${row.categoryName} removida.`, () =>
+          upsertBudget({ category_id: row.categoryId, amount_cents: previousCents }),
+        );
+      } else {
+        toast.success("Meta removida.");
+      }
     });
   };
 
@@ -142,7 +153,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                             variant="ghost"
                             size="sm"
                             className="size-8 p-0 text-muted-foreground hover:text-rose-400"
-                            onClick={() => handleRemove(row.categoryId)}
+                            onClick={() => handleRemove(row)}
                           >
                             <Trash2Icon className="size-3.5" />
                           </Button>
@@ -231,7 +242,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                               <PencilIcon className="size-3" />
                             </Button>
                             {hasBudget && (
-                              <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row.categoryId)}>
+                              <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row)}>
                                 <Trash2Icon className="size-3" />
                               </Button>
                             )}

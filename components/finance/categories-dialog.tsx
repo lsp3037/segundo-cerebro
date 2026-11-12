@@ -9,6 +9,7 @@ import {
   trashFinanceCategory,
   updateFinanceCategory,
 } from "@/lib/actions/finance";
+import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { FinanceCategory } from "@/lib/data/finance";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toastWithUndo } from "./pay-toggle";
 import { LEDGER_LABELS, type LedgerType } from "./meta";
 
 interface CategoriesDialogProps {
@@ -133,12 +135,10 @@ export function CategoriesDialog({
   };
 
   const handleDelete = (cat: FinanceCategory) => {
-    if (!confirm(`Deseja excluir a categoria "${cat.name}"?`)) return;
-
     startTransition(async () => {
       const res = await trashFinanceCategory(cat.id);
       if (res.ok) {
-        toast.success("Categoria excluída.");
+        toastWithUndo(`Categoria ${cat.name} excluída.`, () => restoreFinanceItem("category", cat.id));
         onSuccess?.();
       } else {
         toast.error(res.error);

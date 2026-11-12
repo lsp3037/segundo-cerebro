@@ -5,6 +5,7 @@ import { ArrowRightLeftIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-rea
 import { toast } from "sonner";
 
 import { deleteFinanceAccount, saveFinanceAccount, transferBetweenAccounts } from "@/lib/actions/finance-family";
+import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { AccountWithBalance } from "@/lib/data/finance-family";
 import { ACCOUNT_TYPE_LABELS, HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
 import { centsToInput, formatCentsToBrl, inputToCents } from "@/lib/money";
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FinanceKpiStrip } from "./finance-hierarchy";
+import { toastWithUndo } from "./pay-toggle";
 
 interface AccountsCardsViewProps {
   accounts: AccountWithBalance[];
@@ -86,11 +88,13 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
   };
 
   const handleDelete = (acc: AccountWithBalance) => {
-    if (!confirm(`Remover "${acc.name}"? Os lançamentos já salvos não serão apagados.`)) return;
     startTransition(async () => {
       const res = await deleteFinanceAccount(acc.id);
-      if (res.ok) toast.success("Removido.");
-      else toast.error(res.error);
+      if (res.ok) {
+        toastWithUndo(`${acc.name} foi removido. Os lançamentos continuam salvos.`, () =>
+          restoreFinanceItem("account", acc.id),
+        );
+      } else toast.error(res.error);
     });
   };
 

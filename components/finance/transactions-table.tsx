@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import {
-  CheckIcon,
   LaptopIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -13,7 +12,7 @@ import {
 import { toast } from "sonner";
 
 import { trashTransaction } from "@/lib/actions/finance";
-import { toggleTransactionPaid } from "@/lib/actions/finance-family";
+import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { FinanceCategory, Transaction } from "@/lib/data/finance";
 import { todayIso } from "@/lib/dates";
 import { billStatus } from "@/lib/finance/household";
@@ -28,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getPaymentMethodIcon, LEDGER_BADGES } from "./meta";
+import { PayCheck, toastWithUndo, usePayToggle } from "./pay-toggle";
 
 interface TransactionsTableProps {
   transactions: Transaction[];
@@ -44,7 +44,8 @@ export function TransactionsTable({
   onEditTransaction,
   onNewTransaction,
 }: TransactionsTableProps) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const { isPaid, toggle } = usePayToggle();
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "income" | "expense">("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">(initialStatusFilter);
@@ -70,28 +71,24 @@ export function TransactionsTable({
     });
   }, [transactions, kindFilter, statusFilter, categoryFilter, search]);
 
-  const handleTogglePaid = (tx: Transaction) => {
+  const handleDelete = (tx: Transaction) => {
     startTransition(async () => {
-      const res = await toggleTransactionPaid(tx.id);
+      const res = await trashTransaction(tx.id);
       if (res.ok) {
-        toast.success(res.data.status === "paid" ? `"${tx.description}" pago!` : `"${tx.description}" reaberto.`);
+        toastWithUndo(`${tx.description} foi para a lixeira.`, () => restoreFinanceItem("transaction", tx.id));
       } else {
         toast.error(res.error);
       }
     });
   };
 
-  const handleDelete = (id: string, description: string) => {
-    if (!confirm(`Deseja enviar o lançamento "${description}" para a lixeira?`)) return;
-
-    startTransition(async () => {
-      const res = await trashTransaction(id);
-      if (res.ok) {
-        toast.success("Lançamento excluído.");
-      } else {
-        toast.error(res.error);
-      }
-    });
+  // Texto de situação: diz o estado, sem parecer botão. Quem dá baixa é a bolinha.
+  const statusText = (tx: Transaction, paid: boolean, overdue: boolean, date: string) => {
+    const isIncome = tx.kind === "income";
+    if (paid) return { text: isIncome ? `recebido ${date}` : `pago ${date}`, className: "text-muted-foreground" };
+    if (!tx.due_date) return { text: isIncome ? "a receber" : "a pagar", className: "text-amber-400" };
+    if (overdue) return { text: isIncome ? `atrasado desde ${date}` : `venceu ${date}`, className: "text-rose-400" };
+    return { text: isIncome ? `a receber ${date}` : `vence ${date}`, className: "text-amber-400" };
   };
 
   return (
@@ -208,98 +205,79 @@ export function TransactionsTable({
             <div className="divide-y divide-border/60 md:hidden">
               {filteredTransactions.map((tx) => {
                 const isIncome = tx.kind === "income";
-                const st = billStatus({ status: tx.status ?? "paid", due_date: tx.due_date ?? null }, today);
-                const displayDate = tx.due_date || tx.date;
+                const paid = isPaid(tx);
+                const st = billStatus({ status: paid ? "paid" : "pending", due_date: tx.due_date ?? null }, today);
+                const displayDate = (paid ? tx.paid_at : null) || tx.due_date || tx.date;
                 const [, m, d] = displayDate.split("-");
-                const formattedDate = `${d}/${m}`;
+                const status = statusText(tx, paid, st === "overdue", `${d}/${m}`);
 
                 return (
                   <div
                     key={tx.id}
-                    className={`space-y-2 px-3.5 py-3 text-xs ${
+                    className={`flex items-start gap-1.5 py-2 pl-1.5 pr-1 text-xs ${
                       st === "overdue" ? "bg-rose-950/15" : ""
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onEditTransaction(tx)}
-                        className="min-w-0 flex-1 text-left"
-                      >
-                        <div className="truncate font-medium text-foreground">
+                    <PayCheck paid={paid} income={isIncome} label={tx.description} onToggle={() => toggle(tx)} />
+
+                    <button
+                      type="button"
+                      onClick={() => onEditTransaction(tx)}
+                      className="min-w-0 flex-1 cursor-pointer py-1 text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className={`truncate font-medium ${paid ? "text-muted-foreground" : "text-foreground"}`}>
                           {tx.description}
-                        </div>
-                        {tx.notebook && (
-                          <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-cyan-400">
-                            <LaptopIcon className="size-3" />
-                            <span>
-                              {tx.notebook.brand ? `${tx.notebook.brand} ` : ""}
-                              {tx.notebook.model}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-
-                      <span
-                        className={`shrink-0 text-sm font-semibold tabular-nums ${
-                          isIncome ? "text-emerald-400" : "text-rose-400"
-                        }`}
-                      >
-                        {isIncome ? "+" : "-"} {formatCentsToBrl(tx.amount_cents)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                        <span className="tabular-nums">{formattedDate}</span>
+                        </span>
+                        <span
+                          className={`shrink-0 text-sm font-semibold tabular-nums ${
+                            isIncome ? "text-emerald-400" : "text-rose-400"
+                          }`}
+                        >
+                          {isIncome ? "+" : "-"} {formatCentsToBrl(tx.amount_cents)}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
+                        <span className={`tabular-nums ${status.className}`}>{status.text}</span>
                         {tx.category && <span>· {tx.category.name}</span>}
                         {tx.member_label && <span>· {tx.member_label}</span>}
                       </div>
+                      {tx.notebook && (
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-cyan-400">
+                          <LaptopIcon className="size-3" />
+                          <span>
+                            {tx.notebook.brand ? `${tx.notebook.brand} ` : ""}
+                            {tx.notebook.model}
+                          </span>
+                        </div>
+                      )}
+                    </button>
 
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={isPending}
-                          onClick={() => handleTogglePaid(tx)}
-                          className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                            st === "paid"
-                              ? "border-border bg-muted/40 text-muted-foreground"
-                              : st === "overdue"
-                                ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
-                                : "border-amber-500/35 bg-amber-500/10 text-amber-300"
-                          }`}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="size-8 shrink-0 p-0 text-muted-foreground hover:text-foreground"
                         >
-                          <CheckIcon className="size-3" />
-                          {st === "paid" ? "Pago" : st === "overdue" ? "Atrasado" : "Pagar"}
-                        </button>
-
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="size-8 p-0 text-muted-foreground hover:text-foreground"
-                            >
-                              <MoreVerticalIcon className="size-3.5" />
-                              <span className="sr-only">Opções</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="text-xs">
-                            <DropdownMenuItem onClick={() => onEditTransaction(tx)} className="cursor-pointer gap-2">
-                              <PencilIcon className="size-3.5" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(tx.id, tx.description)}
-                              className="cursor-pointer gap-2 text-rose-400 focus:text-rose-400"
-                            >
-                              <Trash2Icon className="size-3.5" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
+                          <MoreVerticalIcon className="size-3.5" />
+                          <span className="sr-only">Opções de {tx.description}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="text-xs">
+                        <DropdownMenuItem onClick={() => onEditTransaction(tx)} className="cursor-pointer gap-2">
+                          <PencilIcon className="size-3.5" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(tx)}
+                          className="cursor-pointer gap-2 text-rose-400 focus:text-rose-400"
+                        >
+                          <Trash2Icon className="size-3.5" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })}
@@ -310,8 +288,8 @@ export function TransactionsTable({
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-border/70 bg-muted/20 text-[11px] font-medium text-muted-foreground">
-                    <th className="py-2.5 pl-4 pr-2">Status</th>
-                    <th className="px-3 py-2.5">Data / venc.</th>
+                    <th className="w-10 py-2.5 pl-2.5 pr-0"><span className="sr-only">Pago</span></th>
+                    <th className="px-3 py-2.5">Situação</th>
                     <th className="px-3 py-2.5">Descrição</th>
                     <th className="px-3 py-2.5">Categoria</th>
                     <th className="px-3 py-2.5">Pessoa / origem</th>
@@ -325,11 +303,12 @@ export function TransactionsTable({
                     const isIncome = tx.kind === "income";
                     const ledgerConfig = LEDGER_BADGES[tx.ledger as "pessoal" | "trustcare"];
                     const MethodIcon = getPaymentMethodIcon(tx.payment_method?.type);
-                    const st = billStatus({ status: tx.status ?? "paid", due_date: tx.due_date ?? null }, today);
+                    const paid = isPaid(tx);
+                    const st = billStatus({ status: paid ? "paid" : "pending", due_date: tx.due_date ?? null }, today);
 
-                    const displayDate = tx.due_date || tx.date;
+                    const displayDate = (paid ? tx.paid_at : null) || tx.due_date || tx.date;
                     const [, m, d] = displayDate.split("-");
-                    const formattedDate = `${d}/${m}`;
+                    const status = statusText(tx, paid, st === "overdue", `${d}/${m}`);
 
                     return (
                       <tr
@@ -338,32 +317,21 @@ export function TransactionsTable({
                           st === "overdue" ? "bg-rose-950/10" : ""
                         }`}
                       >
-                        <td className="whitespace-nowrap py-3 pl-4 pr-2">
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={() => handleTogglePaid(tx)}
-                            title={st === "paid" ? "Clique para reabrir como pendente" : "Clique para dar baixa (pagar)"}
-                            className={`inline-flex cursor-pointer items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                              st === "paid"
-                                ? "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-                                : st === "overdue"
-                                  ? "border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-emerald-500/15 hover:text-emerald-300"
-                                  : "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-emerald-500/15 hover:text-emerald-300"
-                            }`}
-                          >
-                            <CheckIcon className="size-3" />
-                            {st === "paid" ? "Pago" : st === "overdue" ? "Atrasado" : "Pendente"}
-                          </button>
+                        <td className="py-1.5 pl-2.5 pr-0">
+                          <PayCheck paid={paid} income={isIncome} label={tx.description} onToggle={() => toggle(tx)} />
                         </td>
 
-                        <td className="whitespace-nowrap px-3 py-3 text-[11px] tabular-nums text-muted-foreground">
-                          {formattedDate}
+                        <td className={`whitespace-nowrap px-3 py-3 text-[11px] tabular-nums ${status.className}`}>
+                          {status.text}
                         </td>
 
                         <td className="px-3 py-3">
-                          <div className="flex flex-col">
-                            <span className="font-medium text-foreground">
+                          <button
+                            type="button"
+                            onClick={() => onEditTransaction(tx)}
+                            className="flex cursor-pointer flex-col text-left"
+                          >
+                            <span className={`font-medium hover:underline ${paid ? "text-muted-foreground" : "text-foreground"}`}>
                               {tx.description}
                             </span>
                             {tx.notebook && (
@@ -378,7 +346,7 @@ export function TransactionsTable({
                                 {tx.notes}
                               </span>
                             )}
-                          </div>
+                          </button>
                         </td>
 
                         <td className="whitespace-nowrap px-3 py-3">
@@ -444,7 +412,7 @@ export function TransactionsTable({
                                 className="size-7 p-0 text-muted-foreground hover:text-foreground"
                               >
                                 <MoreVerticalIcon className="size-3.5" />
-                                <span className="sr-only">Opções</span>
+                                <span className="sr-only">Opções de {tx.description}</span>
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="text-xs">
@@ -456,7 +424,7 @@ export function TransactionsTable({
                                 Editar
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDelete(tx.id, tx.description)}
+                                onClick={() => handleDelete(tx)}
                                 className="cursor-pointer gap-2 text-rose-400 focus:text-rose-400"
                               >
                                 <Trash2Icon className="size-3.5" />

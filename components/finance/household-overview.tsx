@@ -1,23 +1,21 @@
 "use client";
 
-import { useTransition } from "react";
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
-  CheckIcon,
   ListChecksIcon,
 } from "lucide-react";
-import { toast } from "sonner";
 
-import { toggleTransactionPaid } from "@/lib/actions/finance-family";
 import type { HouseholdData, HouseholdTransaction } from "@/lib/data/finance-family";
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
+import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
+import { PayCheck, usePayToggle } from "./pay-toggle";
 
 interface HouseholdOverviewProps {
   data: HouseholdData;
   onGoToPendingFluxo: () => void;
+  onGoToAllFluxo: () => void;
   onOpenRecurringDialog: () => void;
   onEditTransaction: (tx: HouseholdTransaction) => void;
 }
@@ -25,14 +23,19 @@ interface HouseholdOverviewProps {
 export function HouseholdOverview({
   data,
   onGoToPendingFluxo,
+  onGoToAllFluxo,
   onOpenRecurringDialog,
   onEditTransaction,
 }: HouseholdOverviewProps) {
-  const [isPending, startTransition] = useTransition();
+  const { isPaid, toggle } = usePayToggle();
 
   const expenses = data.transactions.filter((t) => t.kind === "expense");
   const incomes = data.transactions.filter((t) => t.kind === "income");
-  const pendingExpenses = expenses.filter((t) => t.billStatus !== "paid");
+  const dueKey = (t: HouseholdTransaction) => t.due_date ?? t.date;
+  // Pendentes ordenadas por vencimento: a primeira é de fato a próxima a vencer.
+  const pendingExpenses = expenses
+    .filter((t) => t.billStatus !== "paid")
+    .sort((a, b) => dueKey(a).localeCompare(dueKey(b)));
   const overdueCount = pendingExpenses.filter((t) => t.billStatus === "overdue").length;
 
   const creditCards = data.accounts.filter((a) => a.type === "credit_card");
@@ -44,19 +47,8 @@ export function HouseholdOverview({
     const aPend = a.billStatus !== "paid" ? 0 : 1;
     const bPend = b.billStatus !== "paid" ? 0 : 1;
     if (aPend !== bPend) return aPend - bPend;
-    return (a.due_date ?? a.date).localeCompare(b.due_date ?? b.date);
+    return dueKey(a).localeCompare(dueKey(b));
   });
-
-  const handleTogglePay = (tx: HouseholdTransaction) => {
-    startTransition(async () => {
-      const res = await toggleTransactionPaid(tx.id);
-      if (res.ok) {
-        toast.success(res.data.status === "paid" ? `"${tx.description}" marcado como pago!` : `"${tx.description}" reaberto como pendente.`);
-      } else {
-        toast.error(res.error);
-      }
-    });
-  };
 
   return (
     <div className="space-y-5">
@@ -124,8 +116,8 @@ export function HouseholdOverview({
       {/* Nível 1: Resposta principal do mês */}
       <FinanceHero
         eyebrow="Saldo projetado do mês"
-        value={`${data.kpis.projectedBalanceCents >= 0 ? "+" : ""}${formatCentsToBrl(data.kpis.projectedBalanceCents)}`}
-        tone={data.kpis.projectedBalanceCents >= 0 ? "positive" : "negative"}
+        value={signedResult(data.kpis.projectedBalanceCents).value}
+        tone={signedResult(data.kpis.projectedBalanceCents).tone}
         subtitle={
           <span className="tabular-nums">
             Entradas {formatCentsToBrl(data.kpis.incomeCents)} − Saídas {formatCentsToBrl(data.kpis.expenseCents)} · Poupança{" "}
@@ -197,7 +189,7 @@ export function HouseholdOverview({
             <div>
               <h3 className="text-sm font-medium text-foreground">Contas do mês &amp; baixa rápida</h3>
               <p className="text-xs text-muted-foreground">
-                Clique na linha para editar ou em Pagar para dar baixa
+                Atrasadas e pendentes primeiro, por vencimento
               </p>
             </div>
             {pendingExpenses.length > 0 && (
@@ -214,19 +206,29 @@ export function HouseholdOverview({
           ) : (
             <div className="divide-y divide-border/60">
               {sortedBills.slice(0, 8).map((tx) => {
-                const isPaid = tx.billStatus === "paid";
-                const isOverdue = tx.billStatus === "overdue";
+                const paid = isPaid(tx);
+                const isOverdue = !paid && tx.billStatus === "overdue";
                 const dueLabel = tx.due_date ? `Vence dia ${tx.due_date.slice(8)}/${tx.due_date.slice(5, 7)}` : "Sem dia fixo";
 
                 return (
-                  <div key={tx.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
+                  <div key={tx.id} className="flex items-center gap-2 py-1.5 text-xs">
+                    <PayCheck
+                      paid={paid}
+                      label={tx.description}
+                      onToggle={() => toggle(tx)}
+                      className="-ml-1.5"
+                    />
                     <button
                       type="button"
                       onClick={() => onEditTransaction(tx)}
-                      className="group min-w-0 flex-1 cursor-pointer text-left"
+                      className="group min-w-0 flex-1 cursor-pointer py-1 text-left"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-foreground group-hover:underline">
+                        <span
+                          className={`truncate font-medium group-hover:underline ${
+                            paid ? "text-muted-foreground" : "text-foreground"
+                          }`}
+                        >
                           {tx.description}
                         </span>
                         {isOverdue && (
@@ -236,28 +238,13 @@ export function HouseholdOverview({
                         )}
                       </div>
                       <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        {tx.member_label ?? "Casa"} · {tx.categoryName ?? "Geral"} · {dueLabel}
+                        {tx.member_label ?? "Casa"} · {tx.categoryName ?? "Geral"} · {paid ? "Paga" : dueLabel}
                       </div>
                     </button>
 
-                    <div className="flex shrink-0 items-center gap-2.5">
-                      <span className={`font-medium tabular-nums ${isPaid ? "text-muted-foreground" : "text-foreground"}`}>
-                        {formatCentsToBrl(tx.amount_cents)}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={isPending}
-                        onClick={() => handleTogglePay(tx)}
-                        className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                          isPaid
-                            ? "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
-                            : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-emerald-950"
-                        }`}
-                      >
-                        <CheckIcon className="size-3" />
-                        {isPaid ? "Pago" : "Pagar"}
-                      </button>
-                    </div>
+                    <span className={`shrink-0 font-medium tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
+                      {formatCentsToBrl(tx.amount_cents)}
+                    </span>
                   </div>
                 );
               })}
@@ -266,7 +253,7 @@ export function HouseholdOverview({
 
           {sortedBills.length > 8 && (
             <div className="mt-3 border-t border-border/60 pt-2.5 text-right">
-              <button type="button" onClick={onGoToPendingFluxo} className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+              <button type="button" onClick={onGoToAllFluxo} className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
                 Ver todas as {sortedBills.length} contas do mês &rarr;
               </button>
             </div>

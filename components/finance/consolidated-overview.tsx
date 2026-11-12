@@ -2,7 +2,7 @@
 
 import type { FinanceSummary } from "@/lib/data/finance";
 import { formatCentsToBrl } from "@/lib/money";
-import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
+import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { MonthlyChart } from "./monthly-chart";
 
 interface ConsolidatedOverviewProps {
@@ -22,8 +22,8 @@ export function ConsolidatedOverview({
     <div className="space-y-5">
       <FinanceHero
         eyebrow="Resultado consolidado do mês"
-        value={`${summary.netBalanceCents >= 0 ? "+" : ""}${formatCentsToBrl(summary.netBalanceCents)}`}
-        tone={summary.netBalanceCents >= 0 ? "positive" : "negative"}
+        value={signedResult(summary.netBalanceCents).value}
+        tone={signedResult(summary.netBalanceCents).tone}
         subtitle={
           <span className="tabular-nums">
             Entradas {formatCentsToBrl(summary.totalIncomeCents)} − Saídas{" "}
@@ -43,8 +43,8 @@ export function ConsolidatedOverview({
           {
             id: "pessoal",
             label: "Pessoal & Familiar",
-            value: `${pessoal.netCents >= 0 ? "+" : ""}${formatCentsToBrl(pessoal.netCents)}`,
-            tone: pessoal.netCents >= 0 ? "positive" : "negative",
+            value: signedResult(pessoal.netCents).value,
+            tone: signedResult(pessoal.netCents).tone,
             badge: (
               <span className="text-[11px] tabular-nums text-muted-foreground">
                 {pessoal.transactionCount} itens
@@ -75,8 +75,8 @@ export function ConsolidatedOverview({
           {
             id: "trustcare",
             label: "Trust Care (Empresa)",
-            value: `${trustcare.netCents >= 0 ? "+" : ""}${formatCentsToBrl(trustcare.netCents)}`,
-            tone: trustcare.netCents >= 0 ? "positive" : "negative",
+            value: signedResult(trustcare.netCents).value,
+            tone: signedResult(trustcare.netCents).tone,
             badge: (
               <span className="text-[11px] tabular-nums text-muted-foreground">
                 {trustcare.transactionCount} itens
