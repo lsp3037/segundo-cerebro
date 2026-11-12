@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
-import type { Tables } from "@/lib/supabase/database.types";
+import { ensureMonthBills } from "@/lib/data/finance-family";
+import { addMonths, todayIso } from "@/lib/dates";
+import { monthKey, splitInstallments } from "@/lib/finance/household";
+import type { Tables, TablesInsert } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
 
@@ -24,6 +27,12 @@ const transactionSchema = z.object({
   payment_method_id: z.string().uuid().nullable().optional(),
   notebook_id: z.string().uuid().nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
+  status: z.enum(["paid", "pending"]).optional(),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  paid_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  account_id: z.string().uuid().nullable().optional(),
+  member_label: z.string().trim().max(40).nullable().optional(),
+  installment_total: z.number().int().min(2).max(120).optional(),
 });
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
@@ -34,19 +43,70 @@ export async function createTransaction(input: TransactionInput): Promise<Action
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const supabase = await createClient();
+  const d = parsed.data;
+  const status = d.status ?? "paid";
+  const basePaidAt = status === "paid" ? (d.paid_at ?? todayIso()) : null;
+
+  // Compra parcelada (2x a 120x): gera uma linha por mês mantendo o total exato
+  if (d.installment_total && d.installment_total >= 2) {
+    const parts = splitInstallments(d.amount_cents, d.installment_total);
+    const groupId = crypto.randomUUID();
+    const rows: TablesInsert<"transactions">[] = parts.map((amount, idx) => {
+      const firstPaid = idx === 0 && status === "paid";
+      return {
+        user_id: user.id,
+        ledger: d.ledger,
+        kind: d.kind,
+        amount_cents: amount,
+        date: addMonths(d.date, idx),
+        due_date: d.due_date ? addMonths(d.due_date, idx) : addMonths(d.date, idx),
+        paid_at: firstPaid ? basePaidAt : null,
+        status: firstPaid ? "paid" : "pending",
+        description: `${d.description} (${idx + 1}/${d.installment_total})`,
+        category_id: d.category_id ?? null,
+        payment_method_id: d.payment_method_id ?? null,
+        account_id: d.account_id ?? null,
+        member_label: d.member_label ?? null,
+        notebook_id: d.notebook_id ?? null,
+        notes: d.notes ?? null,
+        installment_group_id: groupId,
+        installment_index: idx + 1,
+        installment_total: d.installment_total,
+      };
+    });
+
+    const { data, error } = await supabase.from("transactions").insert(rows).select("*");
+    if (error || !data || data.length === 0) {
+      console.error("createTransaction (installments) error:", error);
+      return fail("Não foi possível salvar as parcelas.");
+    }
+
+    if (d.ledger === "pessoal" && d.kind === "income") {
+      await ensureMonthBills(user.id, monthKey(d.date));
+    }
+
+    revalidatePath("/", "layout");
+    return ok(data[0]);
+  }
+
   const { data, error } = await supabase
     .from("transactions")
     .insert({
       user_id: user.id,
-      ledger: parsed.data.ledger,
-      kind: parsed.data.kind,
-      amount_cents: parsed.data.amount_cents,
-      date: parsed.data.date,
-      description: parsed.data.description,
-      category_id: parsed.data.category_id ?? null,
-      payment_method_id: parsed.data.payment_method_id ?? null,
-      notebook_id: parsed.data.notebook_id ?? null,
-      notes: parsed.data.notes ?? null,
+      ledger: d.ledger,
+      kind: d.kind,
+      amount_cents: d.amount_cents,
+      date: d.date,
+      due_date: d.due_date ?? null,
+      paid_at: basePaidAt,
+      status,
+      description: d.description,
+      category_id: d.category_id ?? null,
+      payment_method_id: d.payment_method_id ?? null,
+      account_id: d.account_id ?? null,
+      member_label: d.member_label ?? null,
+      notebook_id: d.notebook_id ?? null,
+      notes: d.notes ?? null,
     })
     .select("*")
     .single();
@@ -54,6 +114,10 @@ export async function createTransaction(input: TransactionInput): Promise<Action
   if (error) {
     console.error("createTransaction error:", error);
     return fail("Não foi possível salvar o lançamento.");
+  }
+
+  if (d.ledger === "pessoal" && d.kind === "income") {
+    await ensureMonthBills(user.id, monthKey(d.date));
   }
 
   revalidatePath("/", "layout");
@@ -67,14 +131,21 @@ export async function updateTransaction(
   const user = await getCurrentUser();
   if (!id.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
-  const parsed = transactionSchema.partial().safeParse(patch);
+  const parsed = transactionSchema.omit({ installment_total: true }).partial().safeParse(patch);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const supabase = await createClient();
+  const nextPatch = { ...parsed.data };
+  if (nextPatch.status === "paid" && nextPatch.paid_at === undefined) {
+    nextPatch.paid_at = todayIso();
+  } else if (nextPatch.status === "pending") {
+    nextPatch.paid_at = null;
+  }
+
   const { data, error } = await supabase
     .from("transactions")
     .update({
-      ...parsed.data,
+      ...nextPatch,
       updated_at: new Date().toISOString(),
     })
     .eq("id", transactionId)
@@ -87,6 +158,10 @@ export async function updateTransaction(
     return fail("Não foi possível atualizar o lançamento.");
   }
 
+  if (data.ledger === "pessoal" && data.kind === "income") {
+    await ensureMonthBills(user.id, monthKey(data.date));
+  }
+
   revalidatePath("/", "layout");
   return ok(data);
 }
@@ -96,15 +171,21 @@ export async function trashTransaction(transactionId: string): Promise<ActionRes
   if (!id.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("transactions")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", transactionId)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("ledger, kind, date")
+    .maybeSingle();
 
   if (error) {
     console.error("trashTransaction error:", error);
     return fail("Não foi possível excluir o lançamento.");
+  }
+
+  if (data?.ledger === "pessoal" && data.kind === "income") {
+    await ensureMonthBills(user.id, monthKey(data.date));
   }
 
   revalidatePath("/", "layout");
