@@ -505,6 +505,89 @@ export type Database = {
           },
         ]
       }
+      finance_accounts: {
+        Row: {
+          active: boolean
+          created_at: string
+          credit_limit_cents: number | null
+          deleted_at: string | null
+          due_day: number | null
+          id: string
+          name: string
+          opening_balance_cents: number
+          owner_label: string | null
+          sort_order: number
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          credit_limit_cents?: number | null
+          deleted_at?: string | null
+          due_day?: number | null
+          id?: string
+          name: string
+          opening_balance_cents?: number
+          owner_label?: string | null
+          sort_order?: number
+          type: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          credit_limit_cents?: number | null
+          deleted_at?: string | null
+          due_day?: number | null
+          id?: string
+          name?: string
+          opening_balance_cents?: number
+          owner_label?: string | null
+          sort_order?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_budgets: {
+        Row: {
+          amount_cents: number
+          category_id: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          category_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount_cents?: number
+          category_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_categories: {
         Row: {
           color: string | null
@@ -549,6 +632,78 @@ export type Database = {
           {
             foreignKeyName: "finance_categories_parent_id_fkey"
             columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "finance_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_recurring_bills: {
+        Row: {
+          account_id: string | null
+          active: boolean
+          amount_cents: number
+          amount_mode: string
+          category_id: string | null
+          created_at: string
+          deleted_at: string | null
+          description: string
+          due_day: number | null
+          id: string
+          kind: string
+          member_label: string | null
+          percent_bp: number | null
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          active?: boolean
+          amount_cents?: number
+          amount_mode?: string
+          category_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description: string
+          due_day?: number | null
+          id?: string
+          kind?: string
+          member_label?: string | null
+          percent_bp?: number | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          account_id?: string | null
+          active?: boolean
+          amount_cents?: number
+          amount_mode?: string
+          category_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          description?: string
+          due_day?: number | null
+          id?: string
+          kind?: string
+          member_label?: string | null
+          percent_bp?: number | null
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_recurring_bills_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "finance_recurring_bills_category_id_fkey"
+            columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "finance_categories"
             referencedColumns: ["id"]
@@ -1762,6 +1917,7 @@ export type Database = {
       }
       transactions: {
         Row: {
+          account_id: string | null
           amount_cents: number
           bank_fitid: string | null
           category_id: string | null
@@ -1769,16 +1925,25 @@ export type Database = {
           date: string
           deleted_at: string | null
           description: string
+          due_date: string | null
           id: string
+          installment_group_id: string | null
+          installment_index: number | null
+          installment_total: number | null
           kind: string
           ledger: string
+          member_label: string | null
           notebook_id: string | null
           notes: string | null
+          paid_at: string | null
           payment_method_id: string | null
+          recurring_bill_id: string | null
+          status: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           amount_cents: number
           bank_fitid?: string | null
           category_id?: string | null
@@ -1786,16 +1951,25 @@ export type Database = {
           date: string
           deleted_at?: string | null
           description: string
+          due_date?: string | null
           id?: string
+          installment_group_id?: string | null
+          installment_index?: number | null
+          installment_total?: number | null
           kind: string
           ledger: string
+          member_label?: string | null
           notebook_id?: string | null
           notes?: string | null
+          paid_at?: string | null
           payment_method_id?: string | null
+          recurring_bill_id?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }
         Update: {
+          account_id?: string | null
           amount_cents?: number
           bank_fitid?: string | null
           category_id?: string | null
@@ -1803,16 +1977,38 @@ export type Database = {
           date?: string
           deleted_at?: string | null
           description?: string
+          due_date?: string | null
           id?: string
+          installment_group_id?: string | null
+          installment_index?: number | null
+          installment_total?: number | null
           kind?: string
           ledger?: string
+          member_label?: string | null
           notebook_id?: string | null
           notes?: string | null
+          paid_at?: string | null
           payment_method_id?: string | null
+          recurring_bill_id?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "finance_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_bill_id_fkey"
+            columns: ["recurring_bill_id"]
+            isOneToOne: false
+            referencedRelation: "finance_recurring_bills"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_category_id_fkey"
             columns: ["category_id"]

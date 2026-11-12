@@ -284,7 +284,7 @@ export async function getTransactions(params?: {
 
   let query = supabase
     .from("transactions")
-    .select("id, user_id, ledger, kind, amount_cents, date, description, notes, category_id, payment_method_id, notebook_id, created_at, updated_at, deleted_at")
+    .select("*")
     .is("deleted_at", null)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
