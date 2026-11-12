@@ -29,6 +29,7 @@ import {
   getPaymentMethods,
   getTransactions,
 } from "@/lib/data/finance";
+import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getMarketingCampaigns, getCampaignAngles, getMetaAdsMetrics, getMarketingContentScripts } from "@/lib/data/marketing";
@@ -167,25 +168,31 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
         m?: string;
         ledger?: string;
         tab?: string;
+        member?: string;
       };
       const user = await getCurrentUser();
       await ensureDefaultFinanceData(user.id);
 
       const folderConfig = folder.config as { ledger?: "pessoal" | "trustcare" } | null;
       const targetLedger: "all" | "pessoal" | "trustcare" =
-        (searchParams.ledger as "all" | "pessoal" | "trustcare") || folderConfig?.ledger || "all";
+        (searchParams.ledger as "all" | "pessoal" | "trustcare") || folderConfig?.ledger || "pessoal";
 
       const currentMonth =
         typeof searchParams.m === "string" && /^\d{4}-\d{2}$/.test(searchParams.m)
           ? searchParams.m
           : todayIso().slice(0, 7);
 
-      const [summary, transactions, notebooks, categories, paymentMethods] = await Promise.all([
+      const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
+
+      await ensureMonthBills(user.id, currentMonth);
+
+      const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
         getFinanceSummary({ ledger: targetLedger, month: currentMonth }),
         getTransactions({ ledger: targetLedger, month: currentMonth }),
         getNotebooks(),
         getFinanceCategories(),
         getPaymentMethods(),
+        getHouseholdData({ month: currentMonth, member: currentMember }),
       ]);
 
       content = (
@@ -193,10 +200,12 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           initialSummary={summary}
           initialTransactions={transactions}
           initialNotebooks={notebooks}
+          householdData={householdData}
           categories={categories}
           paymentMethods={paymentMethods}
           currentMonth={currentMonth}
           currentLedger={targetLedger}
+          currentMember={currentMember}
           baseFolderId={folder.id}
         />
       );

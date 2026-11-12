@@ -2,8 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import {
-  ArrowDownRightIcon,
-  ArrowUpRightIcon,
+  CheckIcon,
   LaptopIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -14,7 +13,10 @@ import {
 import { toast } from "sonner";
 
 import { trashTransaction } from "@/lib/actions/finance";
+import { toggleTransactionPaid } from "@/lib/actions/finance-family";
 import type { FinanceCategory, PaymentMethod, Transaction } from "@/lib/data/finance";
+import { todayIso } from "@/lib/dates";
+import { billStatus } from "@/lib/finance/household";
 import { formatCentsToBrl } from "@/lib/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +34,7 @@ interface TransactionsTableProps {
   transactions: Transaction[];
   categories: FinanceCategory[];
   paymentMethods: PaymentMethod[];
+  initialStatusFilter?: "all" | "pending" | "paid";
   onEditTransaction: (tx: Transaction) => void;
   onNewTransaction: () => void;
 }
@@ -40,17 +43,22 @@ export function TransactionsTable({
   transactions,
   categories,
   paymentMethods,
+  initialStatusFilter = "all",
   onEditTransaction,
   onNewTransaction,
 }: TransactionsTableProps) {
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<"all" | "income" | "expense">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">(initialStatusFilter);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const today = todayIso();
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
       if (kindFilter !== "all" && t.kind !== kindFilter) return false;
+      if (statusFilter === "pending" && t.status === "paid") return false;
+      if (statusFilter === "paid" && t.status !== "paid") return false;
       if (categoryFilter !== "all" && t.category_id !== categoryFilter) return false;
       if (search.trim()) {
         const query = search.toLowerCase();
@@ -58,11 +66,23 @@ export function TransactionsTable({
         const matchNotes = t.notes?.toLowerCase().includes(query) ?? false;
         const matchCategory = t.category?.name.toLowerCase().includes(query) ?? false;
         const matchNotebook = t.notebook?.model.toLowerCase().includes(query) ?? false;
-        if (!matchDesc && !matchNotes && !matchCategory && !matchNotebook) return false;
+        const matchMember = t.member_label?.toLowerCase().includes(query) ?? false;
+        if (!matchDesc && !matchNotes && !matchCategory && !matchNotebook && !matchMember) return false;
       }
       return true;
     });
-  }, [transactions, kindFilter, categoryFilter, search]);
+  }, [transactions, kindFilter, statusFilter, categoryFilter, search]);
+
+  const handleTogglePaid = (tx: Transaction) => {
+    startTransition(async () => {
+      const res = await toggleTransactionPaid(tx.id);
+      if (res.ok) {
+        toast.success(res.data.status === "paid" ? `"${tx.description}" pago!` : `"${tx.description}" reaberto.`);
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
 
   const handleDelete = (id: string, description: string) => {
     if (!confirm(`Deseja enviar o lançamento "${description}" para a lixeira?`)) return;
@@ -124,6 +144,28 @@ export function TransactionsTable({
             </button>
           </div>
 
+          {/* Filtro Status: Todos, Pendentes, Pagos */}
+          <div className="inline-flex rounded-lg bg-muted/40 p-0.5 border border-border/60 text-xs">
+            {(
+              [
+                { id: "all", label: "Todos" },
+                { id: "pending", label: "Pendentes" },
+                { id: "paid", label: "Pagos" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setStatusFilter(opt.id)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  statusFilter === opt.id ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           {/* Filtro por Categoria */}
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="h-9 w-40 text-xs bg-card/60 border-border/70">
@@ -169,11 +211,12 @@ export function TransactionsTable({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-border/60 bg-muted/30 text-[11px] font-semibold text-muted-foreground">
-                  <th className="py-2.5 pl-4 pr-2">Data</th>
+                  <th className="py-2.5 pl-4 pr-2">Status</th>
+                  <th className="px-3 py-2.5">Data / Venc.</th>
                   <th className="px-3 py-2.5">Descrição</th>
                   <th className="px-3 py-2.5">Categoria</th>
-                  <th className="px-3 py-2.5">Origem</th>
-                  <th className="px-3 py-2.5">Pagamento</th>
+                  <th className="px-3 py-2.5">Pessoa / Origem</th>
+                  <th className="px-3 py-2.5">Conta / Pagamento</th>
                   <th className="px-3 py-2.5 text-right">Valor</th>
                   <th className="py-2.5 pl-2 pr-4 text-right">Ações</th>
                 </tr>
@@ -183,18 +226,41 @@ export function TransactionsTable({
                   const isIncome = tx.kind === "income";
                   const ledgerConfig = LEDGER_BADGES[tx.ledger as "pessoal" | "trustcare"];
                   const MethodIcon = getPaymentMethodIcon(tx.payment_method?.type);
+                  const st = billStatus({ status: tx.status ?? "paid", due_date: tx.due_date ?? null }, today);
 
-                  // Formata data YYYY-MM-DD para DD/MM
-                  const [y, m, d] = tx.date.split("-");
+                  const displayDate = tx.due_date || tx.date;
+                  const [, m, d] = displayDate.split("-");
                   const formattedDate = `${d}/${m}`;
 
                   return (
                     <tr
                       key={tx.id}
-                      className="group transition-colors hover:bg-muted/30"
+                      className={`group transition-colors hover:bg-muted/30 ${
+                        st === "overdue" ? "bg-rose-950/10" : st === "pending" ? "bg-amber-950/10" : ""
+                      }`}
                     >
-                      {/* Data */}
-                      <td className="py-3 pl-4 pr-2 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
+                      {/* Status (Baixa em 1 clique) */}
+                      <td className="py-3 pl-4 pr-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          disabled={isPending}
+                          onClick={() => handleTogglePaid(tx)}
+                          title={st === "paid" ? "Clique para reabrir como pendente" : "Clique para dar baixa (pagar)"}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                            st === "paid"
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                              : st === "overdue"
+                                ? "border-rose-500/40 bg-rose-500/15 text-rose-300 hover:bg-emerald-500/20 hover:text-emerald-300"
+                                : "border-amber-500/35 bg-amber-500/10 text-amber-300 hover:bg-emerald-500/20 hover:text-emerald-300"
+                          }`}
+                        >
+                          <CheckIcon className="size-3" />
+                          {st === "paid" ? "Pago" : st === "overdue" ? "Atrasado" : "Pendente"}
+                        </button>
+                      </td>
+
+                      {/* Data / Vencimento */}
+                      <td className="px-3 py-3 font-mono text-[11px] text-muted-foreground whitespace-nowrap">
                         {formattedDate}
                       </td>
 
@@ -234,20 +300,29 @@ export function TransactionsTable({
                         )}
                       </td>
 
-                      {/* Origem (Pessoal vs Trust Care) */}
+                      {/* Pessoa / Origem */}
                       <td className="px-3 py-3 whitespace-nowrap">
-                        {ledgerConfig && (
-                          <span
-                            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${ledgerConfig.className}`}
-                          >
-                            {ledgerConfig.label}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          {tx.member_label && (
+                            <span className="inline-flex items-center rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                              {tx.member_label}
+                            </span>
+                          )}
+                          {ledgerConfig && (
+                            <span
+                              className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${ledgerConfig.className}`}
+                            >
+                              {ledgerConfig.label}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
-                      {/* Pagamento */}
+                      {/* Conta / Pagamento */}
                       <td className="px-3 py-3 whitespace-nowrap">
-                        {tx.payment_method ? (
+                        {tx.account ? (
+                          <span className="text-muted-foreground">{tx.account.name}</span>
+                        ) : tx.payment_method ? (
                           <div className="flex items-center gap-1.5 text-muted-foreground">
                             <MethodIcon className="size-3.5 text-muted-foreground" />
                             <span>{tx.payment_method.name}</span>

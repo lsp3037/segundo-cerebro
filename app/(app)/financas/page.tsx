@@ -11,6 +11,7 @@ import {
   getPaymentMethods,
   getTransactions,
 } from "@/lib/data/finance";
+import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
@@ -31,22 +32,25 @@ export default async function Page(props: PageProps<"/financas">) {
       ? searchParams.m
       : todayIso().slice(0, 7);
 
-  // Ledger padrão
-  let currentLedger: "all" | "pessoal" | "trustcare" = "all";
-  if (searchParams.ledger === "pessoal" || searchParams.ledger === "trustcare") {
+  await ensureMonthBills(user.id, currentMonth);
+
+  // Ledger padrão: Pessoal & Familiar (prioridade da casa)
+  let currentLedger: "all" | "pessoal" | "trustcare" = "pessoal";
+  if (searchParams.ledger === "all" || searchParams.ledger === "pessoal" || searchParams.ledger === "trustcare") {
     currentLedger = searchParams.ledger;
-  } else if (area?.slug === "pessoal") {
-    currentLedger = "pessoal";
   } else if (area?.slug === "trustcare" || area?.slug === "profissional") {
     currentLedger = "trustcare";
   }
 
-  const [summary, transactions, notebooks, categories, paymentMethods] = await Promise.all([
+  const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
+
+  const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
     getFinanceSummary({ ledger: currentLedger, month: currentMonth }),
     getTransactions({ ledger: currentLedger, month: currentMonth }),
     getNotebooks(),
     getFinanceCategories(),
     getPaymentMethods(),
+    getHouseholdData({ month: currentMonth, member: currentMember }),
   ]);
 
   return (
@@ -54,10 +58,12 @@ export default async function Page(props: PageProps<"/financas">) {
       initialSummary={summary}
       initialTransactions={transactions}
       initialNotebooks={notebooks}
+      householdData={householdData}
       categories={categories}
       paymentMethods={paymentMethods}
       currentMonth={currentMonth}
       currentLedger={currentLedger}
+      currentMember={currentMember}
     />
   );
 }

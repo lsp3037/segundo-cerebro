@@ -8,13 +8,16 @@ import {
   BarChart3Icon,
   CalendarIcon,
   FileSpreadsheetIcon,
+  LandmarkIcon,
   LaptopIcon,
+  LayoutDashboardIcon,
+  ListChecksIcon,
   PieChartIcon,
   PlusIcon,
   ReceiptTextIcon,
   RotateCcwIcon,
   TagIcon,
-  WalletIcon,
+  TargetIcon,
 } from "lucide-react";
 
 import type {
@@ -24,16 +27,24 @@ import type {
   PaymentMethod,
   Transaction,
 } from "@/lib/data/finance";
+import type { HouseholdData } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
+import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
+import { AccountsCardsView } from "./accounts-cards-view";
+import { BudgetsView } from "./budgets-view";
 import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
-import { LEDGER_LABELS, type LedgerType } from "./meta";
+import { HouseholdOverview } from "./household-overview";
+import { type LedgerType } from "./meta";
 import { MetricsCards } from "./metrics-cards";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
 import { OfxImportDialog } from "./ofx-import-dialog";
+import { RecurringBillsDialog } from "./recurring-bills-dialog";
+import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
@@ -42,10 +53,12 @@ interface FinanceDashboardProps {
   initialSummary: FinanceSummary;
   initialTransactions: Transaction[];
   initialNotebooks: Notebook[];
+  householdData: HouseholdData;
   categories: FinanceCategory[];
   paymentMethods: PaymentMethod[];
   currentMonth: string; // YYYY-MM
   currentLedger: LedgerType;
+  currentMember: string | null;
   baseFolderId?: string;
 }
 
@@ -53,23 +66,24 @@ export function FinanceDashboard({
   initialSummary,
   initialTransactions,
   initialNotebooks,
+  householdData,
   categories,
   paymentMethods,
   currentMonth,
   currentLedger,
-  baseFolderId,
+  currentMember,
 }: FinanceDashboardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
-  // Abas internas: 'fluxo' | 'notebooks' | 'categorias'
-  const activeTab = searchParams.get("tab") || "fluxo";
+  const defaultTab = currentLedger === "pessoal" ? "visao" : "fluxo";
+  const activeTab = searchParams.get("tab") || defaultTab;
 
   // Diálogos de criação / edição
   const [txDialogOpen, setTxDialogOpen] = useState(false);
-  const [txToEdit, setTxToEdit] = useState<Transaction | null>(null);
+  const [txToEdit, setTxToEdit] = useState<Tables<"transactions"> | null>(null);
   const [txDefaultLedger, setTxDefaultLedger] = useState<"pessoal" | "trustcare">(
     currentLedger === "trustcare" ? "trustcare" : "pessoal"
   );
@@ -82,6 +96,8 @@ export function FinanceDashboard({
   const [nbToSell, setNbToSell] = useState<Notebook | null>(null);
   const [ofxDialogOpen, setOfxDialogOpen] = useState(false);
   const [catDialogOpen, setCatDialogOpen] = useState(false);
+  const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
+  const [fluxoStatusFilter, setFluxoStatusFilter] = useState<"all" | "pending" | "paid">("all");
 
   // Mês atual real em Cuiabá
   const realCurrentMonth = todayIso().slice(0, 7);
@@ -142,7 +158,7 @@ export function FinanceDashboard({
     setTxDialogOpen(true);
   };
 
-  const handleEditTransaction = (tx: Transaction) => {
+  const handleEditTransaction = (tx: Tables<"transactions">) => {
     setTxToEdit(tx);
     setTxDialogOpen(true);
   };
@@ -182,7 +198,12 @@ export function FinanceDashboard({
               <button
                 key={ldg}
                 type="button"
-                onClick={() => updateParams({ ledger: ldg === "all" ? null : ldg })}
+                onClick={() =>
+                  updateParams({
+                    ledger: ldg,
+                    tab: ldg === "pessoal" ? "visao" : ldg === "trustcare" ? "fluxo" : activeTab,
+                  })
+                }
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                   isSelected
                     ? "bg-background text-foreground shadow-sm border border-border/80"
@@ -241,6 +262,19 @@ export function FinanceDashboard({
             </Button>
           )}
 
+          {/* Contas Fixas & Dízimo (Pessoal/Familiar) */}
+          {currentLedger !== "trustcare" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRecurringDialogOpen(true)}
+              className="h-8 gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+            >
+              <ListChecksIcon className="size-3.5" />
+              Contas Fixas &amp; Dízimo
+            </Button>
+          )}
+
           {/* Importar Extrato OFX */}
           <Button
             variant="outline"
@@ -287,38 +321,103 @@ export function FinanceDashboard({
         </div>
       </div>
 
-      {/* 2. Cards de Métricas e KPIs Executivos */}
-      <MetricsCards
-        totalIncomeCents={initialSummary.totalIncomeCents}
-        totalExpenseCents={initialSummary.totalExpenseCents}
-        netBalanceCents={initialSummary.netBalanceCents}
-        profitMarginPercent={initialSummary.profitMarginPercent}
-        transactionCount={initialSummary.transactionCount}
-        ledger={currentLedger}
-      />
+      {/* 2. Cards de Métricas (omitido quando na Visão Geral Pessoal, que já exibe os 4 KPIs familiares) */}
+      {activeTab !== "visao" && (
+        <MetricsCards
+          totalIncomeCents={initialSummary.totalIncomeCents}
+          totalExpenseCents={initialSummary.totalExpenseCents}
+          netBalanceCents={initialSummary.netBalanceCents}
+          profitMarginPercent={initialSummary.profitMarginPercent}
+          transactionCount={initialSummary.transactionCount}
+          ledger={currentLedger}
+        />
+      )}
 
-      {/* 3. Abas Principais (Linear / Oil UI Sem Sobreposição de Borda) */}
+      {/* 3. Sub-abas + Filtro de Pessoa */}
       <div className="space-y-4">
-        <div className="border-b border-border/60">
-          <nav className="-mb-px flex gap-6" aria-label="Abas financeiras">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60">
+          <nav className="-mb-px flex gap-5 overflow-x-auto" aria-label="Abas financeiras">
+            {currentLedger !== "trustcare" && (
+              <button
+                type="button"
+                onClick={() => updateParams({ tab: "visao" })}
+                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === "visao"
+                    ? "border-emerald-400 text-emerald-400"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                <LayoutDashboardIcon className="size-4" />
+                Visão Geral
+              </button>
+            )}
+
+            {currentLedger !== "trustcare" && (
+              <button
+                type="button"
+                onClick={() => updateParams({ tab: "contas" })}
+                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === "contas"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                <LandmarkIcon className="size-4" />
+                Contas &amp; Cartões
+              </button>
+            )}
+
+            {currentLedger !== "trustcare" && (
+              <button
+                type="button"
+                onClick={() => updateParams({ tab: "orcamentos" })}
+                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === "orcamentos"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                <TargetIcon className="size-4" />
+                Orçamentos
+              </button>
+            )}
+
+            {currentLedger !== "trustcare" && (
+              <button
+                type="button"
+                onClick={() => updateParams({ tab: "relatorios" })}
+                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
+                  activeTab === "relatorios"
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                <BarChart3Icon className="size-4" />
+                Relatórios &amp; KPIs
+              </button>
+            )}
+
             <button
               type="button"
-              onClick={() => updateParams({ tab: "fluxo" })}
-              className={`flex items-center gap-2 border-b-2 py-3 text-xs font-semibold transition-colors ${
+              onClick={() => {
+                setFluxoStatusFilter("all");
+                updateParams({ tab: "fluxo" });
+              }}
+              className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
                 activeTab === "fluxo"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
               }`}
             >
               <ReceiptTextIcon className="size-4" />
-              Lançamentos & Fluxo
+              Fluxo &amp; Vencimentos
             </button>
 
             {(currentLedger === "all" || currentLedger === "trustcare") && (
               <button
                 type="button"
                 onClick={() => updateParams({ tab: "notebooks" })}
-                className={`flex items-center gap-2 border-b-2 py-3 text-xs font-semibold transition-colors ${
+                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
                   activeTab === "notebooks"
                     ? "border-cyan-500 text-cyan-400"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
@@ -335,26 +434,85 @@ export function FinanceDashboard({
             <button
               type="button"
               onClick={() => updateParams({ tab: "categorias" })}
-              className={`flex items-center gap-2 border-b-2 py-3 text-xs font-semibold transition-colors ${
+              className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
                 activeTab === "categorias"
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
               }`}
             >
               <PieChartIcon className="size-4" />
-              Relatório por Categoria
+              Categorias
             </button>
           </nav>
+
+          {currentLedger !== "trustcare" && (
+            <div className="flex items-center gap-1 pb-2 text-xs">
+              <span className="text-[11px] text-muted-foreground mr-1">Pessoa:</span>
+              <button
+                type="button"
+                onClick={() => updateParams({ member: null })}
+                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                  !currentMember
+                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Todos
+              </button>
+              {HOUSEHOLD_MEMBERS.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => updateParams({ member: m })}
+                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                    currentMember === m
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Conteúdo da Aba 1: Lançamentos & Gráfico */}
+        {/* Tela 1: Visão Geral (Cockpit Pessoal & Familiar) */}
+        {activeTab === "visao" && (
+          <HouseholdOverview
+            data={householdData}
+            onGoToPendingFluxo={() => {
+              setFluxoStatusFilter("pending");
+              updateParams({ tab: "fluxo" });
+            }}
+            onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
+            onEditTransaction={handleEditTransaction}
+          />
+        )}
+
+        {/* Tela 2: Contas & Cartões */}
+        {activeTab === "contas" && <AccountsCardsView accounts={householdData.accounts} />}
+
+        {/* Tela 3: Orçamentos da Casa */}
+        {activeTab === "orcamentos" && <BudgetsView budgets={householdData.budgets} categories={categories} />}
+
+        {/* Tela 4: Relatórios, KPIs & Comparativos */}
+        {activeTab === "relatorios" && <ReportsComparisonsView data={householdData} />}
+
+        {/* Tela 5: Fluxo & Vencimentos */}
         {activeTab === "fluxo" && (
           <div className="space-y-6">
             <MonthlyChart data={initialSummary.monthlyTrend} />
             <TransactionsTable
-              transactions={initialTransactions}
+              key={fluxoStatusFilter}
+              transactions={
+                currentMember
+                  ? initialTransactions.filter((t) => t.member_label === currentMember)
+                  : initialTransactions
+              }
               categories={categories}
               paymentMethods={paymentMethods}
+              initialStatusFilter={fluxoStatusFilter}
               onEditTransaction={handleEditTransaction}
               onNewTransaction={() => handleOpenNewTransaction()}
             />
@@ -393,10 +551,20 @@ export function FinanceDashboard({
         categories={categories}
         paymentMethods={paymentMethods}
         notebooks={initialNotebooks}
+        accounts={householdData.accounts}
         defaultLedger={txDefaultLedger}
         defaultNotebookId={txDefaultNotebookId}
         defaultDescription={txDefaultDescription}
         transactionToEdit={txToEdit}
+      />
+
+      <RecurringBillsDialog
+        open={recurringDialogOpen}
+        onOpenChange={setRecurringDialogOpen}
+        bills={householdData.recurringBills}
+        categories={categories}
+        accounts={householdData.accounts}
+        currentMonth={currentMonth}
       />
 
       <NotebookDialog

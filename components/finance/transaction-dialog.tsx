@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { ArrowDownRightIcon, ArrowUpRightIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { createTransaction, updateTransaction } from "@/lib/actions/finance";
-import type { FinanceCategory, Notebook, PaymentMethod, Transaction } from "@/lib/data/finance";
+import type { FinanceCategory, Notebook, PaymentMethod } from "@/lib/data/finance";
+import type { AccountWithBalance } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
+import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
 import { centsToInput, inputToCents } from "@/lib/money";
+import type { Tables } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,20 +31,32 @@ interface TransactionDialogProps {
   categories: FinanceCategory[];
   paymentMethods: PaymentMethod[];
   notebooks: Notebook[];
+  accounts?: AccountWithBalance[];
   defaultLedger?: "pessoal" | "trustcare";
   defaultNotebookId?: string | null;
   defaultDescription?: string | null;
   defaultKind?: "income" | "expense";
-  transactionToEdit?: Transaction | null;
+  transactionToEdit?: Tables<"transactions"> | null;
   onSuccess?: () => void;
 }
 
-export function TransactionDialog({
-  open,
+export function TransactionDialog(props: TransactionDialogProps) {
+  const formKey = `${props.open}-${props.transactionToEdit?.id ?? "new"}-${props.defaultLedger ?? "pessoal"}-${props.defaultNotebookId ?? ""}`;
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      <DialogContent className="max-w-lg border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl">
+        <TransactionDialogForm key={formKey} {...props} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TransactionDialogForm({
   onOpenChange,
   categories,
   paymentMethods,
   notebooks,
+  accounts = [],
   defaultLedger = "pessoal",
   defaultNotebookId,
   defaultDescription,
@@ -51,42 +66,30 @@ export function TransactionDialog({
 }: TransactionDialogProps) {
   const [isPending, startTransition] = useTransition();
 
-  const [kind, setKind] = useState<"income" | "expense">("expense");
-  const [ledger, setLedger] = useState<"pessoal" | "trustcare">(defaultLedger);
-  const [amountStr, setAmountStr] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(todayIso());
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [paymentMethodId, setPaymentMethodId] = useState<string>("");
-  const [notebookId, setNotebookId] = useState<string>("");
-  const [notes, setNotes] = useState("");
-
-  // Sincroniza com transactionToEdit ou reseta
-  useEffect(() => {
-    if (!open) return;
-
-    if (transactionToEdit) {
-      setKind(transactionToEdit.kind as "income" | "expense");
-      setLedger(transactionToEdit.ledger as "pessoal" | "trustcare");
-      setAmountStr(centsToInput(transactionToEdit.amount_cents));
-      setDescription(transactionToEdit.description);
-      setDate(transactionToEdit.date);
-      setCategoryId(transactionToEdit.category_id ?? "");
-      setPaymentMethodId(transactionToEdit.payment_method_id ?? "");
-      setNotebookId(transactionToEdit.notebook_id ?? "");
-      setNotes(transactionToEdit.notes ?? "");
-    } else {
-      setKind(defaultKind ?? "expense");
-      setLedger(defaultNotebookId ? "trustcare" : defaultLedger);
-      setAmountStr("");
-      setDescription(defaultDescription ?? "");
-      setDate(todayIso());
-      setCategoryId("");
-      setPaymentMethodId("");
-      setNotebookId(defaultNotebookId ?? "");
-      setNotes("");
-    }
-  }, [transactionToEdit, defaultLedger, defaultNotebookId, defaultDescription, defaultKind, open]);
+  const [kind, setKind] = useState<"income" | "expense">(
+    () => (transactionToEdit?.kind as "income" | "expense") ?? defaultKind ?? "expense",
+  );
+  const [ledger, setLedger] = useState<"pessoal" | "trustcare">(
+    () => (transactionToEdit?.ledger as "pessoal" | "trustcare") ?? (defaultNotebookId ? "trustcare" : defaultLedger),
+  );
+  const [status, setStatus] = useState<"paid" | "pending">(
+    () => (transactionToEdit?.status as "paid" | "pending") ?? "paid",
+  );
+  const [amountStr, setAmountStr] = useState(() =>
+    transactionToEdit ? centsToInput(transactionToEdit.amount_cents) : "",
+  );
+  const [description, setDescription] = useState(
+    () => transactionToEdit?.description ?? defaultDescription ?? "",
+  );
+  const [date, setDate] = useState(() => transactionToEdit?.date ?? todayIso());
+  const [dueDate, setDueDate] = useState(() => transactionToEdit?.due_date ?? "");
+  const [categoryId, setCategoryId] = useState<string>(() => transactionToEdit?.category_id ?? "");
+  const [paymentMethodId, setPaymentMethodId] = useState<string>(() => transactionToEdit?.payment_method_id ?? "");
+  const [accountId, setAccountId] = useState<string>(() => transactionToEdit?.account_id ?? "__none__");
+  const [memberLabel, setMemberLabel] = useState<string>(() => transactionToEdit?.member_label ?? "Casa");
+  const [installments, setInstallments] = useState<string>("1");
+  const [notebookId, setNotebookId] = useState<string>(() => transactionToEdit?.notebook_id ?? defaultNotebookId ?? "");
+  const [notes, setNotes] = useState(() => transactionToEdit?.notes ?? "");
 
   // Filtra categorias pelo ledger e kind selecionados (garantindo unicidade)
   const filteredCategories = useMemo(() => {
@@ -121,15 +124,24 @@ export function TransactionDialog({
     }
 
     startTransition(async () => {
+      const resolvedAccountId = accountId && accountId !== "__none__" ? accountId : null;
+      const resolvedMember = ledger === "pessoal" && memberLabel ? memberLabel : null;
+      const resolvedDue = dueDate.trim() ? dueDate : null;
+      const instCount = Number(installments);
+
       if (transactionToEdit) {
         const res = await updateTransaction(transactionToEdit.id, {
           kind,
           ledger,
+          status,
           amount_cents: amountCents,
           description: description.trim(),
           date,
+          due_date: resolvedDue,
           category_id: categoryId ? categoryId : null,
           payment_method_id: paymentMethodId ? paymentMethodId : null,
+          account_id: resolvedAccountId,
+          member_label: resolvedMember,
           notebook_id: ledger === "trustcare" && notebookId ? notebookId : null,
           notes: notes.trim() || null,
         });
@@ -145,17 +157,22 @@ export function TransactionDialog({
         const res = await createTransaction({
           kind,
           ledger,
+          status,
           amount_cents: amountCents,
           description: description.trim(),
           date,
+          due_date: resolvedDue,
           category_id: categoryId ? categoryId : null,
           payment_method_id: paymentMethodId ? paymentMethodId : null,
+          account_id: resolvedAccountId,
+          member_label: resolvedMember,
+          installment_total: instCount >= 2 ? instCount : undefined,
           notebook_id: ledger === "trustcare" && notebookId ? notebookId : null,
           notes: notes.trim() || null,
         });
 
         if (res.ok) {
-          toast.success("Lançamento registrado!");
+          toast.success(instCount >= 2 ? `Parcelamento em ${instCount}x registrado!` : "Lançamento registrado!");
           onOpenChange(false);
           onSuccess?.();
         } else {
@@ -166,8 +183,7 @@ export function TransactionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-border/80 bg-card p-6 shadow-xl sm:rounded-2xl">
+    <>
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
             {transactionToEdit ? "Editar Lançamento" : "Novo Lançamento"}
@@ -294,6 +310,103 @@ export function TransactionDialog({
             </div>
           </div>
 
+          {/* Status (Pago vs Pendente) + Vencimento */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <Label className="text-xs font-medium">Status</Label>
+              <div className="mt-1 grid grid-cols-2 gap-1.5 rounded-lg bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setStatus("paid")}
+                  className={`rounded-md py-1 text-xs font-medium transition-colors ${
+                    status === "paid" ? "bg-emerald-500/20 text-emerald-400 font-semibold" : "text-muted-foreground"
+                  }`}
+                >
+                  Pago
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatus("pending")}
+                  className={`rounded-md py-1 text-xs font-medium transition-colors ${
+                    status === "pending" ? "bg-amber-500/20 text-amber-300 font-semibold" : "text-muted-foreground"
+                  }`}
+                >
+                  Pendente
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="tx-due-date" className="text-xs font-medium">
+                Vencimento (opcional)
+              </Label>
+              <Input
+                id="tx-due-date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="mt-1 font-mono text-xs"
+              />
+            </div>
+          </div>
+
+          {/* Pessoa + Conta / Cartão + Parcelamento (quando Pessoal) */}
+          {ledger === "pessoal" && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div>
+                <Label className="text-xs font-medium">Pessoa / Centro</Label>
+                <Select value={memberLabel} onValueChange={setMemberLabel}>
+                  <SelectTrigger className="mt-1 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {HOUSEHOLD_MEMBERS.map((m) => (
+                      <SelectItem key={m} value={m} className="text-xs">
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-medium">Conta / Cartão</Label>
+                <Select value={accountId} onValueChange={setAccountId}>
+                  <SelectTrigger className="mt-1 text-xs">
+                    <SelectValue placeholder="Nenhum" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__" className="text-xs">Nenhum</SelectItem>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id} className="text-xs">
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {!transactionToEdit && (
+                <div>
+                  <Label className="text-xs font-medium">Parcelas</Label>
+                  <Select value={installments} onValueChange={setInstallments}>
+                    <SelectTrigger className="mt-1 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1" className="text-xs">À vista (1x)</SelectItem>
+                      {[2, 3, 4, 5, 6, 8, 10, 12, 18, 24].map((n) => (
+                        <SelectItem key={n} value={String(n)} className="text-xs">
+                          {n}x mensais
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Categoria e Método de Pagamento */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
@@ -402,7 +515,6 @@ export function TransactionDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { TodayAgenda } from "@/components/agenda/today-agenda";
+import { UpcomingBillsCard } from "@/components/finance/upcoming-bills-card";
 import { HabitsToday } from "@/components/habits/habits-today";
 import { PageHeader } from "@/components/page";
 import { TASK_VIEWS, type TaskView } from "@/components/tasks/meta";
 import { TasksBoard } from "@/components/tasks/tasks-board";
 import { getAreaFilter } from "@/lib/data/area-filter";
 import { getCalendars, getOccurrences } from "@/lib/data/events";
+import { getUpcomingHouseholdBills } from "@/lib/data/finance-family";
 import { getHabits } from "@/lib/data/habits";
 import { countOpenInbox } from "@/lib/data/inbox";
 import { getSidebarData } from "@/lib/data/sidebar";
@@ -26,13 +28,14 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
   const area = await getAreaFilter(props.searchParams);
   const today = todayIso();
 
-  const [{ areas, folders }, tasks, { habits, logs }, inboxCount, todayEvents, calendars] = await Promise.all([
+  const [{ areas, folders }, tasks, { habits, logs }, inboxCount, todayEvents, calendars, upcomingBills] = await Promise.all([
     getSidebarData(),
     getTasks({ areaId: area?.id }),
     getHabits({ areaId: area?.id, activeOnly: true }),
     countOpenInbox(),
     view === "hoje" ? getOccurrences(fromWallParts(today, 0), fromWallParts(addDays(today, 1), 0), area?.id) : Promise.resolve([]),
     view === "hoje" ? getCalendars() : Promise.resolve([]),
+    view === "hoje" ? getUpcomingHouseholdBills() : Promise.resolve([]),
   ]);
 
   const defaultArea = area ?? areas.find((a) => a.slug === "pessoal") ?? areas[0];
@@ -63,6 +66,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
         aside={
           view === "hoje" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3.5">
+              <UpcomingBillsCard bills={upcomingBills} />
               <TodayAgenda occurrences={todayEvents} areas={areas} connected={calendars.some((c) => c.sync_enabled)} />
               <HabitsToday
                 habits={habits}
