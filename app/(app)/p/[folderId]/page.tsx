@@ -183,16 +183,17 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           : todayIso().slice(0, 7);
 
       const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
+      const effectiveMember = targetLedger === "pessoal" ? currentMember : null;
 
       await ensureMonthBills(user.id, currentMonth);
 
       const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
-        getFinanceSummary({ ledger: targetLedger, month: currentMonth }),
-        getTransactions({ ledger: targetLedger, month: currentMonth }),
+        getFinanceSummary({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
+        getTransactions({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         getNotebooks(),
         getFinanceCategories(),
         getPaymentMethods(),
-        getHouseholdData({ month: currentMonth, member: currentMember }),
+        getHouseholdData({ month: currentMonth, member: effectiveMember }),
       ]);
 
       content = (

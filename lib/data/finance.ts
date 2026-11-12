@@ -1,5 +1,7 @@
 import "server-only";
 
+import { todayIso } from "@/lib/dates";
+import { shiftMonth } from "@/lib/finance/household";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,12 +29,25 @@ export type MonthlyPoint = {
   balanceCents: number;
 };
 
+export type LedgerTotals = {
+  incomeCents: number;
+  expenseCents: number;
+  netCents: number;
+  pendingExpenseCents: number;
+  transactionCount: number;
+};
+
 export type FinanceSummary = {
   totalIncomeCents: number;
   totalExpenseCents: number;
+  pendingExpenseCents: number;
   netBalanceCents: number;
   profitMarginPercent: number;
   transactionCount: number;
+  ledgerSplit: {
+    pessoal: LedgerTotals;
+    trustcare: LedgerTotals;
+  };
   monthlyTrend: MonthlyPoint[];
   categoriesBreakdown: Array<{
     categoryId: string | null;
@@ -285,6 +300,7 @@ export async function getFinanceRules(ledger?: "pessoal" | "trustcare" | "all"):
 export async function getTransactions(params?: {
   ledger?: "pessoal" | "trustcare" | "all";
   month?: string; // YYYY-MM
+  member?: string | null;
   categoryId?: string;
   kind?: "income" | "expense";
   notebookId?: string;
@@ -307,6 +323,10 @@ export async function getTransactions(params?: {
   if (params?.month) {
     const { start, end } = getMonthRange(params.month);
     query = query.gte("date", start).lte("date", end);
+  }
+
+  if (params?.member && params.member.trim()) {
+    query = query.eq("member_label", params.member.trim());
   }
 
   if (params?.categoryId) {
@@ -402,13 +422,15 @@ export async function getNotebooks(params?: {
 export async function getFinanceSummary(params?: {
   ledger?: "pessoal" | "trustcare" | "all";
   month?: string; // YYYY-MM
+  member?: string | null;
 }): Promise<FinanceSummary> {
   const supabase = await createClient();
+  const memberFilter = params?.member && params.member.trim() ? params.member.trim() : null;
 
   // 1. Busca transações do período e categorias
   let query = supabase
     .from("transactions")
-    .select("id, kind, amount_cents, date, ledger, category_id")
+    .select("id, kind, amount_cents, date, ledger, category_id, status")
     .is("deleted_at", null);
 
   if (params?.ledger && params.ledger !== "all") {
@@ -418,6 +440,10 @@ export async function getFinanceSummary(params?: {
   if (params?.month) {
     const { start, end } = getMonthRange(params.month);
     query = query.gte("date", start).lte("date", end);
+  }
+
+  if (memberFilter) {
+    query = query.eq("member_label", memberFilter);
   }
 
   const [txRes, catsRes] = await Promise.all([
@@ -432,6 +458,19 @@ export async function getFinanceSummary(params?: {
 
   let totalIncomeCents = 0;
   let totalExpenseCents = 0;
+  let pendingExpenseCents = 0;
+  const emptySplit = (): LedgerTotals => ({
+    incomeCents: 0,
+    expenseCents: 0,
+    netCents: 0,
+    pendingExpenseCents: 0,
+    transactionCount: 0,
+  });
+  const ledgerSplit = {
+    pessoal: emptySplit(),
+    trustcare: emptySplit(),
+  };
+
   const categoriesMap = new Map<
     string,
     { categoryId: string | null; name: string; color: string | null; kind: "income" | "expense"; totalCents: number }
@@ -439,14 +478,23 @@ export async function getFinanceSummary(params?: {
 
   for (const t of transactions) {
     const amount = t.amount_cents || 0;
+    const bucket = t.ledger === "trustcare" ? ledgerSplit.trustcare : ledgerSplit.pessoal;
+    bucket.transactionCount += 1;
+
     if (t.kind === "income") {
       totalIncomeCents += amount;
+      bucket.incomeCents += amount;
     } else {
       totalExpenseCents += amount;
+      bucket.expenseCents += amount;
+      if (t.status === "pending") {
+        pendingExpenseCents += amount;
+        bucket.pendingExpenseCents += amount;
+      }
     }
 
     const catObj = t.category_id ? catsMap.get(t.category_id) : null;
-    const catId = t.category_id || "sem_categoria";
+    const catId = `${t.kind}:${t.category_id || "sem_categoria"}`;
     const catName = catObj?.name || (t.kind === "income" ? "Outras Entradas" : "Outras Despesas");
     const catColor = catObj?.color || "#94a3b8";
 
@@ -460,6 +508,9 @@ export async function getFinanceSummary(params?: {
     prev.totalCents += amount;
     categoriesMap.set(catId, prev);
   }
+
+  ledgerSplit.pessoal.netCents = ledgerSplit.pessoal.incomeCents - ledgerSplit.pessoal.expenseCents;
+  ledgerSplit.trustcare.netCents = ledgerSplit.trustcare.incomeCents - ledgerSplit.trustcare.expenseCents;
 
   const netBalanceCents = totalIncomeCents - totalExpenseCents;
   const profitMarginPercent = totalIncomeCents > 0 ? (netBalanceCents / totalIncomeCents) * 100 : 0;
@@ -480,24 +531,26 @@ export async function getFinanceSummary(params?: {
     })
     .sort((a, b) => b.totalCents - a.totalCents);
 
-  // 2. Histórico dos últimos 6 meses para o gráfico de tendência
-  const now = new Date();
-  const months: string[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    months.push(mStr);
-  }
+  // 2. Histórico dos últimos 6 meses ancorado em currentMonth (fuso de Cuiabá)
+  const anchorMonth =
+    params?.month && /^\d{4}-\d{2}$/.test(params.month) ? params.month : todayIso().slice(0, 7);
+  const months = Array.from({ length: 6 }, (_, i) => shiftMonth(anchorMonth, i - 5));
 
   const oldestDate = `${months[0]}-01`;
+  const { end: newestDate } = getMonthRange(months[5]);
   let trendQuery = supabase
     .from("transactions")
     .select("kind, amount_cents, date")
     .is("deleted_at", null)
-    .gte("date", oldestDate);
+    .gte("date", oldestDate)
+    .lte("date", newestDate);
 
   if (params?.ledger && params.ledger !== "all") {
     trendQuery = trendQuery.eq("ledger", params.ledger);
+  }
+
+  if (memberFilter) {
+    trendQuery = trendQuery.eq("member_label", memberFilter);
   }
 
   const { data: trendTx } = await trendQuery;
@@ -533,9 +586,11 @@ export async function getFinanceSummary(params?: {
   return {
     totalIncomeCents,
     totalExpenseCents,
+    pendingExpenseCents,
     netBalanceCents,
     profitMarginPercent: Number(profitMarginPercent.toFixed(1)),
     transactionCount: transactions.length,
+    ledgerSplit,
     monthlyTrend,
     categoriesBreakdown,
   };

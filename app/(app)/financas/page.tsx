@@ -43,14 +43,15 @@ export default async function Page(props: PageProps<"/financas">) {
   }
 
   const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
+  const effectiveMember = currentLedger === "pessoal" ? currentMember : null;
 
   const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
-    getFinanceSummary({ ledger: currentLedger, month: currentMonth }),
-    getTransactions({ ledger: currentLedger, month: currentMonth }),
+    getFinanceSummary({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
+    getTransactions({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     getNotebooks(),
     getFinanceCategories(),
     getPaymentMethods(),
-    getHouseholdData({ month: currentMonth, member: currentMember }),
+    getHouseholdData({ month: currentMonth, member: effectiveMember }),
   ]);
 
   return (
