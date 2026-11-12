@@ -287,13 +287,13 @@ export function NotebookDialog({
                 <DollarSignIcon className="size-3.5 text-amber-400" />
                 <span>Custo Inicial de Aquisição (Opcional)</span>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Informe quanto pagou pelo aparelho para lançar a compra automaticamente no fluxo de caixa da Trust Care.
               </p>
 
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 <div>
-                  <Label htmlFor="nb-cost" className="text-[11px] text-muted-foreground">
+                  <Label htmlFor="nb-cost" className="text-xs text-muted-foreground">
                     Valor Pago (R$)
                   </Label>
                   <div className="relative mt-1">
@@ -312,7 +312,7 @@ export function NotebookDialog({
                 </div>
 
                 <div>
-                  <Label htmlFor="nb-pdate" className="text-[11px] text-muted-foreground">
+                  <Label htmlFor="nb-pdate" className="text-xs text-muted-foreground">
                     Data da Compra
                   </Label>
                   <Input
@@ -325,7 +325,7 @@ export function NotebookDialog({
                 </div>
 
                 <div>
-                  <Label className="text-[11px] text-muted-foreground">
+                  <Label className="text-xs text-muted-foreground">
                     Meio de Pagamento
                   </Label>
                   <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>

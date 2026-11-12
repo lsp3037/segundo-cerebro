@@ -123,11 +123,11 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 
 ### 7.12 Finanças ✅ Fase 5 (Pessoal/Familiar + Trust Care)
 - **Pessoal & Familiar:** cockpit financeiro inspirado no *Minhas Finanças* e calibrado pela planilha da casa (`Casa`, `Luan`, `Rayzza`), com 5 visões organizadas em hierarquia visual de 56px:
-  - `Visão Geral`: alerta de vencimentos, resposta principal do mês + faixa dividida de KPIs, baixa rápida em 1 clique (`Pago` ↔ `Pendente`), entradas base e distribuição por pessoa.
-  - `Contas & Cartões`: gestão de saldos reais, transferências entre contas e acompanhamento separado de faturas/limites de 4 cartões de crédito.
+  - `Resumo`: uma frase com a sobra prevista do mês, quanto falta pagar, contas agrupadas por urgência (atrasadas, próximos 7 dias, mais tarde, sem vencimento; pagas recolhidas) com a bolinha de pagar, entradas, cartões e gastos por pessoa. Mês vazio mostra um passo a passo.
+  - `Bancos e cartões`: gestão de saldos reais, transferências entre contas e acompanhamento separado de faturas/limites de 4 cartões de crédito.
   - `Orçamentos`: tetos mensais por categoria com barras proporcionais reais (sem barras mínimas enganosas) e cards responsivos no celular.
-  - `Relatórios & KPIs`: Taxa de Poupança, Comprometimento Fixo, Burn Rate, comparativo Mês Atual vs. Anterior vs. Média 3M, tendência de 6 meses ancorada no mês selecionado e diagnóstico mensal sob demanda (local/determinístico quando `ai_enabled = false`, via `assertAreaAllowsAi`).
-  - `Fluxo & Vencimentos`: tabela no desktop, linhas compactas de 2 linhas no celular e quitação direta.
+  - `Análises`: quanto sobrou da renda, quanto as contas fixas levam, gasto por dia, gastos por categoria mês a mês (este mês, mês passado, média de 3 meses), tendência de 6 meses ancorada no mês selecionado e diagnóstico mensal sob demanda (local/determinístico quando `ai_enabled = false`, via `assertAreaAllowsAi`).
+  - `Lançamentos`: tabela no desktop, linhas compactas no celular, bolinha de pagar e "Desfazer" em baixas e exclusões.
 - **Contas Fixas & Dízimo Automático (10%):** carregamento guiado do modelo familiar com cálculo automático de 10% do dízimo sobre as entradas e geração em lote no mês.
 - **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + taxa de maquininha + custos pós-venda/garantia), com preço de vitrine e alerta para estoque parado (>30 dias).
 - **Importação OFX e Privacidade:** leitor local de extratos `.ofx` sem envio para IA, detecção de duplicidades via `FITID` e aprendizado automático de regras de categorização (`finance_rules`). Área nasce travada para IA (`ai_enabled = false`).

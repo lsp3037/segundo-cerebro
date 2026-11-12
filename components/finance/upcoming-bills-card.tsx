@@ -39,7 +39,7 @@ export function UpcomingBillsCard({ bills }: UpcomingBillsCardProps) {
           )}
           <span>Contas da Semana</span>
         </div>
-        <Link href="/financas?ledger=pessoal&tab=fluxo" className="text-[11px] font-medium text-primary hover:underline">
+        <Link href="/financas?ledger=pessoal&tab=fluxo" className="text-xs font-medium text-primary hover:underline">
           Ver todas
         </Link>
       </div>
@@ -52,7 +52,7 @@ export function UpcomingBillsCard({ bills }: UpcomingBillsCardProps) {
             <div key={b.id} className="flex items-center justify-between gap-2 text-xs">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-foreground">{b.description}</div>
-                <div className={`text-[11px] ${isOverdue ? "text-rose-400 font-medium" : "text-muted-foreground"}`}>
+                <div className={`text-xs ${isOverdue ? "text-rose-400 font-medium" : "text-muted-foreground"}`}>
                   {isOverdue ? `Atrasada (${dLabel})` : `Vence ${dLabel}`}
                 </div>
               </div>

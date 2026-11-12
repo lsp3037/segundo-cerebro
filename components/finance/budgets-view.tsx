@@ -43,13 +43,13 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
     e.preventDefault();
     const cents = inputToCents(amountStr);
     if (!selectedCatId || cents <= 0) {
-      toast.error("Escolha uma categoria e informe uma meta maior que R$ 0,00.");
+      toast.error("Escolha uma categoria e informe um limite maior que R$ 0,00.");
       return;
     }
     startTransition(async () => {
       const res = await upsertBudget({ category_id: selectedCatId, amount_cents: cents });
       if (res.ok) {
-        toast.success("Meta salva!");
+        toast.success("Limite salvo!");
         setDialogOpen(false);
       } else {
         toast.error(res.error);
@@ -66,11 +66,11 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
         return;
       }
       if (previousCents && previousCents > 0) {
-        toastWithUndo(`Meta de ${row.categoryName} removida.`, () =>
+        toastWithUndo(`Limite de ${row.categoryName} removido.`, () =>
           upsertBudget({ category_id: row.categoryId, amount_cents: previousCents }),
         );
       } else {
-        toast.success("Meta removida.");
+        toast.success("Limite removido.");
       }
     });
   };
@@ -82,26 +82,26 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
         items={[
           {
             id: "planned",
-            label: "Teto mensal planejado",
+            label: "Limite do mês",
             value: formatCentsToBrl(totalBudget),
-            subtext: "Soma das metas definidas",
+            subtext: "Soma dos limites por categoria",
           },
           {
             id: "spent",
-            label: "Realizado + pendente",
+            label: "Já gasto",
             value: formatCentsToBrl(totalSpent),
             tone: totalBudget > 0 && totalSpent > totalBudget ? "negative" : totalSpent > 0 ? "warning" : "default",
             subtext:
               totalBudget > 0
-                ? `${Math.round((totalSpent / totalBudget) * 100)}% do teto consumido`
-                : "Defina tetos abaixo",
+                ? `${Math.round((totalSpent / totalBudget) * 100)}% do limite, contando o que falta pagar`
+                : "Defina limites abaixo",
           },
           {
             id: "remaining",
-            label: "Margem restante",
+            label: "Ainda pode gastar",
             value: formatCentsToBrl(remaining),
             tone: remaining >= 0 ? "positive" : "negative",
-            subtext: "Diferença planejado × real",
+            subtext: "Limite menos o que já foi gasto",
           },
         ]}
       />
@@ -109,17 +109,17 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
           <div>
-            <h3 className="text-sm font-medium text-foreground">Metas por categoria</h3>
-            <p className="text-xs text-muted-foreground">Acompanhamento mensal de consumo</p>
+            <h3 className="text-sm font-medium text-foreground">Limites por categoria</h3>
+            <p className="text-xs text-muted-foreground">Quanto já foi gasto de cada limite</p>
           </div>
           <Button size="sm" variant="outline" onClick={() => openModal()} className="h-8 gap-1.5 text-xs">
             <PlusIcon className="size-3.5" />
-            Definir meta
+            Definir limite
           </Button>
         </div>
         {budgets.length === 0 ? (
           <div className="p-10 text-center text-xs text-muted-foreground">
-            Nenhuma categoria com meta ou gasto neste mês. Clique em <strong>Definir meta</strong> acima.
+            Nenhuma categoria com limite ou gasto neste mês. Use <strong>Definir limite</strong> acima.
           </div>
         ) : (
           <>
@@ -144,6 +144,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                           variant="ghost"
                           size="sm"
                           className="size-8 p-0 text-muted-foreground hover:text-foreground"
+                          aria-label={`Editar limite de ${row.categoryName}`}
                           onClick={() => openModal(row.categoryId, row.budgetCents)}
                         >
                           <PencilIcon className="size-3.5" />
@@ -153,6 +154,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                             variant="ghost"
                             size="sm"
                             className="size-8 p-0 text-muted-foreground hover:text-rose-400"
+                            aria-label={`Remover limite de ${row.categoryName}`}
                             onClick={() => handleRemove(row)}
                           >
                             <Trash2Icon className="size-3.5" />
@@ -161,12 +163,12 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                       </div>
                     </div>
 
-                    <div className="flex items-baseline justify-between text-[11px] tabular-nums">
+                    <div className="flex items-baseline justify-between text-xs tabular-nums">
                       <span className={level === "over" ? "font-medium text-rose-400" : "text-foreground"}>
                         {formatCentsToBrl(row.spentCents)}
                       </span>
                       <span className="text-muted-foreground">
-                        {hasBudget ? `de ${formatCentsToBrl(row.budgetCents)} (${pct}%)` : "Sem meta"}
+                        {hasBudget ? `de ${formatCentsToBrl(row.budgetCents)} (${pct}%)` : "Sem limite"}
                       </span>
                     </div>
 
@@ -183,12 +185,12 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border/70 bg-muted/20 text-[11px] font-medium text-muted-foreground">
+                  <tr className="border-b border-border/70 bg-muted/20 text-xs font-medium text-muted-foreground">
                     <th className="py-2.5 pl-4 pr-3">Categoria</th>
-                    <th className="px-3 py-2.5 text-right">Meta mensal</th>
-                    <th className="px-3 py-2.5 text-right">Realizado</th>
-                    <th className="px-3 py-2.5 text-right">Diferença</th>
-                    <th className="w-56 px-3 py-2.5">Consumo</th>
+                    <th className="px-3 py-2.5 text-right">Limite</th>
+                    <th className="px-3 py-2.5 text-right">Gasto</th>
+                    <th className="px-3 py-2.5 text-right">Sobra</th>
+                    <th className="w-56 px-3 py-2.5">Usado</th>
                     <th className="py-2.5 pl-2 pr-4 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -210,7 +212,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-right tabular-nums">
-                          {hasBudget ? formatCentsToBrl(row.budgetCents) : <span className="text-muted-foreground">Sem meta</span>}
+                          {hasBudget ? formatCentsToBrl(row.budgetCents) : <span className="text-muted-foreground">Sem limite</span>}
                         </td>
                         <td className={`px-3 py-3 text-right font-medium tabular-nums ${level === "over" ? "text-rose-400" : "text-foreground"}`}>
                           {formatCentsToBrl(row.spentCents)}
@@ -221,9 +223,9 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                         <td className="px-3 py-3">
                           {hasBudget ? (
                             <div className="space-y-1">
-                              <div className="flex justify-between text-[11px] tabular-nums">
+                              <div className="flex justify-between text-xs tabular-nums">
                                 <span className={level === "over" ? "font-medium text-rose-400" : level === "warning" ? "text-amber-400" : "text-muted-foreground"}>
-                                  {pct}%{level === "over" ? " (Acima)" : ""}
+                                  {pct}%{level === "over" ? " · passou" : ""}
                                 </span>
                               </div>
                               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
@@ -231,18 +233,18 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                               </div>
                             </div>
                           ) : (
-                            <button type="button" onClick={() => openModal(row.categoryId, row.spentCents)} className="cursor-pointer text-[11px] text-muted-foreground hover:text-foreground hover:underline">
-                              + Definir teto
+                            <button type="button" onClick={() => openModal(row.categoryId, row.spentCents)} className="cursor-pointer text-xs text-muted-foreground hover:text-foreground hover:underline">
+                              + Definir limite
                             </button>
                           )}
                         </td>
                         <td className="py-3 pl-2 pr-4 text-right">
                           <div className="inline-flex items-center gap-1">
-                            <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openModal(row.categoryId, row.budgetCents)}>
+                            <Button variant="ghost" size="sm" aria-label={`Editar limite de ${row.categoryName}`} className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openModal(row.categoryId, row.budgetCents)}>
                               <PencilIcon className="size-3" />
                             </Button>
                             {hasBudget && (
-                              <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row)}>
+                              <Button variant="ghost" size="sm" aria-label={`Remover limite de ${row.categoryName}`} className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleRemove(row)}>
                                 <Trash2Icon className="size-3" />
                               </Button>
                             )}
@@ -261,7 +263,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">Definir Meta Mensal</DialogTitle>
+            <DialogTitle className="text-base">Limite do mês</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-3">
             <div>
@@ -276,12 +278,12 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Teto Mensal (R$)</Label>
+              <Label className="text-xs">Limite (R$)</Label>
               <Input value={amountStr} onChange={(e) => setAmountStr(e.target.value)} placeholder="1500,00" className="mt-1 font-mono text-sm" required />
             </div>
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" size="sm" disabled={isPending}>Salvar Meta</Button>
+              <Button type="submit" size="sm" disabled={isPending}>Salvar limite</Button>
             </DialogFooter>
           </form>
         </DialogContent>

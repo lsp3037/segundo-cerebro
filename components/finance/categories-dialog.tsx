@@ -223,7 +223,7 @@ export function CategoriesDialog({
               Receitas (Entradas)
             </button>
           </div>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {filteredCategories.length} cadastradas
           </span>
         </div>
@@ -277,7 +277,7 @@ export function CategoriesDialog({
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div className="sm:col-span-2">
-              <Label htmlFor="cat-name" className="text-[11px] text-muted-foreground">
+              <Label htmlFor="cat-name" className="text-xs text-muted-foreground">
                 Nome da Categoria
               </Label>
               <Input
@@ -291,7 +291,7 @@ export function CategoriesDialog({
             </div>
 
             <div>
-              <Label className="text-[11px] text-muted-foreground">Cor da Etiqueta</Label>
+              <Label className="text-xs text-muted-foreground">Cor da Etiqueta</Label>
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {PRESET_COLORS.slice(0, 8).map((pc) => (
                   <button

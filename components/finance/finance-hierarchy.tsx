@@ -40,7 +40,7 @@ export function FinanceHero({
   return (
     <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-5 py-4">
       <div className="min-w-0 space-y-1">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {eyebrow}
         </p>
         <div
@@ -86,7 +86,7 @@ export function FinanceKpiStrip({ items, columns = 3 }: FinanceKpiStripProps) {
       {items.map((item) => (
         <div key={item.id} className="flex flex-col justify-between px-4 py-3.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               {item.label}
             </span>
             {item.badge}
@@ -97,7 +97,7 @@ export function FinanceKpiStrip({ items, columns = 3 }: FinanceKpiStripProps) {
             {item.value}
           </div>
           {(item.subtext || item.action) && (
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="min-w-0 truncate">{item.subtext}</div>
               {item.action && <div className="shrink-0">{item.action}</div>}
             </div>

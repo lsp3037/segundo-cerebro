@@ -145,7 +145,7 @@ export function NotebooksTracker({
             value: stats.inStockCount,
             badge:
               stats.staleCount > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">
                   <AlertTriangleIcon className="size-3" />
                   {stats.staleCount} (&gt;30d)
                 </span>
@@ -281,7 +281,7 @@ export function NotebooksTracker({
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       {nb.brand && (
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <span className="text-xs font-medium text-muted-foreground">
                           {nb.brand}
                         </span>
                       )}
@@ -292,7 +292,7 @@ export function NotebooksTracker({
 
                     <div className="flex items-center gap-1">
                       <span
-                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${statusConfig.badgeClass}`}
+                        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${statusConfig.badgeClass}`}
                       >
                         <span className={`size-1.5 rounded-full ${statusConfig.dotClass}`} />
                         {statusConfig.label}
@@ -338,7 +338,7 @@ export function NotebooksTracker({
 
                           <DropdownMenuSeparator />
                           {/* Troca Rápida de Status */}
-                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase">
+                          <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                             Mudar Status
                           </div>
                           {(Object.keys(NOTEBOOK_STATUS_CONFIG) as NotebookStatus[]).map((st) => (
@@ -374,10 +374,10 @@ export function NotebooksTracker({
                   {/* Preço Vitrine e Margem Projetada (quando em estoque) */}
                   {!isSold && Boolean(nb.asking_price_cents && nb.asking_price_cents > 0) && (
                     <div className="mt-2.5 flex items-center justify-between rounded-lg border border-cyan-500/20 bg-cyan-950/20 px-2.5 py-1 text-xs">
-                      <span className="text-[11px] text-cyan-300 font-medium">Preço Vitrine:</span>
+                      <span className="text-xs text-cyan-300 font-medium">Preço Vitrine:</span>
                       <div className="flex items-center gap-1 font-mono">
                         <span className="font-bold text-cyan-400">{formatCentsToBrl(nb.asking_price_cents!)}</span>
-                        <span className="text-[10px] text-muted-foreground font-normal">
+                        <span className="text-xs text-muted-foreground font-normal">
                           (Margem est.: {formatProfitMargin(nb.asking_price_cents! - expenses, nb.asking_price_cents!)})
                         </span>
                       </div>
@@ -385,7 +385,7 @@ export function NotebooksTracker({
                   )}
 
                   {/* Indicador de Dias em Estoque */}
-                  <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+                  <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <ClockIcon className="size-3" />
                       {isSold ? "Tempo até vender:" : "Dias em estoque:"}
@@ -393,7 +393,7 @@ export function NotebooksTracker({
                     <span className={`font-mono ${isStale ? "text-amber-400 font-bold" : "text-foreground"}`}>
                       {daysInStock} {daysInStock === 1 ? "dia" : "dias"}
                       {isStale && (
-                        <span className="ml-1 inline-flex items-center rounded bg-amber-500/10 px-1 py-0.2 text-[9px] text-amber-400 border border-amber-500/30">
+                        <span className="ml-1 inline-flex items-center rounded bg-amber-500/10 px-1 py-0.2 text-xs text-amber-400 border border-amber-500/30">
                           estagnado
                         </span>
                       )}
@@ -402,7 +402,7 @@ export function NotebooksTracker({
 
                   {/* Ficha da Venda (se já vendido) */}
                   {isSold && (
-                    <div className="mt-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-[11px] space-y-1">
+                    <div className="mt-2 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Comprador:</span>
                         <span className="font-medium text-foreground">{nb.buyer_name || "Não informado"}</span>
@@ -433,7 +433,7 @@ export function NotebooksTracker({
 
                   {/* Notas / Observações */}
                   {nb.notes && (
-                    <div className="mt-2 rounded-md bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground/80 line-clamp-2">
+                    <div className="mt-2 rounded-md bg-muted/30 px-2 py-1 text-xs text-muted-foreground/80 line-clamp-2">
                       {nb.notes}
                     </div>
                   )}
@@ -443,14 +443,14 @@ export function NotebooksTracker({
                 <div className="mt-3 border-t border-border/50 pt-2.5">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[11px] text-muted-foreground">Custo Total:</span>
+                      <span className="text-xs text-muted-foreground">Custo Total:</span>
                       <div className="font-mono font-medium text-rose-400 tabular-nums">
                         {formatCentsToBrl(expenses)}
                       </div>
                     </div>
 
                     <div>
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {isSold ? "Vendido por:" : "Receita Vinculada:"}
                       </span>
                       <div className="font-mono font-medium text-foreground tabular-nums">
@@ -461,7 +461,7 @@ export function NotebooksTracker({
 
                   {/* Resultado: Lucro e Margem */}
                   <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/40 px-2.5 py-1.5">
-                    <span className="text-[11px] font-medium text-muted-foreground">
+                    <span className="text-xs font-medium text-muted-foreground">
                       {isSold ? "Lucro Realizado:" : "Resultado Atual:"}
                     </span>
                     <div className="flex items-center gap-1.5 font-mono text-xs font-bold tabular-nums">
@@ -469,7 +469,7 @@ export function NotebooksTracker({
                         {formatCentsToBrl(profit)}
                       </span>
                       {income > 0 && (
-                        <span className="text-[10px] text-muted-foreground font-normal">
+                        <span className="text-xs text-muted-foreground font-normal">
                           ({margin})
                         </span>
                       )}
@@ -483,7 +483,7 @@ export function NotebooksTracker({
                       variant="outline"
                       size="sm"
                       onClick={() => onAddCostToNotebook(nb, isSold ? "Peça garantia pós-venda" : undefined)}
-                      className="h-7 flex-1 text-[11px] gap-1"
+                      className="h-7 flex-1 text-xs gap-1"
                     >
                       <PlusIcon className="size-3" />
                       {isSold ? "+ Custo Garantia" : "Add Custo"}
@@ -493,7 +493,7 @@ export function NotebooksTracker({
                         type="button"
                         size="sm"
                         onClick={() => onRecordSale(nb)}
-                        className="h-7 flex-1 text-[11px] gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                        className="h-7 flex-1 text-xs gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
                         <ShoppingBagIcon className="size-3" />
                         Vender
@@ -504,7 +504,7 @@ export function NotebooksTracker({
                         variant="secondary"
                         size="sm"
                         onClick={() => onEditNotebook(nb)}
-                        className="h-7 flex-1 text-[11px] gap-1"
+                        className="h-7 flex-1 text-xs gap-1"
                       >
                         <PencilIcon className="size-3" />
                         Detalhes

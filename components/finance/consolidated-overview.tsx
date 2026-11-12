@@ -21,7 +21,7 @@ export function ConsolidatedOverview({
   return (
     <div className="space-y-5">
       <FinanceHero
-        eyebrow="Resultado consolidado do mês"
+        eyebrow="Pessoal + Trust Care: resultado do mês"
         value={signedResult(summary.netBalanceCents).value}
         tone={signedResult(summary.netBalanceCents).tone}
         subtitle={
@@ -42,11 +42,11 @@ export function ConsolidatedOverview({
         items={[
           {
             id: "pessoal",
-            label: "Pessoal & Familiar",
+            label: "Pessoal",
             value: signedResult(pessoal.netCents).value,
             tone: signedResult(pessoal.netCents).tone,
             badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {pessoal.transactionCount} itens
               </span>
             ),
@@ -74,11 +74,11 @@ export function ConsolidatedOverview({
           },
           {
             id: "trustcare",
-            label: "Trust Care (Empresa)",
+            label: "Trust Care",
             value: signedResult(trustcare.netCents).value,
             tone: signedResult(trustcare.netCents).tone,
             badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {trustcare.transactionCount} itens
               </span>
             ),

@@ -180,7 +180,7 @@ export function SaleNotebookDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="machineFee" className="text-xs font-medium text-muted-foreground">
-                Taxa Maquininha (R$) <span className="text-[10px]">(opcional)</span>
+                Taxa Maquininha (R$) <span className="text-xs">(opcional)</span>
               </Label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-mono">
@@ -263,7 +263,7 @@ export function SaleNotebookDialog({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label htmlFor="buyerName" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="buyerName" className="text-xs text-muted-foreground">
                   Nome do Cliente
                 </Label>
                 <Input
@@ -277,7 +277,7 @@ export function SaleNotebookDialog({
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="buyerContact" className="text-[11px] text-muted-foreground">
+                <Label htmlFor="buyerContact" className="text-xs text-muted-foreground">
                   WhatsApp / Telefone
                 </Label>
                 <Input
@@ -305,7 +305,7 @@ export function SaleNotebookDialog({
                     key={d}
                     type="button"
                     onClick={() => setWarrantyDays(d)}
-                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    className={`rounded px-1.5 py-0.5 text-xs font-medium transition-colors ${
                       warrantyDays === d
                         ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                         : "bg-muted/40 text-muted-foreground hover:bg-muted/70"

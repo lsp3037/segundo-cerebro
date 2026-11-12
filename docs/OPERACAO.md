@@ -64,8 +64,8 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [x] Migration `supabase/migrations/20261112120000_finance_family.sql` executada no SQL Editor do Supabase.
 - [x] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Configurar ▾ → Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
 - [x] Conferir cálculo automático de `10%` do Dízimo ao alterar Entradas, filtro por Pessoa (`Casa`, `Luan`, `Rayzza`), baixa rápida em 1 clique (`Pagar` ↔ `Pago`) e card **Contas da Semana** em `/hoje`.
-- [x] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado), conferir comparativos entre períodos, distribuição por categoria e testar **Gerar diagnóstico do mês** (resumo local determinístico enquanto `ai_enabled = false` em Finanças).
-- [x] Alternar entre `Pessoal`, `Trust Care` e `Consolidado` (e testar também via `/p/[folderId]` e no celular `390×844`): conferir cabeçalho único sem título duplicado, linhas responsivas de 2 linhas em `Fluxo & Vencimentos` / `Orçamentos`, cadastro de notebook com preço de vitrine e venda com garantia/taxa de maquininha.
+- [x] Bancos e cartões, Orçamento e Análises: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado), conferir comparativos entre períodos, distribuição por categoria e testar **Gerar diagnóstico do mês** (resumo local determinístico enquanto `ai_enabled = false` em Finanças).
+- [x] Alternar entre `Pessoal` e `Trust Care` e ligar "Somar Trust Care" (antigo `Consolidado`) (e testar também via `/p/[folderId]` e no celular `390×844`): conferir cabeçalho único sem título duplicado, linhas responsivas de 2 linhas em `Lançamentos` / `Orçamento`, cadastro de notebook com preço de vitrine e venda com garantia/taxa de maquininha.
 - [x] Importador OFX (`Configurar ▾ → Importar Extrato (.OFX)`): subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
 - [x] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo e concluir.
 

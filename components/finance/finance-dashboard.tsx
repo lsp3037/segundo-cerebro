@@ -225,20 +225,19 @@ export function FinanceDashboard({
             </h1>
           </div>
 
-          {/* Seletor de Conta / Ledger */}
+          {/* Seletor Pessoal / Trust Care. "Somando as duas" (ledger all) acende os dois. */}
           <div
-            role="tablist"
-            aria-label="Contexto financeiro"
+            role="group"
+            aria-label="De quem são as finanças"
             className="inline-flex h-8 items-center rounded-md border border-border bg-card p-0.5 text-xs"
           >
-            {(["pessoal", "trustcare", "all"] as LedgerType[]).map((ldg) => {
-              const isSelected = currentLedger === ldg;
+            {(["pessoal", "trustcare"] as const).map((ldg) => {
+              const isSelected = currentLedger === ldg || currentLedger === "all";
               return (
                 <button
                   key={ldg}
                   type="button"
-                  role="tab"
-                  aria-selected={isSelected}
+                  aria-pressed={isSelected}
                   onClick={() => handleSwitchLedger(ldg)}
                   className={`h-7 cursor-pointer rounded-sm px-2.5 text-xs font-medium transition-colors ${
                     isSelected
@@ -246,11 +245,7 @@ export function FinanceDashboard({
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {ldg === "pessoal"
-                    ? "Pessoal"
-                    : ldg === "trustcare"
-                      ? "Trust Care"
-                      : "Consolidado"}
+                  {ldg === "pessoal" ? "Pessoal" : "Trust Care"}
                 </button>
               );
             })}
@@ -370,7 +365,7 @@ export function FinanceDashboard({
               >
                 <span>{tab.label}</span>
                 {tab.id === "notebooks" && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
                     {initialNotebooks.length}
                   </span>
                 )}
@@ -379,13 +374,36 @@ export function FinanceDashboard({
           })}
         </nav>
 
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {currentLedger !== "trustcare" && LEDGER_TABS.all.some((t) => t.id === activeTab) && (
+          <label className="flex cursor-pointer items-center gap-2 py-1.5 text-xs text-muted-foreground">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={currentLedger === "all"}
+              onClick={() =>
+                updateParams({ ledger: currentLedger === "all" ? "pessoal" : "all", member: null, tab: activeTab })
+              }
+              className={`relative h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors ${
+                currentLedger === "all" ? "bg-emerald-500" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 size-3 rounded-full bg-background transition-transform ${
+                  currentLedger === "all" ? "translate-x-3" : ""
+                }`}
+              />
+            </button>
+            Somar Trust Care
+          </label>
+        )}
         {currentLedger === "pessoal" && (
           <div className="flex items-center gap-1 py-1.5 text-xs">
-            <span className="mr-1 text-[11px] text-muted-foreground">Pessoa:</span>
+            <span className="mr-1 text-xs text-muted-foreground">Pessoa:</span>
             <button
               type="button"
               onClick={() => updateParams({ member: null })}
-              className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`cursor-pointer rounded border px-2 py-0.5 text-xs font-medium transition-colors ${
                 !activeMember
                   ? "border-foreground/30 bg-muted text-foreground"
                   : "border-border text-muted-foreground hover:text-foreground"
@@ -398,7 +416,7 @@ export function FinanceDashboard({
                 key={m}
                 type="button"
                 onClick={() => updateParams({ member: m })}
-                className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                className={`cursor-pointer rounded border px-2 py-0.5 text-xs font-medium transition-colors ${
                   activeMember === m
                     ? "border-foreground/30 bg-muted text-foreground"
                     : "border-border text-muted-foreground hover:text-foreground"
@@ -409,6 +427,7 @@ export function FinanceDashboard({
             ))}
           </div>
         )}
+        </div>
       </div>
 
       {/* 3. Conteúdo da Aba Ativa */}
@@ -453,7 +472,7 @@ export function FinanceDashboard({
         {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount > 0 && (
           <div className="space-y-5">
             <FinanceHero
-              eyebrow="Resultado Trust Care no mês"
+              eyebrow="Resultado da Trust Care no mês"
               value={signedResult(initialSummary.netBalanceCents).value}
               tone={signedResult(initialSummary.netBalanceCents).tone}
               subtitle={

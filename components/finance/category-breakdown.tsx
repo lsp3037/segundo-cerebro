@@ -82,7 +82,7 @@ export function CategoryBreakdown({ categoriesBreakdown }: CategoryBreakdownProp
                     <span>{item.categoryName}</span>
                   </div>
                   <div className="flex items-center gap-3 tabular-nums">
-                    <span className="text-[11px] text-muted-foreground">{item.percentage}%</span>
+                    <span className="text-xs text-muted-foreground">{item.percentage}%</span>
                     <span className="font-medium text-foreground">{formatCentsToBrl(item.totalCents)}</span>
                   </div>
                 </div>

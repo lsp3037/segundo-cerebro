@@ -8,7 +8,7 @@ export type HouseholdTemplateRow = {
   member: string | null;
   categoryName: string;
   percentBp?: number; // Dízimo: 1000 = 10% das entradas do mês
-  isCard?: boolean; // cria o cartão em "Contas & Cartões"
+  isCard?: boolean; // cria o cartão em "Bancos e cartões"
 };
 
 export const HOUSEHOLD_TEMPLATE: HouseholdTemplateRow[] = [

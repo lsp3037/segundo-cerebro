@@ -51,6 +51,8 @@ export function TransactionsTable({
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "paid">(initialStatusFilter);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const today = todayIso();
+  // O selo Pessoal / Trust Care só ajuda quando a lista mistura os dois (Pessoal + Trust Care).
+  const mixedLedgers = new Set(transactions.map((t) => t.ledger)).size > 1;
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((t) => {
@@ -237,13 +239,13 @@ export function TransactionsTable({
                           {isIncome ? "+" : "-"} {formatCentsToBrl(tx.amount_cents)}
                         </span>
                       </div>
-                      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground">
+                      <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                         <span className={`tabular-nums ${status.className}`}>{status.text}</span>
                         {tx.category && <span>· {tx.category.name}</span>}
                         {tx.member_label && <span>· {tx.member_label}</span>}
                       </div>
                       {tx.notebook && (
-                        <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-cyan-400">
+                        <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-cyan-400">
                           <LaptopIcon className="size-3" />
                           <span>
                             {tx.notebook.brand ? `${tx.notebook.brand} ` : ""}
@@ -287,7 +289,7 @@ export function TransactionsTable({
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border/70 bg-muted/20 text-[11px] font-medium text-muted-foreground">
+                  <tr className="border-b border-border/70 bg-muted/20 text-xs font-medium text-muted-foreground">
                     <th className="w-10 py-2.5 pl-2.5 pr-0"><span className="sr-only">Pago</span></th>
                     <th className="px-3 py-2.5">Situação</th>
                     <th className="px-3 py-2.5">Descrição</th>
@@ -321,7 +323,7 @@ export function TransactionsTable({
                           <PayCheck paid={paid} income={isIncome} label={tx.description} onToggle={() => toggle(tx)} />
                         </td>
 
-                        <td className={`whitespace-nowrap px-3 py-3 text-[11px] tabular-nums ${status.className}`}>
+                        <td className={`whitespace-nowrap px-3 py-3 text-xs tabular-nums ${status.className}`}>
                           {status.text}
                         </td>
 
@@ -335,14 +337,14 @@ export function TransactionsTable({
                               {tx.description}
                             </span>
                             {tx.notebook && (
-                              <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-cyan-400">
+                              <span className="mt-0.5 inline-flex items-center gap-1 text-xs text-cyan-400">
                                 <LaptopIcon className="size-3" />
                                 {tx.notebook.brand ? `${tx.notebook.brand} ` : ""}
                                 {tx.notebook.model}
                               </span>
                             )}
                             {tx.notes && (
-                              <span className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                              <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
                                 {tx.notes}
                               </span>
                             )}
@@ -366,13 +368,13 @@ export function TransactionsTable({
                         <td className="whitespace-nowrap px-3 py-3">
                           <div className="flex items-center gap-1.5">
                             {tx.member_label && (
-                              <span className="inline-flex items-center rounded border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+                              <span className="inline-flex items-center rounded border border-border bg-muted/40 px-1.5 py-0.5 text-xs font-medium text-foreground">
                                 {tx.member_label}
                               </span>
                             )}
-                            {ledgerConfig && (
+                            {mixedLedgers && ledgerConfig && (
                               <span
-                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium ${ledgerConfig.className}`}
+                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-medium ${ledgerConfig.className}`}
                               >
                                 {ledgerConfig.label}
                               </span>

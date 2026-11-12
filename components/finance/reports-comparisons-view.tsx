@@ -28,28 +28,31 @@ export function ReportsComparisonsView({
         items={[
           {
             id: "savings-rate",
-            label: "Taxa de poupança",
+            label: "Da renda, sobrou",
             value: `${data.kpis.savingsRatePercent}%`,
-            tone: data.kpis.savingsRatePercent >= 0 ? "positive" : "negative",
-            badge:
+            tone: data.kpis.savingsRatePercent > 0 ? "positive" : data.kpis.savingsRatePercent < 0 ? "negative" : "default",
+            subtext:
               data.previousKpis.incomeCents > 0 ? (
-                <span className={`text-[11px] tabular-nums ${savDelta >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {savDelta >= 0 ? "+" : ""}{savDelta} p.p. MoM
+                <span className={savDelta > 0 ? "text-emerald-400" : savDelta < 0 ? "text-rose-400" : ""}>
+                  {savDelta === 0
+                    ? "igual ao mês passado"
+                    : `${Math.abs(savDelta)} ${Math.abs(savDelta) === 1 ? "ponto" : "pontos"} a ${savDelta > 0 ? "mais" : "menos"} que no mês passado`}
                 </span>
-              ) : undefined,
-            subtext: `Sobra projetada: ${formatCentsToBrl(data.kpis.projectedBalanceCents)}`,
+              ) : (
+                `Sobra prevista: ${formatCentsToBrl(data.kpis.projectedBalanceCents)}`
+              ),
           },
           {
             id: "fixed-commitment",
-            label: "Comprometimento fixo",
+            label: "Contas fixas levam",
             value: `${data.kpis.fixedCommitmentPercent}%`,
-            subtext: `Fixas ${formatCentsToBrl(data.kpis.fixedExpenseCents)} · Var. ${formatCentsToBrl(variableCents)}`,
+            subtext: `da renda · fixas ${formatCentsToBrl(data.kpis.fixedExpenseCents)}, do dia a dia ${formatCentsToBrl(variableCents)}`,
           },
           {
             id: "burn-rate",
-            label: "Custo diário médio",
+            label: "Gasto por dia",
             value: formatCentsToBrl(data.kpis.dailyBurnCents),
-            subtext: "Média diária sobre as saídas do mês",
+            subtext: "média dos gastos do mês",
           },
         ]}
       />
@@ -58,22 +61,22 @@ export function ReportsComparisonsView({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="rounded-lg border border-border bg-card p-4 lg:col-span-7">
           <div className="border-b border-border/70 pb-3">
-            <h3 className="text-sm font-medium text-foreground">Comparativo entre períodos</h3>
-            <p className="text-xs text-muted-foreground">Mês selecionado vs. mês anterior vs. média de 3 meses</p>
+            <h3 className="text-sm font-medium text-foreground">Gastos por categoria, mês a mês</h3>
+            <p className="text-xs text-muted-foreground">Este mês comparado com o mês passado e com a média dos últimos 3</p>
           </div>
 
           {data.comparison.length === 0 ? (
-            <div className="py-10 text-center text-xs text-muted-foreground">Sem dados suficientes para comparar ainda.</div>
+            <div className="py-10 text-center text-[13px] text-muted-foreground">Ainda não há meses suficientes para comparar.</div>
           ) : (
             <div className="mt-2 overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border/70 text-[11px] font-medium text-muted-foreground">
+                  <tr className="border-b border-border/70 text-xs font-medium text-muted-foreground">
                     <th className="py-2 pr-3">Categoria</th>
-                    <th className="px-2 py-2 text-right">Atual</th>
-                    <th className="px-2 py-2 text-right">Anterior</th>
-                    <th className="px-2 py-2 text-right">Média 3M</th>
-                    <th className="pl-2 py-2 text-right">MoM</th>
+                    <th className="px-2 py-2 text-right">Este mês</th>
+                    <th className="px-2 py-2 text-right">Mês passado</th>
+                    <th className="px-2 py-2 text-right">Média de 3 meses</th>
+                    <th className="pl-2 py-2 text-right">Mudou</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -95,8 +98,8 @@ export function ReportsComparisonsView({
                         <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{formatCentsToBrl(row.previousCents)}</td>
                         <td className="px-2 py-2.5 text-right tabular-nums text-muted-foreground">{formatCentsToBrl(row.average3Cents)}</td>
                         <td className="pl-2 py-2.5 text-right">
-                          <span className={`inline-block rounded border px-1.5 py-0.5 text-[11px] tabular-nums ${badgeClass}`}>
-                            {ch === null ? "—" : `${ch > 0 ? "+" : ""}${ch}%`}
+                          <span className={`inline-block rounded border px-1.5 py-0.5 text-xs tabular-nums ${badgeClass}`}>
+                            {ch === null ? "—" : ch === 0 ? "igual" : `${ch > 0 ? "↑" : "↓"} ${Math.abs(ch)}%`}
                           </span>
                         </td>
                       </tr>

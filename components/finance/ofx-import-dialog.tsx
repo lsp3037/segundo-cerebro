@@ -255,7 +255,7 @@ export function OfxImportDialog({
           <div className="space-y-4 py-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Conta / Ledger de Destino</Label>
+                <Label className="text-xs font-medium">De quem é o extrato?</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -267,7 +267,7 @@ export function OfxImportDialog({
                     }`}
                   >
                     <div className="font-semibold text-foreground">Pessoal & Familiar</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">Contas e cartões pessoais</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Bancos e cartões pessoais</div>
                   </button>
 
                   <button
@@ -280,7 +280,7 @@ export function OfxImportDialog({
                     }`}
                   >
                     <div className="font-semibold text-foreground">Trust Care</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">Conta PJ da assistência</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Banco PJ da assistência</div>
                   </button>
                 </div>
               </div>
@@ -289,7 +289,7 @@ export function OfxImportDialog({
                 <Label className="text-xs font-medium">Meio de Pagamento Padrão (Opcional)</Label>
                 <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
                   <SelectTrigger className="text-xs h-10">
-                    <SelectValue placeholder="Selecione conta ou cartão associado..." />
+                    <SelectValue placeholder="Selecione o banco ou cartão..." />
                   </SelectTrigger>
                   <SelectContent className="text-xs">
                     {paymentMethods.map((pm) => (
@@ -299,7 +299,7 @@ export function OfxImportDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Atribui esta forma de pagamento a todos os lançamentos deste extrato.
                 </p>
               </div>
@@ -341,7 +341,7 @@ export function OfxImportDialog({
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-foreground">{selectedFile.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                       {(selectedFile.size / 1024).toFixed(1)} KB • Arquivo OFX Pronto
                     </p>
                   </div>
@@ -368,7 +368,7 @@ export function OfxImportDialog({
                     <p className="text-xs font-semibold text-foreground">
                       Arraste seu arquivo .ofx ou clique para selecionar
                     </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Compatível com Nubank, Itaú, Sicredi, Banco do Brasil, Inter, Caixa, Bradesco...
                     </p>
                   </div>
@@ -422,28 +422,28 @@ export function OfxImportDialog({
             {/* Cards de Resumo */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs shrink-0">
               <div className="rounded-xl border border-border/70 bg-card/60 p-2.5">
-                <span className="text-[10px] text-muted-foreground">Total Encontrado</span>
+                <span className="text-xs text-muted-foreground">Total Encontrado</span>
                 <div className="font-mono text-lg font-bold text-foreground">
                   {report.summary.total}
                 </div>
               </div>
 
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-2.5">
-                <span className="text-[10px] text-emerald-300">Novos Lançamentos</span>
+                <span className="text-xs text-emerald-300">Novos Lançamentos</span>
                 <div className="font-mono text-lg font-bold text-emerald-400">
                   {report.summary.newCount}
                 </div>
               </div>
 
               <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-2.5">
-                <span className="text-[10px] text-blue-300">Possíveis Mesclagens</span>
+                <span className="text-xs text-blue-300">Possíveis Mesclagens</span>
                 <div className="font-mono text-lg font-bold text-blue-400">
                   {report.summary.matchedCount}
                 </div>
               </div>
 
               <div className="rounded-xl border border-border/70 bg-muted/20 p-2.5">
-                <span className="text-[10px] text-muted-foreground">Já Importados</span>
+                <span className="text-xs text-muted-foreground">Já Importados</span>
                 <div className="font-mono text-lg font-bold text-muted-foreground">
                   {report.summary.alreadyImportedCount}
                 </div>
@@ -572,18 +572,18 @@ export function OfxImportDialog({
                         <div className="flex-1 space-y-2">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-[11px] text-muted-foreground">
+                              <span className="font-mono text-xs text-muted-foreground">
                                 {item.date.split("-").reverse().join("/")}
                               </span>
 
                               {isImported && (
-                                <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
+                                <Badge variant="secondary" className="text-xs py-0 px-1.5">
                                   Já Importada (Ignorada)
                                 </Badge>
                               )}
 
                               {isMatched && (
-                                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] py-0 px-1.5 flex items-center gap-1">
+                                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs py-0 px-1.5 flex items-center gap-1">
                                   <GitMergeIcon className="size-3" />
                                   Possível Correspondência
                                 </Badge>
@@ -647,7 +647,7 @@ export function OfxImportDialog({
 
                           {/* Se for correspondência, oferece opção de Mesclar */}
                           {isMatched && item.matchedTransaction && (
-                            <div className="rounded-lg border border-blue-500/30 bg-blue-950/30 p-2 text-[11px] text-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                            <div className="rounded-lg border border-blue-500/30 bg-blue-950/30 p-2 text-xs text-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                               <div>
                                 <span className="font-semibold text-white">Lançamento prévio no sistema:</span> "
                                 {item.matchedTransaction.description}" em {item.matchedTransaction.date} (
@@ -664,7 +664,7 @@ export function OfxImportDialog({
                                       [item.fitid]: { ...state, action: "link_existing" },
                                     }));
                                   }}
-                                  className="h-6 text-[10px] px-2"
+                                  className="h-6 text-xs px-2"
                                 >
                                   Mesclar (1 clique)
                                 </Button>
@@ -678,7 +678,7 @@ export function OfxImportDialog({
                                       [item.fitid]: { ...state, action: "create" },
                                     }));
                                   }}
-                                  className="h-6 text-[10px] px-2 text-muted-foreground"
+                                  className="h-6 text-xs px-2 text-muted-foreground"
                                 >
                                   Criar Novo
                                 </Button>
@@ -688,7 +688,7 @@ export function OfxImportDialog({
 
                           {/* Memorização de Regra Automática */}
                           {state.included && !isImported && (
-                            <div className="flex items-center gap-2 pt-1 text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
                               <label className="flex items-center gap-1.5 cursor-pointer">
                                 <input
                                   type="checkbox"
@@ -715,7 +715,7 @@ export function OfxImportDialog({
                                     }));
                                   }}
                                   placeholder="Palavra-chave..."
-                                  className="h-6 text-[11px] w-48 font-mono"
+                                  className="h-6 text-xs w-48 font-mono"
                                 />
                               )}
                             </div>

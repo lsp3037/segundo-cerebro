@@ -18,29 +18,31 @@ export type FinanceTab =
   | "fluxo"
   | "notebooks";
 
+// Abas com nomes e posições fixos: Resumo e Lançamentos sempre primeiro, Análises sempre por último.
+// O que muda entre Pessoal e Trust Care fica no meio (Orçamento e Bancos e cartões / Notebooks).
 export const LEDGER_TABS: Record<LedgerType, Array<{ id: FinanceTab; label: string }>> = {
   pessoal: [
-    { id: "visao", label: "Visão Geral" },
-    { id: "contas", label: "Contas & Cartões" },
-    { id: "orcamentos", label: "Orçamentos" },
-    { id: "relatorios", label: "Relatórios & KPIs" },
-    { id: "fluxo", label: "Fluxo & Vencimentos" },
+    { id: "visao", label: "Resumo" },
+    { id: "fluxo", label: "Lançamentos" },
+    { id: "orcamentos", label: "Orçamento" },
+    { id: "contas", label: "Bancos e cartões" },
+    { id: "relatorios", label: "Análises" },
   ],
   trustcare: [
     { id: "visao", label: "Resumo" },
+    { id: "fluxo", label: "Lançamentos" },
     { id: "notebooks", label: "Notebooks" },
-    { id: "relatorios", label: "Relatórios & KPIs" },
-    { id: "fluxo", label: "Fluxo & Vencimentos" },
+    { id: "relatorios", label: "Análises" },
   ],
   all: [
-    { id: "visao", label: "Resumo Geral" },
-    { id: "relatorios", label: "Relatórios & KPIs" },
-    { id: "fluxo", label: "Fluxo & Vencimentos" },
+    { id: "visao", label: "Resumo" },
+    { id: "fluxo", label: "Lançamentos" },
+    { id: "relatorios", label: "Análises" },
   ],
 };
 
 export const LEDGER_LABELS: Record<LedgerType, string> = {
-  all: "Visão Consolidada",
+  all: "Pessoal + Trust Care",
   pessoal: "Pessoal / Familiar",
   trustcare: "Trust Care (Empresa)",
 };

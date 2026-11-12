@@ -17,17 +17,30 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
 
   const peakCents = Math.max(...data.flatMap((d) => [d.incomeCents, d.expenseCents]));
   const scaleMaxCents = peakCents > 0 ? peakCents : 100000;
+  const monthsWithData = data.filter((d) => d.incomeCents > 0 || d.expenseCents > 0).length;
+
+  // Com menos de 2 meses lançados não há tendência para mostrar: uma frase no lugar de caixas vazias.
+  if (monthsWithData < 2) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h3 className="text-sm font-medium text-foreground">Últimos 6 meses</h3>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          O gráfico aparece quando houver pelo menos 2 meses com lançamentos.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 pb-3">
         <div>
           <h3 className="text-sm font-medium text-foreground">
-            Tendência dos últimos 6 meses
+            Últimos 6 meses
           </h3>
           <p className="text-xs text-muted-foreground">
-            Comparativo mensal de entradas e saídas
-            {peakCents > 0 ? ` · Topo ${formatCentsToBrl(peakCents)}` : ""}
+            Quanto entrou e quanto saiu em cada mês
+            {peakCents > 0 ? ` · maior valor ${formatCentsToBrl(peakCents)}` : ""}
           </p>
         </div>
 
@@ -78,7 +91,7 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
                     <span className="tabular-nums">{formatCentsToBrl(point.expenseCents)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-1 font-medium">
-                    <span className="text-muted-foreground">Líquido:</span>
+                    <span className="text-muted-foreground">Sobrou:</span>
                     <span
                       className={`tabular-nums ${
                         point.balanceCents >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -111,7 +124,7 @@ export function MonthlyChart({ data, currentMonth }: MonthlyChartProps) {
               </div>
 
               <span
-                className={`mt-2 text-center text-[11px] tabular-nums ${
+                className={`mt-2 text-center text-xs tabular-nums ${
                   isSelectedMonth
                     ? "font-medium text-foreground"
                     : "text-muted-foreground group-hover:text-foreground"

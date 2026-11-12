@@ -117,7 +117,7 @@ export async function generateMonthDiagnostic(input: {
 
       const actionTip =
         overdueCount > 0
-          ? `Priorize a quitação das ${overdueCount} contas atrasadas em Fluxo & Vencimentos.`
+          ? `Priorize a quitação das ${overdueCount} contas atrasadas em Lançamentos.`
           : summary.netBalanceCents < 0 && topExpense
             ? `Revise gastos em ${topExpense.categoryName} ou ajuste o teto mensal em Orçamentos.`
             : "Mantenha os recebimentos e faturas de cartão atualizados para preservar a previsibilidade do mês.";

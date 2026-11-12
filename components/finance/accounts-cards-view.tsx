@@ -79,7 +79,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
         due_day: type === "credit_card" && due && due >= 1 && due <= 31 ? due : null,
       });
       if (res.ok) {
-        toast.success(editingId ? "Conta atualizada." : "Conta criada!");
+        toast.success(editingId ? "Banco ou cartão atualizado." : "Banco ou cartão salvo!");
         setDialogOpen(false);
       } else {
         toast.error(res.error);
@@ -124,12 +124,12 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
         items={[
           {
             id: "bank-balance",
-            label: "Saldo em contas bancárias",
+            label: "Saldo nos bancos",
             value: formatCentsToBrl(totalBankBalance),
-            tone: totalBankBalance >= 0 ? "positive" : "negative",
+            tone: totalBankBalance > 0 ? "positive" : totalBankBalance < 0 ? "negative" : "default",
             badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {bankAccounts.length} {bankAccounts.length === 1 ? "conta" : "contas"}
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {bankAccounts.length} {bankAccounts.length === 1 ? "banco" : "bancos"}
               </span>
             ),
             subtext: "Saldos reais separados dos cartões",
@@ -140,7 +140,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
             value: formatCentsToBrl(totalCardsMonth),
             tone: totalCardsMonth > 0 ? "negative" : "default",
             badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {creditCards.length} {creditCards.length === 1 ? "cartão" : "cartões"}
               </span>
             ),
@@ -154,10 +154,10 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-medium text-foreground">
-              Contas bancárias &amp; reserva
+              Bancos e reserva
             </h3>
             <p className="text-xs text-muted-foreground">
-              Transferências entre contas não contam como despesa
+              Transferir de um banco para outro não conta como gasto
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -178,14 +178,14 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
             )}
             <Button variant="outline" size="sm" onClick={() => openNew("checking")} className="h-8 gap-1.5 text-xs">
               <PlusIcon className="size-3.5" />
-              Nova conta
+              Novo banco
             </Button>
           </div>
         </div>
 
         {bankAccounts.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
-            Nenhuma conta bancária ou reserva cadastrada ainda.
+            Nenhum banco ou reserva cadastrado ainda.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -196,15 +196,15 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
                     <div className="text-xs font-medium text-foreground">
                       {acc.name}
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {ACCOUNT_TYPE_LABELS[acc.type] ?? acc.type} · {acc.owner_label ?? "Casa"}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openEdit(acc)}>
+                    <Button variant="ghost" size="sm" aria-label={`Editar ${acc.name}`} className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openEdit(acc)}>
                       <PencilIcon className="size-3" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleDelete(acc)}>
+                    <Button variant="ghost" size="sm" aria-label={`Remover ${acc.name}`} className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleDelete(acc)}>
                       <Trash2Icon className="size-3" />
                     </Button>
                   </div>
@@ -254,7 +254,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
                       <div className="text-sm font-medium text-foreground">
                         {card.name}
                       </div>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
                         Titular: {card.owner_label ?? "Casa"}
                         {card.due_day ? ` · Vence dia ${String(card.due_day).padStart(2, "0")}` : ""}
                       </p>
@@ -281,7 +281,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
                         <div style={{ width: `${barWidth}%`, backgroundColor: barColor }} className="h-full rounded-full" />
                       </div>
-                      <div className="flex justify-between text-[11px] tabular-nums text-muted-foreground">
+                      <div className="flex justify-between text-xs tabular-nums text-muted-foreground">
                         <span>{pct}% usado</span>
                         <span>Limite: {formatCentsToBrl(card.credit_limit_cents)}</span>
                       </div>
@@ -298,7 +298,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base">{editingId ? "Editar Conta / Cartão" : "Nova Conta ou Cartão"}</DialogTitle>
+            <DialogTitle className="text-base">{editingId ? "Editar banco ou cartão" : "Novo banco ou cartão"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSave} className="space-y-3">
             <div>
@@ -366,7 +366,7 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
       <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-base">Transferir entre Contas</DialogTitle>
+            <DialogTitle className="text-base">Transferir entre bancos</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleTransfer} className="space-y-3">
             <div>

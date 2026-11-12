@@ -242,7 +242,7 @@ function RecurringBillsForm({
                   </span>
                   {b.description}
                 </div>
-                <div className="text-[11px] text-muted-foreground">{b.member_label ?? "Casa"}</div>
+                <div className="text-xs text-muted-foreground">{b.member_label ?? "Casa"}</div>
               </div>
               <div className="col-span-2">
                 <Input
@@ -257,7 +257,7 @@ function RecurringBillsForm({
               </div>
               <div className="col-span-4">
                 {b.amount_mode === "percent_of_income" ? (
-                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-center font-mono text-[11px] text-emerald-400">
+                  <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-center font-mono text-xs text-emerald-400">
                     {((b.percent_bp ?? 1000) / 100).toFixed(0)}% auto das Entradas
                   </div>
                 ) : (

@@ -1,15 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
+  CheckCircle2Icon,
+  ChevronDownIcon,
   ListChecksIcon,
 } from "lucide-react";
 
 import type { HouseholdData, HouseholdTransaction } from "@/lib/data/finance-family";
+import { addDays, formatRelativeDay, formatShortDate, todayIso } from "@/lib/dates";
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
-import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { EmptyMonth, GettingStarted, monthNameLong } from "./getting-started";
 import { PayCheck, usePayToggle } from "./pay-toggle";
 
@@ -41,6 +44,7 @@ export function HouseholdOverview({
   onImportOfx,
 }: HouseholdOverviewProps) {
   const { isPaid, toggle } = usePayToggle();
+  const [showPaid, setShowPaid] = useState(false);
 
   // Mês sem nenhum lançamento: em vez de uma tela de zeros, mostra o caminho para começar.
   if (data.transactions.length === 0) {
@@ -96,6 +100,11 @@ export function HouseholdOverview({
     );
   }
 
+  const today = todayIso();
+  const weekEnd = addDays(today, 7);
+  const monthName = monthNameLong(month);
+  const monthTitle = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+
   const expenses = data.transactions.filter((t) => t.kind === "expense");
   const incomes = data.transactions.filter((t) => t.kind === "income");
   const dueKey = (t: HouseholdTransaction) => t.due_date ?? t.date;
@@ -103,297 +112,281 @@ export function HouseholdOverview({
   const pendingExpenses = expenses
     .filter((t) => t.billStatus !== "paid")
     .sort((a, b) => dueKey(a).localeCompare(dueKey(b)));
+  const paidExpenses = expenses.filter((t) => t.billStatus === "paid");
+  const paidTotalCents = paidExpenses.reduce((acc, t) => acc + t.amount_cents, 0);
   const overdueCount = pendingExpenses.filter((t) => t.billStatus === "overdue").length;
+  const nextDue = pendingExpenses.find((t) => t.due_date && t.billStatus !== "overdue");
 
-  const creditCards = data.accounts.filter((a) => a.type === "credit_card");
-  const cardsTotalCents = creditCards.reduce((acc, c) => acc + c.monthInvoiceCents, 0);
-  const cardsPercent = data.kpis.expenseCents > 0 ? Math.round((cardsTotalCents / data.kpis.expenseCents) * 1000) / 10 : 0;
+  // Grupos por urgência. Cada conta pendente cai em exatamente um.
+  const groups: Array<{ id: string; title: string; tone: string; items: HouseholdTransaction[] }> = [
+    { id: "atrasadas", title: overdueCount === 1 ? "Atrasada" : "Atrasadas", tone: "text-rose-400", items: [] },
+    { id: "semana", title: "Vence nos próximos 7 dias", tone: "text-amber-400", items: [] },
+    { id: "depois", title: "Vence mais tarde", tone: "text-muted-foreground", items: [] },
+    { id: "sem-data", title: "Sem vencimento", tone: "text-muted-foreground", items: [] },
+  ];
+  for (const tx of pendingExpenses) {
+    if (tx.billStatus === "overdue") groups[0].items.push(tx);
+    else if (!tx.due_date) groups[3].items.push(tx);
+    else if (tx.due_date <= weekEnd) groups[1].items.push(tx);
+    else groups[2].items.push(tx);
+  }
 
-  // Ordena contas do mês: atrasadas/pendentes primeiro, depois maiores valores pagos
-  const sortedBills = [...expenses].sort((a, b) => {
-    const aPend = a.billStatus !== "paid" ? 0 : 1;
-    const bPend = b.billStatus !== "paid" ? 0 : 1;
-    if (aPend !== bPend) return aPend - bPend;
-    return dueKey(a).localeCompare(dueKey(b));
-  });
+  const creditCards = data.accounts.filter((a) => a.type === "credit_card" && a.monthInvoiceCents > 0);
+
+  const projected = data.kpis.projectedBalanceCents;
+  const answer =
+    projected > 0
+      ? { lead: `${monthTitle} deve fechar com`, value: `${formatCentsToBrl(projected)} de sobra`, tone: "text-emerald-400" }
+      : projected < 0
+        ? { lead: `${monthTitle} deve fechar no vermelho`, value: `faltam ${formatCentsToBrl(-projected)}`, tone: "text-rose-400" }
+        : { lead: `${monthTitle} deve fechar empatado`, value: formatCentsToBrl(0), tone: "text-foreground" };
+
+  // "seg" sozinho é curto demais para ler de relance: vira "seg, 16 nov".
+  const relativeDay = (iso: string) => {
+    const rel = formatRelativeDay(iso, today);
+    return /^[a-zà-ú]{3}$/i.test(rel) ? `${rel}, ${formatShortDate(iso)}` : rel;
+  };
+
+  const dueText = (tx: HouseholdTransaction) => {
+    if (!tx.due_date) return "sem vencimento";
+    const rel = relativeDay(tx.due_date);
+    return tx.billStatus === "overdue" ? `venceu ${rel}` : `vence ${rel}`;
+  };
+
+  const renderBill = (tx: HouseholdTransaction) => {
+    const paid = isPaid(tx);
+    return (
+      <li key={tx.id} className="flex items-center gap-2 py-1">
+        <PayCheck paid={paid} label={tx.description} onToggle={() => toggle(tx)} className="-ml-1.5" />
+        <button
+          type="button"
+          onClick={() => onEditTransaction(tx)}
+          className="group min-w-0 flex-1 cursor-pointer py-1 text-left"
+        >
+          <span
+            className={`block truncate text-sm font-medium group-hover:underline ${
+              paid ? "text-muted-foreground line-through decoration-muted-foreground/50" : "text-foreground"
+            }`}
+          >
+            {tx.description}
+          </span>
+          <span className="block text-xs text-muted-foreground">
+            {paid ? "paga" : dueText(tx)} · {tx.categoryName ?? "Geral"}
+            {tx.member_label && tx.member_label !== "Casa" ? ` · ${tx.member_label}` : ""}
+          </span>
+        </button>
+        <span className={`shrink-0 text-sm font-medium tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
+          {formatCentsToBrl(tx.amount_cents)}
+        </span>
+      </li>
+    );
+  };
 
   return (
     <div className="space-y-5">
-      {/* Faixa sutil de pendências no mês */}
-      {pendingExpenses.length > 0 && (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5 text-xs ${
-            overdueCount > 0 ? "border-rose-500/40" : "border-amber-500/35"
-          }`}
-        >
-          <div className="flex items-center gap-2.5 text-foreground">
-            <AlertTriangleIcon
-              className={`size-3.5 shrink-0 ${overdueCount > 0 ? "text-rose-400" : "text-amber-400"}`}
-            />
-            <span>
-              <strong>
-                {pendingExpenses.length}{" "}
-                {pendingExpenses.length === 1 ? "conta pendente" : "contas pendentes"}
-              </strong>{" "}
-              {overdueCount > 0 && (
-                <span className="text-rose-400">({overdueCount} atrasada{overdueCount > 1 ? "s" : ""}) </span>
-              )}
-              somando{" "}
-              <strong className="tabular-nums text-amber-400">
-                {formatCentsToBrl(data.kpis.pendingExpenseCents)}
-              </strong>
-              {pendingExpenses[0]?.due_date && (
-                <span className="text-muted-foreground">
-                  {" "}
-                  · próxima: {pendingExpenses[0].description} ({pendingExpenses[0].due_date.slice(8)}/{pendingExpenses[0].due_date.slice(5, 7)})
-                </span>
-              )}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            onClick={onGoToPendingFluxo}
-            className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-foreground hover:underline"
-          >
-            Ver pendentes
-            <ArrowRightIcon className="size-3" />
-          </button>
-        </div>
-      )}
-
-      {/* Onboarding rápido quando ainda não há contas fixas */}
+      {/* Convite para a planilha fixa enquanto ela não existe */}
       {data.recurringBills.length === 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-[13px]">
           <div className="flex items-center gap-2.5">
             <ListChecksIcon className="size-4 shrink-0 text-muted-foreground" />
-            <div>
-              <span className="font-medium text-foreground">Planilha fixa da casa: </span>
-              <span className="text-muted-foreground">
-                carregue o modelo com entradas, cartões, contas fixas e Dízimo automático (10%).
-              </span>
-            </div>
+            <span className="text-muted-foreground">
+              <span className="font-medium text-foreground">Contas fixas da casa:</span> use o modelo com aluguel, energia,
+              cartões e Dízimo (10%) para o mês se montar sozinho.
+            </span>
           </div>
-          <Button variant="outline" size="sm" onClick={onOpenRecurringDialog} className="h-7 text-xs">
-            Configurar contas fixas
+          <Button variant="outline" size="sm" onClick={onOpenRecurringDialog}>
+            Usar modelo
           </Button>
         </div>
       )}
 
-      {/* Nível 1: Resposta principal do mês */}
-      <FinanceHero
-        eyebrow="Saldo projetado do mês"
-        value={signedResult(data.kpis.projectedBalanceCents).value}
-        tone={signedResult(data.kpis.projectedBalanceCents).tone}
-        subtitle={
-          <span className="tabular-nums">
-            Entradas {formatCentsToBrl(data.kpis.incomeCents)} − Saídas {formatCentsToBrl(data.kpis.expenseCents)} · Poupança{" "}
-            <strong className={data.kpis.savingsRatePercent >= 0 ? "font-medium text-emerald-400" : "font-medium text-rose-400"}>
-              {data.kpis.savingsRatePercent}%
-            </strong>{" "}
-            · Comprometimento fixo {data.kpis.fixedCommitmentPercent}%
-          </span>
-        }
-      />
+      {/* 1. A resposta do mês, numa frase */}
+      <section aria-labelledby="month-answer">
+        <p id="month-answer" className="text-sm text-muted-foreground">
+          {answer.lead}
+        </p>
+        <p className={`text-3xl font-semibold tracking-tight tabular-nums sm:text-4xl ${answer.tone}`}>{answer.value}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground tabular-nums">
+          Entrou {formatCentsToBrl(data.kpis.incomeCents)} · sai {formatCentsToBrl(data.kpis.expenseCents)}
+          {data.kpis.incomeCents > 0 && <> · guarda {data.kpis.savingsRatePercent}% da renda</>}
+        </p>
+      </section>
 
-      {/* Nível 2: Faixa dividida de KPIs */}
-      <FinanceKpiStrip
-        columns={3}
-        items={[
-          {
-            id: "incomes",
-            label: "Entradas",
-            value: formatCentsToBrl(data.kpis.incomeCents),
-            tone: data.kpis.incomeCents > 0 ? "positive" : "default",
-            badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {incomes.length} {incomes.length === 1 ? "fonte" : "fontes"}
-              </span>
-            ),
-            subtext: (
-              <span className="tabular-nums">
-                Recebido {formatCentsToBrl(data.kpis.paidIncomeCents)} · Previsto {formatCentsToBrl(data.kpis.pendingIncomeCents)}
-              </span>
-            ),
-          },
-          {
-            id: "expenses",
-            label: "Saídas totais",
-            value: formatCentsToBrl(data.kpis.expenseCents),
-            tone: data.kpis.expenseCents > 0 ? "negative" : "default",
-            badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {expenses.length} {expenses.length === 1 ? "item" : "itens"}
-              </span>
-            ),
-            subtext: (
-              <span className="tabular-nums">
-                Pago {formatCentsToBrl(data.kpis.paidExpenseCents)} · Falta{" "}
-                <span className={data.kpis.pendingExpenseCents > 0 ? "text-amber-400" : ""}>
-                  {formatCentsToBrl(data.kpis.pendingExpenseCents)}
+      {/* 2. O que falta pagar */}
+      {pendingExpenses.length > 0 ? (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border bg-card px-4 py-3 text-sm ${
+            overdueCount > 0 ? "border-rose-500/40" : "border-amber-500/35"
+          }`}
+        >
+          <span className="flex items-center gap-2.5 text-foreground">
+            <AlertTriangleIcon className={`size-4 shrink-0 ${overdueCount > 0 ? "text-rose-400" : "text-amber-400"}`} />
+            <span>
+              <strong className="font-semibold">
+                Falta pagar <span className="tabular-nums">{formatCentsToBrl(data.kpis.pendingExpenseCents)}</span>
+              </strong>{" "}
+              em {pendingExpenses.length} {pendingExpenses.length === 1 ? "conta" : "contas"}
+              {overdueCount > 0 && (
+                <span className="text-rose-400">
+                  {" "}
+                  · {overdueCount} {overdueCount === 1 ? "atrasada" : "atrasadas"}
                 </span>
-              </span>
-            ),
-          },
-          {
-            id: "cards",
-            label: "Cartões de crédito",
-            value: formatCentsToBrl(cardsTotalCents),
-            badge: (
-              <span className="text-[11px] tabular-nums text-muted-foreground">
-                {creditCards.length} {creditCards.length === 1 ? "cartão" : "cartões"}
-              </span>
-            ),
-            subtext: `${cardsPercent}% das saídas do mês`,
-          },
-        ]}
-      />
-
-      {/* Nível 3: Superfície operacional — Baixa Rápida + Entradas / Pessoa */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="rounded-lg border border-border bg-card p-4 lg:col-span-7">
-          <div className="flex items-center justify-between border-b border-border/70 pb-3">
-            <div>
-              <h3 className="text-sm font-medium text-foreground">Contas do mês &amp; baixa rápida</h3>
-              <p className="text-xs text-muted-foreground">
-                Atrasadas e pendentes primeiro, por vencimento
-              </p>
-            </div>
-            {pendingExpenses.length > 0 && (
-              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium tabular-nums text-amber-400">
-                {pendingExpenses.length} {pendingExpenses.length === 1 ? "pendente" : "pendentes"}
-              </span>
-            )}
-          </div>
-
-          {sortedBills.length === 0 ? (
-            <div className="py-10 text-center text-xs text-muted-foreground">
-              Nenhuma saída registrada neste mês ainda.
-            </div>
-          ) : (
-            <div className="divide-y divide-border/60">
-              {sortedBills.slice(0, 8).map((tx) => {
-                const paid = isPaid(tx);
-                const isOverdue = !paid && tx.billStatus === "overdue";
-                const dueLabel = tx.due_date ? `Vence dia ${tx.due_date.slice(8)}/${tx.due_date.slice(5, 7)}` : "Sem dia fixo";
-
-                return (
-                  <div key={tx.id} className="flex items-center gap-2 py-1.5 text-xs">
-                    <PayCheck
-                      paid={paid}
-                      label={tx.description}
-                      onToggle={() => toggle(tx)}
-                      className="-ml-1.5"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onEditTransaction(tx)}
-                      className="group min-w-0 flex-1 cursor-pointer py-1 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`truncate font-medium group-hover:underline ${
-                            paid ? "text-muted-foreground" : "text-foreground"
-                          }`}
-                        >
-                          {tx.description}
-                        </span>
-                        {isOverdue && (
-                          <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-400">
-                            Atrasado
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">
-                        {tx.member_label ?? "Casa"} · {tx.categoryName ?? "Geral"} · {paid ? "Paga" : dueLabel}
-                      </div>
-                    </button>
-
-                    <span className={`shrink-0 font-medium tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
-                      {formatCentsToBrl(tx.amount_cents)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {sortedBills.length > 8 && (
-            <div className="mt-3 border-t border-border/60 pt-2.5 text-right">
-              <button type="button" onClick={onGoToAllFluxo} className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
-                Ver todas as {sortedBills.length} contas do mês &rarr;
-              </button>
-            </div>
-          )}
+              )}
+              {nextDue?.due_date && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · próxima: {nextDue.description}, {relativeDay(nextDue.due_date)}
+                </span>
+              )}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={onGoToPendingFluxo}
+            className="inline-flex cursor-pointer items-center gap-1 text-[13px] font-medium text-foreground hover:underline"
+          >
+            Ver em Lançamentos
+            <ArrowRightIcon className="size-3.5" />
+          </button>
         </div>
+      ) : (
+        expenses.length > 0 && (
+          <p className="rounded-lg border border-emerald-500/30 bg-card px-4 py-3 text-sm text-foreground">
+            Tudo pago em {monthName}. <span className="text-muted-foreground">{paidExpenses.length} contas quitadas.</span>
+          </p>
+        )
+      )}
 
-        {/* Direita (5 cols): Entradas da Casa + Distribuição por Pessoa */}
-        <div className="space-y-4 lg:col-span-5">
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="flex items-center justify-between border-b border-border/70 pb-3">
-              <div>
-                <h3 className="text-sm font-medium text-foreground">Entradas da casa</h3>
-                <p className="text-xs text-muted-foreground">Base para cálculo de Dízimo (10%)</p>
+      {/* 3. Contas por urgência + apoio */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <section aria-labelledby="bills-title" className="rounded-lg border border-border bg-card px-4 pb-3 pt-4 lg:col-span-7">
+          <h3 id="bills-title" className="text-sm font-medium text-foreground">
+            Contas de {monthName}
+          </h3>
+
+          {expenses.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">Nenhum gasto lançado em {monthName} ainda.</p>
+          ) : (
+            <>
+              {groups
+                .filter((g) => g.items.length > 0)
+                .map((g) => (
+                  <div key={g.id} className="mt-3">
+                    <h4 className={`text-xs font-semibold ${g.tone}`}>{g.title}</h4>
+                    <ul className="divide-y divide-border/60">{g.items.map(renderBill)}</ul>
+                  </div>
+                ))}
+
+              {paidExpenses.length > 0 && (
+                <div className="mt-3 border-t border-border/60 pt-2">
+                  <button
+                    type="button"
+                    aria-expanded={showPaid}
+                    onClick={() => setShowPaid((v) => !v)}
+                    className="flex w-full cursor-pointer items-center justify-between gap-2 py-1.5 text-[13px] text-muted-foreground hover:text-foreground"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CheckCircle2Icon className="size-4 text-emerald-500" />
+                      {paidExpenses.length} {paidExpenses.length === 1 ? "já paga" : "já pagas"} ·{" "}
+                      <span className="tabular-nums">{formatCentsToBrl(paidTotalCents)}</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      {showPaid ? "esconder" : "mostrar"}
+                      <ChevronDownIcon className={`size-3.5 transition-transform ${showPaid ? "rotate-180" : ""}`} />
+                    </span>
+                  </button>
+                  {showPaid && <ul className="divide-y divide-border/60">{paidExpenses.map(renderBill)}</ul>}
+                </div>
+              )}
+
+              <div className="mt-2 border-t border-border/60 pt-2.5 text-right">
+                <button
+                  type="button"
+                  onClick={onGoToAllFluxo}
+                  className="cursor-pointer text-[13px] font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Ver todos os lançamentos de {monthName} &rarr;
+                </button>
               </div>
+            </>
+          )}
+        </section>
+
+        <div className="space-y-4 lg:col-span-5">
+          <section aria-labelledby="incomes-title" className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <h3 id="incomes-title" className="text-sm font-medium text-foreground">
+                Entradas
+              </h3>
               <span className="text-sm font-semibold tabular-nums text-emerald-400">
                 {formatCentsToBrl(data.kpis.incomeCents)}
               </span>
             </div>
-
+            <p className="text-xs text-muted-foreground">Base do Dízimo (10%)</p>
             {incomes.length === 0 ? (
-              <div className="py-6 text-center text-xs text-muted-foreground">Nenhuma entrada registrada neste mês.</div>
+              <p className="py-5 text-center text-[13px] text-muted-foreground">Nenhuma entrada em {monthName}.</p>
             ) : (
-              <div className="divide-y divide-border/60">
+              <ul className="mt-2 divide-y divide-border/60">
                 {incomes.map((inc) => (
-                  <button
-                    key={inc.id}
-                    type="button"
-                    onClick={() => onEditTransaction(inc)}
-                    className="flex w-full cursor-pointer items-center justify-between py-2.5 text-left text-xs transition-colors hover:bg-muted/20"
-                  >
-                    <span className="truncate font-medium text-foreground">{inc.description}</span>
-                    <span className="shrink-0 font-medium tabular-nums text-emerald-400">
-                      {formatCentsToBrl(inc.amount_cents)}
-                    </span>
-                  </button>
+                  <li key={inc.id}>
+                    <button
+                      type="button"
+                      onClick={() => onEditTransaction(inc)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 py-2 text-left text-[13px] hover:underline"
+                    >
+                      <span className="truncate text-foreground">
+                        {inc.description}
+                        {inc.billStatus !== "paid" && <span className="text-amber-400"> · a receber</span>}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-emerald-400">{formatCentsToBrl(inc.amount_cents)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {creditCards.length > 0 && (
+            <section aria-labelledby="cards-title" className="rounded-lg border border-border bg-card p-4">
+              <h3 id="cards-title" className="text-sm font-medium text-foreground">
+                Cartões em {monthName}
+              </h3>
+              <ul className="mt-2 divide-y divide-border/60">
+                {creditCards.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
+                    <span className="truncate text-foreground">{c.name}</span>
+                    <span className="shrink-0 tabular-nums text-foreground">{formatCentsToBrl(c.monthInvoiceCents)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {data.members.length > 0 && (
+            <section aria-labelledby="members-title" className="rounded-lg border border-border bg-card p-4">
+              <h3 id="members-title" className="text-sm font-medium text-foreground">
+                Gastos por pessoa
+              </h3>
+              <div className="mt-3 space-y-3">
+                {data.members.map((m) => (
+                  <div key={m.member} className="space-y-1">
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-foreground">{m.member}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatCentsToBrl(m.expenseCents)} · {m.percent}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                      <div
+                        style={{ width: `${m.percent > 0 ? Math.min(100, Math.max(2, m.percent)) : 0}%` }}
+                        className="h-full rounded-full bg-zinc-400"
+                      />
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
-
-          <div className="rounded-lg border border-border bg-card p-4">
-            <div className="border-b border-border/70 pb-3">
-              <h3 className="text-sm font-medium text-foreground">Distribuição por pessoa</h3>
-              <p className="text-xs text-muted-foreground">Saídas por responsável no mês</p>
-            </div>
-
-            {data.members.length === 0 ? (
-              <div className="py-6 text-center text-xs text-muted-foreground">Sem saídas no mês.</div>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {data.members.map((m, idx) => {
-                  const color = idx === 0 ? "#10b981" : idx === 1 ? "#a1a1aa" : "#71717a";
-                  const barWidth = m.percent > 0 ? Math.min(100, Math.max(2, m.percent)) : 0;
-                  return (
-                    <div key={m.member} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium text-foreground">{m.member}</span>
-                        <span className="tabular-nums text-muted-foreground">
-                          {formatCentsToBrl(m.expenseCents)} ({m.percent}%)
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
-                        <div
-                          style={{ width: `${barWidth}%`, backgroundColor: color }}
-                          className="h-full rounded-full transition-all"
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+            </section>
+          )}
         </div>
       </div>
     </div>
