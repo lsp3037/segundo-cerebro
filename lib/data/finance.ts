@@ -7,6 +7,7 @@ export type Transaction = Tables<"transactions"> & {
   category?: { name: string; color: string | null } | null;
   payment_method?: { name: string; type: string | null } | null;
   notebook?: { model: string; brand: string | null } | null;
+  account?: { name: string; type: string } | null;
 };
 
 export type FinanceCategory = Tables<"finance_categories">;
@@ -330,11 +331,12 @@ export async function getTransactions(params?: {
     query = query.limit(1000);
   }
 
-  const [txRes, catsRes, methodsRes, notebooksRes] = await Promise.all([
+  const [txRes, catsRes, methodsRes, notebooksRes, accountsRes] = await Promise.all([
     query,
     supabase.from("finance_categories").select("id, name, color"),
     supabase.from("payment_methods").select("id, name, type"),
     supabase.from("notebooks").select("id, model, brand"),
+    supabase.from("finance_accounts").select("id, name, type").is("deleted_at", null),
   ]);
 
   if (txRes.error) throw txRes.error;
@@ -342,12 +344,14 @@ export async function getTransactions(params?: {
   const catsMap = new Map((catsRes.data ?? []).map((c) => [c.id, c]));
   const methodsMap = new Map((methodsRes.data ?? []).map((m) => [m.id, m]));
   const notebooksMap = new Map((notebooksRes.data ?? []).map((n) => [n.id, n]));
+  const accountsMap = new Map((accountsRes.data ?? []).map((a) => [a.id, a]));
 
   return (txRes.data ?? []).map((t) => ({
     ...t,
     category: t.category_id ? catsMap.get(t.category_id) ?? null : null,
     payment_method: t.payment_method_id ? methodsMap.get(t.payment_method_id) ?? null : null,
     notebook: t.notebook_id ? notebooksMap.get(t.notebook_id) ?? null : null,
+    account: t.account_id ? accountsMap.get(t.account_id) ?? null : null,
   })) as Transaction[];
 }
 
