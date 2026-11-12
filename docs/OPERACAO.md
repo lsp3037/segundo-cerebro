@@ -60,14 +60,14 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
   - [ ] Campanhas & Ângulos: cadastrar campanha com orçamento e datas; criar ângulos de teste e usar "Sugerir com IA".
   - [ ] Analisador Meta Ads: visualizar KPIs (Spend, Cliques, CTR, CPC, Leads, CPL); testar botão de sincronização e diagnóstico da IA.
 
-### Fase 5: Finanças e Revisão Semanal
-- [ ] Finanças: alternar entre Pessoal, Trust Care e Consolidado; conferir métricas e gráficos mensais.
-- [ ] Lançar despesa e receita; editar categorias e formas de pagamento.
-- [ ] Notebooks de Revenda: cadastrar notebook com preço de vitrine; conferir cálculo de Dias em Estoque e alerta de estagnação (>30 dias).
-- [ ] Fechamento de Venda: registrar venda com comprador, WhatsApp, prazo de garantia e taxa da maquininha; conferir baixa do estoque e lucro real.
-- [ ] Pós-Venda: lançar custo de garantia em notebook vendido e conferir recálculo de margem.
-- [ ] Importador OFX: subir arquivo de extrato bancário, conferir detecção de novos, sugestão de mesclagem com lançamentos manuais e auto-categorização com memorização de regras.
-- [ ] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo, registrar anotações e concluir, visualizando o histórico.
+### Fase 5: Finanças, Pessoal/Familiar e Revisão Semanal
+- [ ] Executar a migration `supabase/migrations/20261112120000_finance_family.sql` no SQL Editor do Supabase.
+- [ ] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
+- [ ] Conferir cálculo automático de `10%` do Dízimo ao alterar Entradas, filtro por Pessoa (`Casa`, `Luan`, `Rayzza`), baixa rápida em 1 clique (`Pagar` ↔ `Pago`) e card **Contas da Semana** em `/hoje`.
+- [ ] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado) e conferir comparativos entre períodos.
+- [ ] Trust Care & Notebooks: alternar para Trust Care, cadastrar notebook com preço de vitrine, registrar venda com garantia/taxa de maquininha e conferir lucro real.
+- [ ] Importador OFX: subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
+- [ ] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo e concluir.
 
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 

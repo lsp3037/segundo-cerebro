@@ -280,3 +280,14 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 4. **Interface de Importação e Regras**: Desenvolver modal/gaveta de importação de extrato bancário com prévia interativa, auto-categorização via `finance_rules`, salvamento em lote e aprendizado de regras.
 5. **Revisão Semanal**: Implementar a tela `/revisao` com o checklist guiado de domingo integrando tarefas pendentes, Caixa de Entrada e o resumo financeiro da semana.
 
+---
+
+## 11. Finanças Pessoal & Familiar ("Minhas Finanças" · 2026-11-12)
+
+> Evolução do ledger `pessoal` calibrada com a planilha familiar de Luan & Rayzza.
+
+- **Modelo de Dados (`20261112120000_finance_family.sql`):** `finance_accounts` (contas correntes, reserva, dinheiro e 4 cartões de crédito com limite e dia de vencimento), `finance_recurring_bills` (contas/entradas fixas mensais + regra percentual automática de `10%` para o Dízimo), `finance_budgets` (tetos mensais por categoria) e extensão de `transactions` (`status` Pago/Pendente, `due_date`, `paid_at`, `account_id`, `member_label` Casa/Luan/Rayzza, `recurring_bill_id` e parcelamentos `installment_group_id` / `installment_index` / `installment_total`). Todas as tabelas novas com RLS (`private.apply_owner_policy`).
+- **5 Visões em `/financas`:** (1) `Visão Geral` (alertas de vencimento, 4 KPIs familiares, baixa rápida em 1 clique, entradas base e distribuição por pessoa), (2) `Contas & Cartões` (saldos reais, transferência entre contas e faturas dos cartões), (3) `Orçamentos` (planejado vs. realizado com semáforo verde/âmbar/vermelho), (4) `Relatórios & KPIs` (Taxa de Poupança, Comprometimento Fixo, Burn Rate, comparativo Mês Atual vs. Anterior vs. Média 3M e tendência 6 meses) e (5) `Fluxo & Vencimentos` (filtros por status e pessoa + quitação direta).
+- **Integração com `/hoje`:** Card lateral **Contas da Semana** destacando contas atrasadas ou vencendo nos próximos 7 dias.
+
+

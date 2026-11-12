@@ -118,12 +118,12 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 - **Pendente:** a especificação pede busca também em **fluxos, eventos e ideias de conteúdo**.
 - Fase 6: modo "perguntar", com respostas baseadas no próprio conteúdo, citando as notas. Áreas travadas para a IA nem são indexadas.
 
-### 7.12 Finanças ⏳ Fase 5
-- Pessoal: entradas e saídas com categoria, data, forma de pagamento e observação.
-- Trust Care: receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda).
-- Resumo mensal por área, com entradas, saídas, saldo e um gráfico simples. A área nasce travada para a IA.
+### 7.12 Finanças ✅ Fase 5 (Pessoal/Familiar + Trust Care)
+- **Pessoal & Familiar:** cockpit financeiro inspirado no *Minhas Finanças* e calibrado pela planilha da casa (`Casa`, `Luan`, `Rayzza`), com **Contas & Cartões** (saldos reais e limites/faturas separados), **Contas Fixas Mensais & Dízimo Automático (10%)**, **Baixa em 1 clique** (Pago / Pendente / Atrasado), **Parcelamentos (`1/N`)**, **Orçamentos por Categoria**, **KPIs e Comparativos entre Períodos** (Taxa de Poupança, Comprometimento Fixo, Burn Rate, MoM e Média 3M) e alertas de vencimento na tela `/financas` e no card **Contas da Semana** em `/hoje`.
+- **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + garantia).
+- Resumo mensal por área e importação local de extrato `.ofx`. A área nasce travada para a IA (`ai_enabled = false`).
 
-### 7.13 Revisão Semanal ⏳ Fase 5
+### 7.13 Revisão Semanal ✅ Fase 5
 - Checklist de domingo:
   - esvaziar a Caixa de Entrada;
   - revisar as atrasadas;
