@@ -37,11 +37,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { updateArea } from "@/lib/actions/areas";
 import { renameFolder, reorderFolders, setFolderCollapsed } from "@/lib/actions/folders";
 import type { Area, Folder } from "@/lib/modules";
 import { cn } from "@/lib/utils";
 import { type FolderDialogState, FolderDialogs } from "./folder-dialogs";
+
+const AREA_DEFAULT_ICON: Record<string, string> = {
+  profissional: "briefcase",
+  pessoal: "user",
+  trustcare: "wrench",
+  financas: "wallet",
+};
 
 type TreeContextValue = {
   childrenOf: (areaId: string, parentId: string | null) => Folder[];
@@ -50,6 +58,7 @@ type TreeContextValue = {
   renamingId: string | null;
   setRenamingId: (id: string | null) => void;
   onNavigate: () => void;
+  collapsed: boolean;
 };
 
 const TreeContext = createContext<TreeContextValue | null>(null);
@@ -65,10 +74,12 @@ const siblingsKey = (areaId: string, parentId: string | null) => `${areaId}:${pa
 export function Sidebar({
   areas: areasProp,
   folders: foldersProp,
+  collapsed = false,
   onNavigate,
 }: {
   areas: Area[];
   folders: Folder[];
+  collapsed?: boolean;
   onNavigate: () => void;
 }) {
   // Estado local para resposta imediata; volta a seguir o servidor quando os dados mudam.
@@ -101,33 +112,52 @@ export function Sidebar({
     renamingId,
     setRenamingId,
     onNavigate,
+    collapsed,
   };
 
   function toggleArea(area: Area) {
-    const collapsed = !area.collapsed;
-    setAreas((list) => list.map((a) => (a.id === area.id ? { ...a, collapsed } : a)));
-    void updateArea(area.id, { collapsed });
+    const nextCollapsed = !area.collapsed;
+    setAreas((list) => list.map((a) => (a.id === area.id ? { ...a, collapsed: nextCollapsed } : a)));
+    void updateArea(area.id, { collapsed: nextCollapsed });
   }
+
+  const settingsLink = (
+    <Link
+      href="/configuracoes"
+      onClick={onNavigate}
+      aria-label="Configurações"
+      className={cn(
+        "flex items-center rounded-md text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+        collapsed ? "mx-auto size-9 justify-center" : "h-8 gap-2 px-2",
+      )}
+    >
+      <SettingsIcon className="size-4 shrink-0" />
+      {!collapsed && <span>Configurações</span>}
+    </Link>
+  );
 
   return (
     <TreeContext value={tree}>
       <div className="flex h-full flex-col">
         <ScrollArea className="min-h-0 flex-1">
-          <nav aria-label="Áreas e pastas" className="space-y-3 p-2 pt-3">
+          <nav
+            aria-label="Áreas e pastas"
+            className={cn(collapsed ? "space-y-2 p-1.5 pt-2.5" : "space-y-3 p-2 pt-3")}
+          >
             {areas.map((area) => (
               <AreaSection key={area.id} area={area} onToggle={() => toggleArea(area)} />
             ))}
           </nav>
         </ScrollArea>
         <div className="border-t p-2">
-          <Link
-            href="/configuracoes"
-            onClick={onNavigate}
-            className="flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <SettingsIcon className="size-4" />
-            Configurações
-          </Link>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>{settingsLink}</TooltipTrigger>
+              <TooltipContent side="right">Configurações</TooltipContent>
+            </Tooltip>
+          ) : (
+            settingsLink
+          )}
         </div>
       </div>
       <FolderDialogs state={dialog} onClose={() => setDialog(null)} areas={areas} folders={folders} />
@@ -139,16 +169,48 @@ export function Sidebar({
 const FILTERABLE = ["/hoje", "/agenda", "/entrada", "/ideias", "/conhecimento", "/aprender", "/financas", "/revisao"];
 
 function AreaSection({ area, onToggle }: { area: Area; onToggle: () => void }) {
-  const { openDialog, onNavigate } = useTree();
+  const { openDialog, onNavigate, collapsed } = useTree();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const active = searchParams.get("area") === area.slug;
+  const areaIcon = area.icon || AREA_DEFAULT_ICON[area.slug] || "folder";
 
   function filter() {
     const base = FILTERABLE.some((p) => pathname.startsWith(p)) ? pathname : "/hoje";
     router.push(active ? base : `${base}?area=${area.slug}`);
     onNavigate();
+  }
+
+  if (collapsed) {
+    return (
+      <section
+        style={{ "--area": area.color } as React.CSSProperties}
+        className="space-y-0.5 border-t border-border/50 pt-2 first:border-t-0 first:pt-0"
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={filter}
+              aria-label={active ? `Remover filtro de ${area.name}` : `Filtrar por ${area.name}`}
+              className={cn(
+                "mx-auto flex size-9 items-center justify-center rounded-md transition-colors hover:bg-accent/60",
+                active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon name={areaIcon} className={cn("size-4 shrink-0", active && "text-(--area)")} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {area.name}
+            {active ? " (filtro ativo)" : ""}
+          </TooltipContent>
+        </Tooltip>
+
+        {!area.collapsed && <CollapsedFolderRail areaId={area.id} parentId={null} />}
+      </section>
+    );
   }
 
   return (
@@ -172,9 +234,12 @@ function AreaSection({ area, onToggle }: { area: Area; onToggle: () => void }) {
             active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground",
           )}
         >
-          <span
-            className={cn("size-2 shrink-0 rounded-full bg-(--area)", active && "ring-2 ring-(--area)/30")}
-            aria-hidden="true"
+          <Icon
+            name={areaIcon}
+            className={cn(
+              "size-3.5 shrink-0 transition-colors",
+              active ? "text-(--area)" : "text-muted-foreground group-hover:text-foreground",
+            )}
           />
           <span className="truncate">{area.name}</span>
         </button>
@@ -190,6 +255,48 @@ function AreaSection({ area, onToggle }: { area: Area; onToggle: () => void }) {
       </div>
       {!area.collapsed && <FolderList areaId={area.id} parentId={null} depth={0} />}
     </section>
+  );
+}
+
+function CollapsedFolderRail({ areaId, parentId }: { areaId: string; parentId: string | null }) {
+  const { childrenOf, onNavigate } = useTree();
+  const pathname = usePathname();
+  const items = childrenOf(areaId, parentId);
+  if (items.length === 0) return null;
+
+  return (
+    <ul role="list" className="space-y-0.5">
+      {items.map((folder) => {
+        const active = pathname === `/p/${folder.id}`;
+        const hasChildren = childrenOf(folder.area_id, folder.id).length > 0;
+        return (
+          <li key={folder.id}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link
+                  href={`/p/${folder.id}`}
+                  onClick={onNavigate}
+                  aria-label={folder.name}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "mx-auto flex size-9 items-center justify-center rounded-md transition-colors",
+                    active
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                  )}
+                >
+                  <Icon name={folder.icon} className={cn("size-4 shrink-0", active && "text-(--area)")} />
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">{folder.name}</TooltipContent>
+            </Tooltip>
+            {hasChildren && !folder.collapsed && (
+              <CollapsedFolderRail areaId={folder.area_id} parentId={folder.id} />
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

@@ -1,6 +1,15 @@
 "use client";
 
-import { InboxIcon, LogOutIcon, MenuIcon, SearchIcon, SettingsIcon, XIcon } from "lucide-react";
+import {
+  InboxIcon,
+  LogOutIcon,
+  MenuIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  SearchIcon,
+  SettingsIcon,
+  XIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -26,12 +35,16 @@ import type { ShellUser } from "./app-shell";
 export function Topbar({
   user,
   areas,
+  sidebarCollapsed,
+  onToggleSidebar,
   onOpenNav,
   onOpenCommand,
   onOpenCapture,
 }: {
   user: ShellUser;
   areas: Area[];
+  sidebarCollapsed: boolean;
+  onToggleSidebar: () => void;
   onOpenNav: () => void;
   onOpenCommand: () => void;
   onOpenCapture: () => void;
@@ -48,7 +61,19 @@ export function Topbar({
         <MenuIcon />
       </Button>
 
-      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 xl:w-[15.25rem]">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="hidden text-muted-foreground hover:text-foreground md:inline-flex"
+        onClick={onToggleSidebar}
+        aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+        aria-expanded={!sidebarCollapsed}
+        title={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+      >
+        {sidebarCollapsed ? <PanelLeftOpenIcon className="size-4" /> : <PanelLeftCloseIcon className="size-4" />}
+      </Button>
+
+      <Link href="/hoje" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 xl:mr-3">
         <BrainMark className="size-5" />
         <span className="hidden text-sm font-semibold tracking-tight xl:inline">Segundo Cérebro</span>
       </Link>
