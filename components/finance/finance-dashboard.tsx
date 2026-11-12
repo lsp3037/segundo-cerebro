@@ -3,21 +3,14 @@
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  BarChart3Icon,
-  CalendarIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   FileSpreadsheetIcon,
-  LandmarkIcon,
-  LaptopIcon,
-  LayoutDashboardIcon,
   ListChecksIcon,
-  PieChartIcon,
   PlusIcon,
-  ReceiptTextIcon,
-  RotateCcwIcon,
+  SlidersHorizontalIcon,
   TagIcon,
-  TargetIcon,
 } from "lucide-react";
 
 import type {
@@ -30,15 +23,22 @@ import type {
 import type { HouseholdData } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
+import { formatCentsToBrl } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AccountsCardsView } from "./accounts-cards-view";
 import { BudgetsView } from "./budgets-view";
 import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
 import { HouseholdOverview } from "./household-overview";
-import { type LedgerType } from "./meta";
-import { MetricsCards } from "./metrics-cards";
+import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
@@ -60,6 +60,7 @@ interface FinanceDashboardProps {
   currentLedger: LedgerType;
   currentMember: string | null;
   baseFolderId?: string;
+  contextLabel?: string;
 }
 
 export function FinanceDashboard({
@@ -72,14 +73,18 @@ export function FinanceDashboard({
   currentMonth,
   currentLedger,
   currentMember,
+  contextLabel,
 }: FinanceDashboardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
-  const defaultTab = currentLedger === "pessoal" ? "visao" : "fluxo";
-  const activeTab = searchParams.get("tab") || defaultTab;
+  const allowedTabs = LEDGER_TABS[currentLedger];
+  const rawTab = searchParams.get("tab") as FinanceTab | null;
+  const activeTab: FinanceTab =
+    rawTab && allowedTabs.some((t) => t.id === rawTab) ? rawTab : "visao";
+  const activeMember = currentLedger === "pessoal" ? currentMember : null;
 
   // Diálogos de criação / edição
   const [txDialogOpen, setTxDialogOpen] = useState(false);
@@ -143,13 +148,25 @@ export function FinanceDashboard({
     updateParams({ m: realCurrentMonth });
   };
 
-  // Formatação bonita do nome do mês (ex: "Novembro de 2026")
+  // Formatação compacta do mês (ex: "Nov 2026")
   const formattedMonthLabel = (() => {
     const [yStr, mStr] = currentMonth.split("-");
     const d = new Date(parseInt(yStr, 10), parseInt(mStr, 10) - 1, 1);
-    const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-    return label.charAt(0).toUpperCase() + label.slice(1);
+    const shortMonth = d
+      .toLocaleDateString("pt-BR", { month: "short" })
+      .replace(".", "");
+    return `${shortMonth.charAt(0).toUpperCase()}${shortMonth.slice(1)} ${yStr}`;
   })();
+
+  const handleSwitchLedger = (nextLedger: LedgerType) => {
+    const nextAllowed = LEDGER_TABS[nextLedger];
+    const nextTab = nextAllowed.some((t) => t.id === activeTab) ? activeTab : "visao";
+    updateParams({
+      ledger: nextLedger,
+      tab: nextTab,
+      member: nextLedger === "pessoal" ? activeMember : null,
+    });
+  };
 
   // Handlers para ações diretas
   const handleOpenNewTransaction = (prefLedger?: "pessoal" | "trustcare") => {
@@ -186,299 +203,212 @@ export function FinanceDashboard({
     setNbDialogOpen(true);
   };
 
+  const isNotebooksPrimary = currentLedger === "trustcare" && activeTab === "notebooks";
+
   return (
-    <div className="space-y-6 px-4 py-4 md:px-6">
-      {/* 1. Barra de Controles Superiores (Ledger Switcher, Mês e Ações) */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        {/* Alternador de Conta / Ledger (Pills elegantes estilo Linear) */}
-        <div className="inline-flex rounded-xl bg-muted/40 p-1 border border-border/60">
-          {(["all", "pessoal", "trustcare"] as LedgerType[]).map((ldg) => {
-            const isSelected = currentLedger === ldg;
+    <div className="px-4 pb-8 md:px-6">
+      {/* 1. Workspace Header único (~56px no desktop) */}
+      <header className="flex min-h-14 flex-wrap items-center justify-between gap-2.5 border-b border-border/70 py-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-baseline gap-1.5">
+            {contextLabel && (
+              <span className="text-xs text-muted-foreground">{contextLabel} /</span>
+            )}
+            <h1 className="text-sm font-semibold tracking-tight text-foreground">
+              Finanças
+            </h1>
+          </div>
+
+          {/* Seletor de Conta / Ledger */}
+          <div
+            role="tablist"
+            aria-label="Contexto financeiro"
+            className="inline-flex h-8 items-center rounded-md border border-border bg-card p-0.5 text-xs"
+          >
+            {(["pessoal", "trustcare", "all"] as LedgerType[]).map((ldg) => {
+              const isSelected = currentLedger === ldg;
+              return (
+                <button
+                  key={ldg}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => handleSwitchLedger(ldg)}
+                  className={`h-7 cursor-pointer rounded-sm px-2.5 text-xs font-medium transition-colors ${
+                    isSelected
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {ldg === "pessoal"
+                    ? "Pessoal"
+                    : ldg === "trustcare"
+                      ? "Trust Care"
+                      : "Consolidado"}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Seletor de Mês compacto + Hoje inline */}
+          <div className="flex items-center gap-1.5">
+            <div className="inline-flex h-8 items-center rounded-md border border-border bg-card px-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePrevMonth}
+                className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                title="Mês anterior"
+                aria-label="Mês anterior"
+              >
+                <ChevronLeftIcon className="size-3.5" />
+              </Button>
+              <span className="min-w-[74px] px-1.5 text-center text-xs font-medium tabular-nums text-foreground">
+                {formattedMonthLabel}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNextMonth}
+                className="size-7 p-0 text-muted-foreground hover:text-foreground"
+                title="Próximo mês"
+                aria-label="Próximo mês"
+              >
+                <ChevronRightIcon className="size-3.5" />
+              </Button>
+            </div>
+
+            {currentMonth !== realCurrentMonth && (
+              <button
+                type="button"
+                onClick={handleResetCurrentMonth}
+                className="cursor-pointer rounded px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                Hoje
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Ações do Workspace: 1 menu Configurar + 1 CTA primário invertido */}
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                <SlidersHorizontalIcon className="size-3.5" />
+                <span>Configurar</span>
+                <ChevronDownIcon className="size-3.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {currentLedger !== "trustcare" && (
+                <>
+                  <DropdownMenuItem onSelect={() => setRecurringDialogOpen(true)}>
+                    <ListChecksIcon className="size-4" />
+                    <span>Contas Fixas &amp; Dízimo</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem onSelect={() => setOfxDialogOpen(true)}>
+                <FileSpreadsheetIcon className="size-4" />
+                <span>Importar Extrato (.OFX)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setCatDialogOpen(true)}>
+                <TagIcon className="size-4" />
+                <span>Gerenciar Categorias</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            size="sm"
+            onClick={
+              isNotebooksPrimary
+                ? handleOpenNewNotebook
+                : () => handleOpenNewTransaction()
+            }
+            className="h-8 gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background hover:bg-foreground/90"
+          >
+            <PlusIcon className="size-3.5" />
+            <span>{isNotebooksPrimary ? "Novo Notebook" : "Lançamento"}</span>
+          </Button>
+        </div>
+      </header>
+
+      {/* 2. Sub-abas (~40px) + Filtro de Pessoa exclusivo de Pessoal */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70">
+        <nav
+          className="-mb-px flex items-center gap-5 overflow-x-auto"
+          aria-label="Abas financeiras"
+        >
+          {allowedTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
             return (
               <button
-                key={ldg}
+                key={tab.id}
                 type="button"
-                onClick={() =>
-                  updateParams({
-                    ledger: ldg,
-                    tab: ldg === "pessoal" ? "visao" : ldg === "trustcare" ? "fluxo" : activeTab,
-                  })
-                }
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  isSelected
-                    ? "bg-background text-foreground shadow-sm border border-border/80"
-                    : "text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  if (tab.id === "fluxo") setFluxoStatusFilter("all");
+                  updateParams({ tab: tab.id });
+                }}
+                className={`flex h-10 cursor-pointer items-center gap-1.5 border-b-2 text-xs whitespace-nowrap transition-colors ${
+                  isActive
+                    ? "border-foreground font-medium text-foreground"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
                 }`}
               >
-                {ldg === "all"
-                  ? "Consolidado Geral"
-                  : ldg === "pessoal"
-                    ? "Pessoal & Familiar"
-                    : "Trust Care"}
+                <span>{tab.label}</span>
+                {tab.id === "notebooks" && (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                    {initialNotebooks.length}
+                  </span>
+                )}
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Navegador de Mês & Botões de Ação */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Seletor de Mês */}
-          <div className="flex items-center rounded-xl border border-border/70 bg-card/60 p-1 shadow-xs backdrop-blur-sm">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handlePrevMonth}
-              className="size-7 p-0 text-muted-foreground hover:text-foreground"
-              title="Mês anterior"
-            >
-              <ArrowLeftIcon className="size-3.5" />
-            </Button>
-
-            <div className="flex items-center gap-1.5 px-3 font-mono text-xs font-medium text-foreground">
-              <CalendarIcon className="size-3.5 text-muted-foreground" />
-              <span>{formattedMonthLabel}</span>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNextMonth}
-              className="size-7 p-0 text-muted-foreground hover:text-foreground"
-              title="Próximo mês"
-            >
-              <ArrowRightIcon className="size-3.5" />
-            </Button>
-          </div>
-
-          {currentMonth !== realCurrentMonth && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetCurrentMonth}
-              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <RotateCcwIcon className="size-3" />
-              Mês Atual
-            </Button>
-          )}
-
-          {/* Contas Fixas & Dízimo (Pessoal/Familiar) */}
-          {currentLedger !== "trustcare" && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRecurringDialogOpen(true)}
-              className="h-8 gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-            >
-              <ListChecksIcon className="size-3.5" />
-              Contas Fixas &amp; Dízimo
-            </Button>
-          )}
-
-          {/* Importar Extrato OFX */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setOfxDialogOpen(true)}
-            className="h-8 gap-1.5 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-          >
-            <FileSpreadsheetIcon className="size-3.5" />
-            Importar Extrato (.OFX)
-          </Button>
-
-          {/* Gerenciar Categorias */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCatDialogOpen(true)}
-            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            <TagIcon className="size-3.5" />
-            Categorias
-          </Button>
-
-          {/* Botões de Ação Primária */}
-          {(currentLedger === "all" || currentLedger === "trustcare") && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleOpenNewNotebook}
-              className="h-8 gap-1.5 text-xs border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10"
-            >
-              <LaptopIcon className="size-3.5" />
-              + Notebook
-            </Button>
-          )}
-
-          <Button
-            size="sm"
-            onClick={() => handleOpenNewTransaction()}
-            className="h-8 gap-1.5 text-xs font-semibold"
-          >
-            <PlusIcon className="size-3.5" />
-            Novo Lançamento
-          </Button>
-        </div>
-      </div>
-
-      {/* 2. Cards de Métricas (omitido quando na Visão Geral Pessoal, que já exibe os 4 KPIs familiares) */}
-      {activeTab !== "visao" && (
-        <MetricsCards
-          totalIncomeCents={initialSummary.totalIncomeCents}
-          totalExpenseCents={initialSummary.totalExpenseCents}
-          netBalanceCents={initialSummary.netBalanceCents}
-          profitMarginPercent={initialSummary.profitMarginPercent}
-          transactionCount={initialSummary.transactionCount}
-          ledger={currentLedger}
-        />
-      )}
-
-      {/* 3. Sub-abas + Filtro de Pessoa */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60">
-          <nav className="-mb-px flex gap-5 overflow-x-auto" aria-label="Abas financeiras">
-            {currentLedger !== "trustcare" && (
-              <button
-                type="button"
-                onClick={() => updateParams({ tab: "visao" })}
-                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === "visao"
-                    ? "border-emerald-400 text-emerald-400"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <LayoutDashboardIcon className="size-4" />
-                Visão Geral
-              </button>
-            )}
-
-            {currentLedger !== "trustcare" && (
-              <button
-                type="button"
-                onClick={() => updateParams({ tab: "contas" })}
-                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === "contas"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <LandmarkIcon className="size-4" />
-                Contas &amp; Cartões
-              </button>
-            )}
-
-            {currentLedger !== "trustcare" && (
-              <button
-                type="button"
-                onClick={() => updateParams({ tab: "orcamentos" })}
-                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === "orcamentos"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <TargetIcon className="size-4" />
-                Orçamentos
-              </button>
-            )}
-
-            {currentLedger !== "trustcare" && (
-              <button
-                type="button"
-                onClick={() => updateParams({ tab: "relatorios" })}
-                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === "relatorios"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <BarChart3Icon className="size-4" />
-                Relatórios &amp; KPIs
-              </button>
-            )}
-
+        {currentLedger === "pessoal" && (
+          <div className="flex items-center gap-1 py-1.5 text-xs">
+            <span className="mr-1 text-[11px] text-muted-foreground">Pessoa:</span>
             <button
               type="button"
-              onClick={() => {
-                setFluxoStatusFilter("all");
-                updateParams({ tab: "fluxo" });
-              }}
-              className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                activeTab === "fluxo"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+              onClick={() => updateParams({ member: null })}
+              className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                !activeMember
+                  ? "border-foreground/30 bg-muted text-foreground"
+                  : "border-border text-muted-foreground hover:text-foreground"
               }`}
             >
-              <ReceiptTextIcon className="size-4" />
-              Fluxo &amp; Vencimentos
+              Todos
             </button>
-
-            {(currentLedger === "all" || currentLedger === "trustcare") && (
+            {HOUSEHOLD_MEMBERS.map((m) => (
               <button
+                key={m}
                 type="button"
-                onClick={() => updateParams({ tab: "notebooks" })}
-                className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                  activeTab === "notebooks"
-                    ? "border-cyan-500 text-cyan-400"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <LaptopIcon className="size-4" />
-                Revenda de Notebooks
-                <span className="rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] text-cyan-400">
-                  {initialNotebooks.length}
-                </span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => updateParams({ tab: "categorias" })}
-              className={`flex items-center gap-1.5 border-b-2 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${
-                activeTab === "categorias"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-              }`}
-            >
-              <PieChartIcon className="size-4" />
-              Categorias
-            </button>
-          </nav>
-
-          {currentLedger !== "trustcare" && (
-            <div className="flex items-center gap-1 pb-2 text-xs">
-              <span className="text-[11px] text-muted-foreground mr-1">Pessoa:</span>
-              <button
-                type="button"
-                onClick={() => updateParams({ member: null })}
-                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
-                  !currentMember
-                    ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                onClick={() => updateParams({ member: m })}
+                className={`cursor-pointer rounded border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                  activeMember === m
+                    ? "border-foreground/30 bg-muted text-foreground"
                     : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
-                Todos
+                {m}
               </button>
-              {HOUSEHOLD_MEMBERS.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => updateParams({ member: m })}
-                  className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
-                    currentMember === m
-                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-        {/* Tela 1: Visão Geral (Cockpit Pessoal & Familiar) */}
-        {activeTab === "visao" && (
+      {/* 3. Conteúdo da Aba Ativa */}
+      <div className="pt-5">
+        {/* Visão Geral Pessoal / Familiar */}
+        {activeTab === "visao" && currentLedger === "pessoal" && (
           <HouseholdOverview
             data={householdData}
             onGoToPendingFluxo={() => {
@@ -490,36 +420,131 @@ export function FinanceDashboard({
           />
         )}
 
+        {/* Resumo Trust Care (será promovido na Etapa 3 com FinanceHero + Strip) */}
+        {activeTab === "visao" && currentLedger === "trustcare" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 divide-y divide-border rounded-lg border border-border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Entradas Trust Care
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-400">
+                  {formatCentsToBrl(initialSummary.totalIncomeCents)}
+                </p>
+              </div>
+              <div className="p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Saídas &amp; Custos
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-rose-400">
+                  {formatCentsToBrl(initialSummary.totalExpenseCents)}
+                </p>
+              </div>
+              <div className="p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Resultado do Mês
+                </p>
+                <p
+                  className={`mt-1 text-2xl font-semibold tabular-nums ${
+                    initialSummary.netBalanceCents >= 0 ? "text-emerald-400" : "text-rose-400"
+                  }`}
+                >
+                  {formatCentsToBrl(initialSummary.netBalanceCents)}
+                </p>
+              </div>
+            </div>
+            <MonthlyChart data={initialSummary.monthlyTrend} />
+          </div>
+        )}
+
+        {/* Resumo Geral Consolidado (Pessoal + Trust Care) */}
+        {activeTab === "visao" && currentLedger === "all" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Pessoal &amp; Familiar
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+                  {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.netCents)}
+                </p>
+                <div className="mt-3 flex items-center gap-4 text-xs tabular-nums text-muted-foreground">
+                  <span>
+                    Entradas:{" "}
+                    <strong className="font-medium text-emerald-400">
+                      {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.incomeCents)}
+                    </strong>
+                  </span>
+                  <span>
+                    Saídas:{" "}
+                    <strong className="font-medium text-rose-400">
+                      {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.expenseCents)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Trust Care (Empresa)
+                </p>
+                <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
+                  {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.netCents)}
+                </p>
+                <div className="mt-3 flex items-center gap-4 text-xs tabular-nums text-muted-foreground">
+                  <span>
+                    Entradas:{" "}
+                    <strong className="font-medium text-emerald-400">
+                      {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.incomeCents)}
+                    </strong>
+                  </span>
+                  <span>
+                    Saídas:{" "}
+                    <strong className="font-medium text-rose-400">
+                      {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.expenseCents)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <MonthlyChart data={initialSummary.monthlyTrend} />
+          </div>
+        )}
+
         {/* Tela 2: Contas & Cartões */}
         {activeTab === "contas" && <AccountsCardsView accounts={householdData.accounts} />}
 
         {/* Tela 3: Orçamentos da Casa */}
         {activeTab === "orcamentos" && <BudgetsView budgets={householdData.budgets} categories={categories} />}
 
-        {/* Tela 4: Relatórios, KPIs & Comparativos */}
-        {activeTab === "relatorios" && <ReportsComparisonsView data={householdData} />}
-
-        {/* Tela 5: Fluxo & Vencimentos */}
-        {activeTab === "fluxo" && (
+        {/* Tela 4: Relatórios, KPIs & Categorias */}
+        {activeTab === "relatorios" && currentLedger === "pessoal" && (
+          <ReportsComparisonsView data={householdData} />
+        )}
+        {activeTab === "relatorios" && currentLedger !== "pessoal" && (
           <div className="space-y-6">
             <MonthlyChart data={initialSummary.monthlyTrend} />
-            <TransactionsTable
-              key={fluxoStatusFilter}
-              transactions={
-                currentMember
-                  ? initialTransactions.filter((t) => t.member_label === currentMember)
-                  : initialTransactions
-              }
-              categories={categories}
-              paymentMethods={paymentMethods}
-              initialStatusFilter={fluxoStatusFilter}
-              onEditTransaction={handleEditTransaction}
-              onNewTransaction={() => handleOpenNewTransaction()}
-            />
+            <CategoryBreakdown categoriesBreakdown={initialSummary.categoriesBreakdown} />
           </div>
         )}
 
-        {/* Conteúdo da Aba 2: Revenda de Notebooks (Trust Care) */}
+        {/* Tela 5: Fluxo & Vencimentos */}
+        {activeTab === "fluxo" && (
+          <TransactionsTable
+            key={fluxoStatusFilter}
+            transactions={
+              activeMember
+                ? initialTransactions.filter((t) => t.member_label === activeMember)
+                : initialTransactions
+            }
+            categories={categories}
+            paymentMethods={paymentMethods}
+            initialStatusFilter={fluxoStatusFilter}
+            onEditTransaction={handleEditTransaction}
+            onNewTransaction={() => handleOpenNewTransaction()}
+          />
+        )}
+
+        {/* Notebooks Trust Care */}
         {activeTab === "notebooks" && (
           <NotebooksTracker
             notebooks={initialNotebooks}
@@ -530,11 +555,6 @@ export function FinanceDashboard({
             onAddCostToNotebook={handleAddCostToNotebook}
             onRecordSale={handleRecordSale}
           />
-        )}
-
-        {/* Conteúdo da Aba 3: Relatório por Categoria */}
-        {activeTab === "categorias" && (
-          <CategoryBreakdown categoriesBreakdown={initialSummary.categoriesBreakdown} />
         )}
       </div>
 

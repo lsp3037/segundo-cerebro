@@ -206,14 +206,24 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           paymentMethods={paymentMethods}
           currentMonth={currentMonth}
           currentLedger={targetLedger}
-          currentMember={currentMember}
+          currentMember={effectiveMember}
           baseFolderId={folder.id}
+          contextLabel={area.name}
         />
       );
       break;
     }
     default:
       content = <PhasePlaceholder phase={mod.phase} items={[mod.description]} className={area.show_lgpd_notice ? "pt-4" : undefined} />;
+  }
+
+  if (kind === "finance") {
+    return (
+      <>
+        {area.show_lgpd_notice && <LgpdNotice className="mx-4 mt-4 max-w-xl md:mx-6" />}
+        {content}
+      </>
+    );
   }
 
   return (

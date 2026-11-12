@@ -64,7 +64,7 @@ export default async function Page(props: PageProps<"/financas">) {
       paymentMethods={paymentMethods}
       currentMonth={currentMonth}
       currentLedger={currentLedger}
-      currentMember={currentMember}
+      currentMember={effectiveMember}
     />
   );
 }

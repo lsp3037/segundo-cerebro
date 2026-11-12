@@ -1,10 +1,7 @@
 import type { ComponentType } from "react";
 import {
-  ArrowDownRightIcon,
-  ArrowUpRightIcon,
   BanknoteIcon,
   CreditCardIcon,
-  LaptopIcon,
   QrCodeIcon,
   ReceiptIcon,
   WalletIcon,
@@ -13,6 +10,34 @@ import {
 export type LedgerType = "all" | "pessoal" | "trustcare";
 export type TransactionKind = "income" | "expense";
 export type NotebookStatus = "bought" | "repair" | "for_sale" | "sold";
+export type FinanceTab =
+  | "visao"
+  | "contas"
+  | "orcamentos"
+  | "relatorios"
+  | "fluxo"
+  | "notebooks";
+
+export const LEDGER_TABS: Record<LedgerType, Array<{ id: FinanceTab; label: string }>> = {
+  pessoal: [
+    { id: "visao", label: "Visão Geral" },
+    { id: "contas", label: "Contas & Cartões" },
+    { id: "orcamentos", label: "Orçamentos" },
+    { id: "relatorios", label: "Relatórios & KPIs" },
+    { id: "fluxo", label: "Fluxo & Vencimentos" },
+  ],
+  trustcare: [
+    { id: "visao", label: "Resumo" },
+    { id: "notebooks", label: "Notebooks" },
+    { id: "relatorios", label: "Relatórios & KPIs" },
+    { id: "fluxo", label: "Fluxo & Vencimentos" },
+  ],
+  all: [
+    { id: "visao", label: "Resumo Geral" },
+    { id: "relatorios", label: "Relatórios & KPIs" },
+    { id: "fluxo", label: "Fluxo & Vencimentos" },
+  ],
+};
 
 export const LEDGER_LABELS: Record<LedgerType, string> = {
   all: "Visão Consolidada",
@@ -23,7 +48,7 @@ export const LEDGER_LABELS: Record<LedgerType, string> = {
 export const LEDGER_BADGES: Record<"pessoal" | "trustcare", { label: string; className: string }> = {
   pessoal: {
     label: "Pessoal / Familiar",
-    className: "border-violet-500/30 bg-violet-500/10 text-violet-400",
+    className: "border-border bg-muted/60 text-foreground",
   },
   trustcare: {
     label: "Trust Care",
@@ -37,15 +62,15 @@ export const NOTEBOOK_STATUS_CONFIG: Record<
 > = {
   bought: {
     label: "Comprado",
-    color: "#a855f7",
-    badgeClass: "border-purple-500/30 bg-purple-500/10 text-purple-400",
-    dotClass: "bg-purple-400",
+    color: "#a1a1aa",
+    badgeClass: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300",
+    dotClass: "bg-zinc-400",
   },
   repair: {
     label: "Em Bancada / Reparo",
     color: "#f59e0b",
     badgeClass: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-    dotClass: "bg-amber-400 animate-pulse",
+    dotClass: "bg-amber-400",
   },
   for_sale: {
     label: "À Venda (Estoque)",
