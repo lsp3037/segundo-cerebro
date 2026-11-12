@@ -4,11 +4,8 @@ import { useTransition } from "react";
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
-  ArrowUpRightIcon,
   CheckIcon,
-  CreditCardIcon,
   ListChecksIcon,
-  ScaleIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,6 +13,7 @@ import { toggleTransactionPaid } from "@/lib/actions/finance-family";
 import type { HouseholdData, HouseholdTransaction } from "@/lib/data/finance-family";
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
+import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
 
 interface HouseholdOverviewProps {
   data: HouseholdData;
@@ -62,153 +60,149 @@ export function HouseholdOverview({
 
   return (
     <div className="space-y-5">
-      {/* Banner de Atenção para Vencimentos e Pendentes */}
+      {/* Faixa sutil de pendências no mês */}
       {pendingExpenses.length > 0 && (
         <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-xs ${
-            overdueCount > 0
-              ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
-              : "border-amber-500/35 bg-amber-500/10 text-amber-100"
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card px-4 py-2.5 text-xs ${
+            overdueCount > 0 ? "border-rose-500/40" : "border-amber-500/35"
           }`}
         >
-          <div className="flex items-center gap-2.5">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                overdueCount > 0 ? "bg-rose-500/25 text-rose-300" : "bg-amber-500/25 text-amber-300"
-              }`}
-            >
-              <AlertTriangleIcon className="size-3" />
-              {overdueCount > 0 ? `${overdueCount} atrasada(s)` : "Atenção"}
-            </span>
+          <div className="flex items-center gap-2.5 text-foreground">
+            <AlertTriangleIcon
+              className={`size-3.5 shrink-0 ${overdueCount > 0 ? "text-rose-400" : "text-amber-400"}`}
+            />
             <span>
-              <strong>{pendingExpenses.length} {pendingExpenses.length === 1 ? "conta pendente" : "contas pendentes"}</strong> no mês somando{" "}
-              <strong className="font-mono tabular-nums text-amber-300">
+              <strong>
+                {pendingExpenses.length}{" "}
+                {pendingExpenses.length === 1 ? "conta pendente" : "contas pendentes"}
+              </strong>{" "}
+              {overdueCount > 0 && (
+                <span className="text-rose-400">({overdueCount} atrasada{overdueCount > 1 ? "s" : ""}) </span>
+              )}
+              somando{" "}
+              <strong className="tabular-nums text-amber-400">
                 {formatCentsToBrl(data.kpis.pendingExpenseCents)}
               </strong>
               {pendingExpenses[0]?.due_date && (
-                <> — próxima: <strong>{pendingExpenses[0].description}</strong> ({pendingExpenses[0].due_date.slice(8)}/{pendingExpenses[0].due_date.slice(5, 7)})</>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · próxima: {pendingExpenses[0].description} ({pendingExpenses[0].due_date.slice(8)}/{pendingExpenses[0].due_date.slice(5, 7)})
+                </span>
               )}
             </span>
           </div>
 
-          <Button variant="outline" size="sm" onClick={onGoToPendingFluxo} className="h-7 gap-1 text-xs">
+          <button
+            type="button"
+            onClick={onGoToPendingFluxo}
+            className="inline-flex cursor-pointer items-center gap-1 text-xs font-medium text-foreground hover:underline"
+          >
             Ver pendentes
             <ArrowRightIcon className="size-3" />
-          </Button>
+          </button>
         </div>
       )}
 
-      {/* Onboarding rápido caso ainda não tenha configurado contas fixas */}
+      {/* Onboarding rápido quando ainda não há contas fixas */}
       {data.recurringBills.length === 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3 text-xs">
           <div className="flex items-center gap-2.5">
-            <ListChecksIcon className="size-4 text-emerald-400 shrink-0" />
+            <ListChecksIcon className="size-4 shrink-0 text-muted-foreground" />
             <div>
-              <span className="font-semibold text-foreground">Configure a planilha fixa da casa uma única vez: </span>
+              <span className="font-medium text-foreground">Planilha fixa da casa: </span>
               <span className="text-muted-foreground">
-                carregue o modelo com suas entradas, os 4 cartões, contas da casa e o Dízimo automático (10%).
+                carregue o modelo com entradas, cartões, contas fixas e Dízimo automático (10%).
               </span>
             </div>
           </div>
-          <Button size="sm" onClick={onOpenRecurringDialog} className="h-7 bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700">
-            Configurar Contas Fixas
+          <Button variant="outline" size="sm" onClick={onOpenRecurringDialog} className="h-7 text-xs">
+            Configurar contas fixas
           </Button>
         </div>
       )}
 
-      {/* 4 Cards KPI Executivos */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-medium">Entradas do Mês</span>
-            <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
-              {incomes.length} {incomes.length === 1 ? "fonte" : "fontes"}
-            </span>
-          </div>
-          <div className="mt-2.5 font-mono text-2xl font-bold tracking-tight text-emerald-400 tabular-nums">
-            {formatCentsToBrl(data.kpis.incomeCents)}
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Recebido: {formatCentsToBrl(data.kpis.paidIncomeCents)}</span>
-            <span>Previsto: {formatCentsToBrl(data.kpis.pendingIncomeCents)}</span>
-          </div>
-        </div>
+      {/* Nível 1: Resposta principal do mês */}
+      <FinanceHero
+        eyebrow="Saldo projetado do mês"
+        value={`${data.kpis.projectedBalanceCents >= 0 ? "+" : ""}${formatCentsToBrl(data.kpis.projectedBalanceCents)}`}
+        tone={data.kpis.projectedBalanceCents >= 0 ? "positive" : "negative"}
+        subtitle={
+          <span className="tabular-nums">
+            Entradas {formatCentsToBrl(data.kpis.incomeCents)} − Saídas {formatCentsToBrl(data.kpis.expenseCents)} · Poupança{" "}
+            <strong className={data.kpis.savingsRatePercent >= 0 ? "font-medium text-emerald-400" : "font-medium text-rose-400"}>
+              {data.kpis.savingsRatePercent}%
+            </strong>{" "}
+            · Comprometimento fixo {data.kpis.fixedCommitmentPercent}%
+          </span>
+        }
+      />
 
-        <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-medium">Saídas Totais (Previsto + Pago)</span>
-            <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium">
-              {expenses.length} {expenses.length === 1 ? "item" : "itens"}
-            </span>
-          </div>
-          <div className="mt-2.5 font-mono text-2xl font-bold tracking-tight text-rose-400 tabular-nums">
-            {formatCentsToBrl(data.kpis.expenseCents)}
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px]">
-            <span className="text-muted-foreground">Pago: <strong className="font-mono text-foreground">{formatCentsToBrl(data.kpis.paidExpenseCents)}</strong></span>
-            <span className="text-amber-400">Falta: <strong className="font-mono">{formatCentsToBrl(data.kpis.pendingExpenseCents)}</strong></span>
-          </div>
-        </div>
+      {/* Nível 2: Faixa dividida de KPIs */}
+      <FinanceKpiStrip
+        columns={3}
+        items={[
+          {
+            id: "incomes",
+            label: "Entradas",
+            value: formatCentsToBrl(data.kpis.incomeCents),
+            tone: data.kpis.incomeCents > 0 ? "positive" : "default",
+            badge: (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {incomes.length} {incomes.length === 1 ? "fonte" : "fontes"}
+              </span>
+            ),
+            subtext: (
+              <span className="tabular-nums">
+                Recebido {formatCentsToBrl(data.kpis.paidIncomeCents)} · Previsto {formatCentsToBrl(data.kpis.pendingIncomeCents)}
+              </span>
+            ),
+          },
+          {
+            id: "expenses",
+            label: "Saídas totais",
+            value: formatCentsToBrl(data.kpis.expenseCents),
+            tone: data.kpis.expenseCents > 0 ? "negative" : "default",
+            badge: (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {expenses.length} {expenses.length === 1 ? "item" : "itens"}
+              </span>
+            ),
+            subtext: (
+              <span className="tabular-nums">
+                Pago {formatCentsToBrl(data.kpis.paidExpenseCents)} · Falta{" "}
+                <span className={data.kpis.pendingExpenseCents > 0 ? "text-amber-400" : ""}>
+                  {formatCentsToBrl(data.kpis.pendingExpenseCents)}
+                </span>
+              </span>
+            ),
+          },
+          {
+            id: "cards",
+            label: "Cartões de crédito",
+            value: formatCentsToBrl(cardsTotalCents),
+            badge: (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {creditCards.length} {creditCards.length === 1 ? "cartão" : "cartões"}
+              </span>
+            ),
+            subtext: `${cardsPercent}% das saídas do mês`,
+          },
+        ]}
+      />
 
-        <div
-          className={`rounded-xl border p-4 ${
-            data.kpis.projectedBalanceCents >= 0
-              ? "border-emerald-500/35 bg-emerald-950/15"
-              : "border-rose-500/35 bg-rose-950/15"
-          }`}
-        >
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-medium">Saldo Projetado do Mês</span>
-            <ScaleIcon className={`size-4 ${data.kpis.projectedBalanceCents >= 0 ? "text-emerald-400" : "text-rose-400"}`} />
-          </div>
-          <div
-            className={`mt-2.5 font-mono text-2xl font-bold tracking-tight tabular-nums ${
-              data.kpis.projectedBalanceCents >= 0 ? "text-emerald-400" : "text-rose-400"
-            }`}
-          >
-            {data.kpis.projectedBalanceCents >= 0 ? "+ " : ""}
-            {formatCentsToBrl(data.kpis.projectedBalanceCents)}
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>
-              Taxa de Poupança:{" "}
-              <strong className={data.kpis.savingsRatePercent >= 0 ? "text-emerald-400" : "text-rose-400"}>
-                {data.kpis.savingsRatePercent}%
-              </strong>
-            </span>
-            <span>Fixas: {data.kpis.fixedCommitmentPercent}%</span>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-medium">Cartões de Crédito (Mês)</span>
-            <CreditCardIcon className="size-4 text-muted-foreground" />
-          </div>
-          <div className="mt-2.5 font-mono text-2xl font-bold tracking-tight text-foreground tabular-nums">
-            {formatCentsToBrl(cardsTotalCents)}
-          </div>
-          <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{cardsPercent}% das saídas</span>
-            <span>{creditCards.length} {creditCards.length === 1 ? "cartão" : "cartões"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Corpo Principal: Baixa Rápida + Entradas / Distribuição por Pessoa */}
+      {/* Nível 3: Superfície operacional — Baixa Rápida + Entradas / Pessoa */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* Esquerda (7 cols): Contas do Mês & Baixa Rápida */}
-        <div className="rounded-xl border border-border/70 bg-card/60 p-4 lg:col-span-7">
-          <div className="flex items-center justify-between border-b border-border/50 pb-3">
+        <div className="rounded-lg border border-border bg-card p-4 lg:col-span-7">
+          <div className="flex items-center justify-between border-b border-border/70 pb-3">
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Contas do Mês &amp; Baixa Rápida</h3>
+              <h3 className="text-sm font-medium text-foreground">Contas do mês &amp; baixa rápida</h3>
               <p className="text-xs text-muted-foreground">
-                Clique em Pagar para dar baixa no mês em 1 clique
+                Clique na linha para editar ou em Pagar para dar baixa
               </p>
             </div>
             {pendingExpenses.length > 0 && (
-              <span className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-400">
-                {pendingExpenses.length} pendentes
+              <span className="rounded border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium tabular-nums text-amber-400">
+                {pendingExpenses.length} {pendingExpenses.length === 1 ? "pendente" : "pendentes"}
               </span>
             )}
           </div>
@@ -218,7 +212,7 @@ export function HouseholdOverview({
               Nenhuma saída registrada neste mês ainda.
             </div>
           ) : (
-            <div className="divide-y divide-border/40">
+            <div className="divide-y divide-border/60">
               {sortedBills.slice(0, 8).map((tx) => {
                 const isPaid = tx.billStatus === "paid";
                 const isOverdue = tx.billStatus === "overdue";
@@ -229,14 +223,14 @@ export function HouseholdOverview({
                     <button
                       type="button"
                       onClick={() => onEditTransaction(tx)}
-                      className="min-w-0 flex-1 text-left group"
+                      className="group min-w-0 flex-1 cursor-pointer text-left"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="truncate font-medium text-foreground group-hover:text-primary">
+                        <span className="truncate font-medium text-foreground group-hover:underline">
                           {tx.description}
                         </span>
                         {isOverdue && (
-                          <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-400">
+                          <span className="rounded bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-medium text-rose-400">
                             Atrasado
                           </span>
                         )}
@@ -246,18 +240,18 @@ export function HouseholdOverview({
                       </div>
                     </button>
 
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <span className={`font-mono font-semibold tabular-nums ${isPaid ? "text-muted-foreground" : "text-foreground"}`}>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span className={`font-medium tabular-nums ${isPaid ? "text-muted-foreground" : "text-foreground"}`}>
                         {formatCentsToBrl(tx.amount_cents)}
                       </span>
                       <button
                         type="button"
                         disabled={isPending}
                         onClick={() => handleTogglePay(tx)}
-                        className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        className={`inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
                           isPaid
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
-                            : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500 hover:text-emerald-950"
+                            ? "border-border bg-muted/40 text-muted-foreground hover:text-foreground"
+                            : "border-emerald-500/40 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-emerald-950"
                         }`}
                       >
                         <CheckIcon className="size-3" />
@@ -271,8 +265,8 @@ export function HouseholdOverview({
           )}
 
           {sortedBills.length > 8 && (
-            <div className="mt-3 border-t border-border/40 pt-2.5 text-right">
-              <button type="button" onClick={onGoToPendingFluxo} className="text-xs font-medium text-primary hover:underline">
+            <div className="mt-3 border-t border-border/60 pt-2.5 text-right">
+              <button type="button" onClick={onGoToPendingFluxo} className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
                 Ver todas as {sortedBills.length} contas do mês &rarr;
               </button>
             </div>
@@ -281,13 +275,13 @@ export function HouseholdOverview({
 
         {/* Direita (5 cols): Entradas da Casa + Distribuição por Pessoa */}
         <div className="space-y-4 lg:col-span-5">
-          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-            <div className="flex items-center justify-between border-b border-border/50 pb-3">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="flex items-center justify-between border-b border-border/70 pb-3">
               <div>
-                <h3 className="text-sm font-semibold text-foreground">Entradas da Casa</h3>
-                <p className="text-xs text-muted-foreground">Base para cálculo automático de 10% (Dízimo)</p>
+                <h3 className="text-sm font-medium text-foreground">Entradas da casa</h3>
+                <p className="text-xs text-muted-foreground">Base para cálculo de Dízimo (10%)</p>
               </div>
-              <span className="font-mono text-sm font-bold text-emerald-400 tabular-nums">
+              <span className="text-sm font-semibold tabular-nums text-emerald-400">
                 {formatCentsToBrl(data.kpis.incomeCents)}
               </span>
             </div>
@@ -295,19 +289,16 @@ export function HouseholdOverview({
             {incomes.length === 0 ? (
               <div className="py-6 text-center text-xs text-muted-foreground">Nenhuma entrada registrada neste mês.</div>
             ) : (
-              <div className="divide-y divide-border/40">
+              <div className="divide-y divide-border/60">
                 {incomes.map((inc) => (
                   <button
                     key={inc.id}
                     type="button"
                     onClick={() => onEditTransaction(inc)}
-                    className="flex w-full items-center justify-between py-2.5 text-left text-xs hover:bg-muted/20"
+                    className="flex w-full cursor-pointer items-center justify-between py-2.5 text-left text-xs transition-colors hover:bg-muted/20"
                   >
-                    <div className="flex items-center gap-2">
-                      <ArrowUpRightIcon className="size-3.5 text-emerald-400" />
-                      <span className="font-medium text-foreground">{inc.description}</span>
-                    </div>
-                    <span className="font-mono font-semibold text-emerald-400 tabular-nums">
+                    <span className="truncate font-medium text-foreground">{inc.description}</span>
+                    <span className="shrink-0 font-medium tabular-nums text-emerald-400">
                       {formatCentsToBrl(inc.amount_cents)}
                     </span>
                   </button>
@@ -316,10 +307,10 @@ export function HouseholdOverview({
             )}
           </div>
 
-          <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-            <div className="border-b border-border/50 pb-3">
-              <h3 className="text-sm font-semibold text-foreground">Distribuição por Pessoa</h3>
-              <p className="text-xs text-muted-foreground">Total de saídas por responsável no mês</p>
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="border-b border-border/70 pb-3">
+              <h3 className="text-sm font-medium text-foreground">Distribuição por pessoa</h3>
+              <p className="text-xs text-muted-foreground">Saídas por responsável no mês</p>
             </div>
 
             {data.members.length === 0 ? (
@@ -327,18 +318,19 @@ export function HouseholdOverview({
             ) : (
               <div className="mt-3 space-y-3">
                 {data.members.map((m, idx) => {
-                  const color = idx === 0 ? "#10b981" : idx === 1 ? "#3b82f6" : "#f59e0b";
+                  const color = idx === 0 ? "#10b981" : idx === 1 ? "#a1a1aa" : "#71717a";
+                  const barWidth = m.percent > 0 ? Math.min(100, Math.max(2, m.percent)) : 0;
                   return (
                     <div key={m.member} className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-medium text-foreground">{m.member}</span>
-                        <span className="font-mono text-muted-foreground tabular-nums">
+                        <span className="tabular-nums text-muted-foreground">
                           {formatCentsToBrl(m.expenseCents)} ({m.percent}%)
                         </span>
                       </div>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted/40">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
                         <div
-                          style={{ width: `${Math.min(100, Math.max(2, m.percent))}%`, backgroundColor: color }}
+                          style={{ width: `${barWidth}%`, backgroundColor: color }}
                           className="h-full rounded-full transition-all"
                         />
                       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowRightLeftIcon, CreditCardIcon, LandmarkIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ArrowRightLeftIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteFinanceAccount, saveFinanceAccount, transferBetweenAccounts } from "@/lib/actions/finance-family";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FinanceKpiStrip } from "./finance-hierarchy";
 
 interface AccountsCardsViewProps {
   accounts: AccountWithBalance[];
@@ -114,16 +115,45 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
 
   return (
     <div className="space-y-6">
+      <FinanceKpiStrip
+        columns={2}
+        items={[
+          {
+            id: "bank-balance",
+            label: "Saldo em contas bancárias",
+            value: formatCentsToBrl(totalBankBalance),
+            tone: totalBankBalance >= 0 ? "positive" : "negative",
+            badge: (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {bankAccounts.length} {bankAccounts.length === 1 ? "conta" : "contas"}
+              </span>
+            ),
+            subtext: "Saldos reais separados dos cartões",
+          },
+          {
+            id: "cards-month",
+            label: "Faturas no mês (cartões)",
+            value: formatCentsToBrl(totalCardsMonth),
+            tone: totalCardsMonth > 0 ? "negative" : "default",
+            badge: (
+              <span className="text-[11px] tabular-nums text-muted-foreground">
+                {creditCards.length} {creditCards.length === 1 ? "cartão" : "cartões"}
+              </span>
+            ),
+            subtext: "Soma das faturas vinculadas no período",
+          },
+        ]}
+      />
+
       {/* Contas Bancárias & Reserva */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Contas Bancárias &amp; Reserva ·{" "}
-              <span className="font-mono text-emerald-400 tabular-nums">{formatCentsToBrl(totalBankBalance)}</span>
+            <h3 className="text-sm font-medium text-foreground">
+              Contas bancárias &amp; reserva
             </h3>
             <p className="text-xs text-muted-foreground">
-              Saldos reais separados dos cartões; transferências entre contas não inflam despesas
+              Transferências entre contas não contam como despesa
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -142,41 +172,40 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
                 Transferir
               </Button>
             )}
-            <Button size="sm" onClick={() => openNew("checking")} className="h-8 gap-1.5 text-xs">
+            <Button variant="outline" size="sm" onClick={() => openNew("checking")} className="h-8 gap-1.5 text-xs">
               <PlusIcon className="size-3.5" />
-              Nova Conta
+              Nova conta
             </Button>
           </div>
         </div>
 
         {bankAccounts.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
             Nenhuma conta bancária ou reserva cadastrada ainda.
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {bankAccounts.map((acc) => (
-              <div key={acc.id} className="rounded-xl border border-border/70 bg-card/60 p-4">
+              <div key={acc.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <LandmarkIcon className="size-3.5 text-emerald-400" />
-                      <span>{acc.name}</span>
+                    <div className="text-xs font-medium text-foreground">
+                      {acc.name}
                     </div>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">
                       {ACCOUNT_TYPE_LABELS[acc.type] ?? acc.type} · {acc.owner_label ?? "Casa"}
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => openEdit(acc)}>
+                    <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openEdit(acc)}>
                       <PencilIcon className="size-3" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="size-7 p-0 text-rose-400" onClick={() => handleDelete(acc)}>
+                    <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleDelete(acc)}>
                       <Trash2Icon className="size-3" />
                     </Button>
                   </div>
                 </div>
-                <div className={`mt-3 font-mono text-xl font-bold tabular-nums ${acc.balanceCents >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                <div className={`mt-3 text-xl font-semibold tabular-nums ${acc.balanceCents >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                   {formatCentsToBrl(acc.balanceCents)}
                 </div>
               </div>
@@ -189,20 +218,19 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Cartões de Crédito da Casa ·{" "}
-              <span className="font-mono text-rose-400 tabular-nums">{formatCentsToBrl(totalCardsMonth)}</span>
+            <h3 className="text-sm font-medium text-foreground">
+              Cartões de crédito da casa
             </h3>
-            <p className="text-xs text-muted-foreground">Total de faturas vinculadas no mês selecionado</p>
+            <p className="text-xs text-muted-foreground">Faturas vinculadas no mês selecionado</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => openNew("credit_card")} className="h-8 gap-1.5 text-xs">
             <PlusIcon className="size-3.5" />
-            Novo Cartão
+            Novo cartão
           </Button>
         </div>
 
         {creditCards.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/70 p-8 text-center text-xs text-muted-foreground">
+          <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
             Nenhum cartão cadastrado ainda.
           </div>
         ) : (
@@ -213,25 +241,25 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
                   ? Math.min(100, Math.round((card.monthInvoiceCents / card.credit_limit_cents) * 100))
                   : null;
               const barColor = pct === null ? "#10b981" : pct >= 85 ? "#f43f5e" : pct >= 60 ? "#f59e0b" : "#10b981";
+              const barWidth = pct !== null && pct > 0 ? Math.max(2, pct) : 0;
 
               return (
-                <div key={card.id} className="rounded-xl border border-border/70 bg-card/60 p-4">
+                <div key={card.id} className="rounded-lg border border-border bg-card p-4">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-                        <CreditCardIcon className="size-4 text-primary" />
-                        <span>{card.name}</span>
+                      <div className="text-sm font-medium text-foreground">
+                        {card.name}
                       </div>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         Titular: {card.owner_label ?? "Casa"}
-                        {card.due_day ? ` · Vence todo dia ${String(card.due_day).padStart(2, "0")}` : ""}
+                        {card.due_day ? ` · Vence dia ${String(card.due_day).padStart(2, "0")}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" className="size-7 p-0" onClick={() => openEdit(card)}>
+                      <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-foreground" onClick={() => openEdit(card)}>
                         <PencilIcon className="size-3" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="size-7 p-0 text-rose-400" onClick={() => handleDelete(card)}>
+                      <Button variant="ghost" size="sm" className="size-7 p-0 text-muted-foreground hover:text-rose-400" onClick={() => handleDelete(card)}>
                         <Trash2Icon className="size-3" />
                       </Button>
                     </div>
@@ -239,17 +267,17 @@ export function AccountsCardsView({ accounts }: AccountsCardsViewProps) {
 
                   <div className="mt-3 flex items-baseline justify-between">
                     <span className="text-xs text-muted-foreground">Fatura no mês</span>
-                    <span className="font-mono text-xl font-bold tabular-nums text-foreground">
+                    <span className="text-xl font-semibold tabular-nums text-foreground">
                       {formatCentsToBrl(card.monthInvoiceCents)}
                     </span>
                   </div>
 
                   {pct !== null && (
                     <div className="mt-2.5 space-y-1">
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted/40">
-                        <div style={{ width: `${Math.max(2, pct)}%`, backgroundColor: barColor }} className="h-full rounded-full" />
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div style={{ width: `${barWidth}%`, backgroundColor: barColor }} className="h-full rounded-full" />
                       </div>
-                      <div className="flex justify-between text-[11px] text-muted-foreground">
+                      <div className="flex justify-between text-[11px] tabular-nums text-muted-foreground">
                         <span>{pct}% usado</span>
                         <span>Limite: {formatCentsToBrl(card.credit_limit_cents)}</span>
                       </div>

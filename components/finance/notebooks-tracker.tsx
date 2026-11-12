@@ -3,10 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   AlertTriangleIcon,
-  ArrowUpRightIcon,
-  CheckCircle2Icon,
   ClockIcon,
-  CoinsIcon,
   LaptopIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -20,7 +17,7 @@ import {
 import { toast } from "sonner";
 
 import { trashNotebook, updateNotebook } from "@/lib/actions/finance";
-import type { FinanceCategory, Notebook, PaymentMethod } from "@/lib/data/finance";
+import type { Notebook } from "@/lib/data/finance";
 import { formatCentsToBrl, formatProfitMargin } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,12 +28,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { FinanceKpiStrip } from "./finance-hierarchy";
 import { NOTEBOOK_STATUS_CONFIG, type NotebookStatus } from "./meta";
 
 interface NotebooksTrackerProps {
   notebooks: Notebook[];
-  categories: FinanceCategory[];
-  paymentMethods: PaymentMethod[];
   onNewNotebook: () => void;
   onEditNotebook: (nb: Notebook) => void;
   onAddCostToNotebook: (nb: Notebook, defaultDescription?: string) => void;
@@ -45,8 +41,6 @@ interface NotebooksTrackerProps {
 
 export function NotebooksTracker({
   notebooks,
-  categories,
-  paymentMethods,
   onNewNotebook,
   onEditNotebook,
   onAddCostToNotebook,
@@ -55,6 +49,7 @@ export function NotebooksTracker({
   const [, startTransition] = useTransition();
   const [statusFilter, setStatusFilter] = useState<NotebookStatus | "all">("all");
   const [search, setSearch] = useState("");
+  const [now] = useState(() => Date.now());
 
   // Métricas consolidadas dos notebooks
   const stats = useMemo(() => {
@@ -63,8 +58,6 @@ export function NotebooksTracker({
     let totalRealizedProfitCents = 0;
     let totalSoldIncomeCents = 0;
     let staleCount = 0;
-
-    const now = Date.now();
 
     for (const nb of notebooks) {
       const expenses = nb.expense_cents ?? 0;
@@ -93,7 +86,7 @@ export function NotebooksTracker({
       marginStr,
       staleCount,
     };
-  }, [notebooks]);
+  }, [notebooks, now]);
 
   // Filtra notebooks
   const filteredNotebooks = useMemo(() => {
@@ -143,60 +136,44 @@ export function NotebooksTracker({
 
   return (
     <div className="space-y-4">
-      {/* 4 Mini KPIs específicos de Revenda */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Aparelhos no Estoque</span>
-            <LaptopIcon className="size-4 text-cyan-400" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold tracking-tight text-foreground tabular-nums">
-              {stats.inStockCount}
-            </span>
-            {stats.staleCount > 0 && (
-              <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/30">
-                <AlertTriangleIcon className="size-3" />
-                {stats.staleCount} {stats.staleCount === 1 ? "estagnado" : "estagnados"} (&gt;30d)
-              </span>
-            )}
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Aguardando reparo ou à venda</p>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Capital Preso em Estoque</span>
-            <CoinsIcon className="size-4 text-amber-400" />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-amber-400 tabular-nums">
-            {formatCentsToBrl(stats.capitalInvestedInStockCents)}
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Custo de compra + peças instaladas</p>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Lucro Líquido Realizado</span>
-            <ArrowUpRightIcon className="size-4 text-emerald-400" />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-emerald-400 tabular-nums">
-            {formatCentsToBrl(stats.totalRealizedProfitCents)}
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Soma de lucro nos aparelhos vendidos</p>
-        </div>
-
-        <div className="rounded-xl border border-border/70 bg-card/60 p-3.5 shadow-sm backdrop-blur-sm">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Margem Média na Venda</span>
-            <CheckCircle2Icon className="size-4 text-primary" />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-bold tracking-tight text-primary tabular-nums">
-            {stats.marginStr}
-          </div>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Retorno médio sobre faturamento</p>
-        </div>
-      </div>
+      <FinanceKpiStrip
+        columns={4}
+        items={[
+          {
+            id: "in-stock",
+            label: "No estoque",
+            value: stats.inStockCount,
+            badge:
+              stats.staleCount > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-400">
+                  <AlertTriangleIcon className="size-3" />
+                  {stats.staleCount} (&gt;30d)
+                </span>
+              ) : undefined,
+            subtext: "Em reparo ou à venda",
+          },
+          {
+            id: "capital",
+            label: "Capital investido",
+            value: formatCentsToBrl(stats.capitalInvestedInStockCents),
+            tone: stats.capitalInvestedInStockCents > 0 ? "warning" : "default",
+            subtext: "Compra + peças em estoque",
+          },
+          {
+            id: "profit",
+            label: "Lucro realizado",
+            value: formatCentsToBrl(stats.totalRealizedProfitCents),
+            tone: stats.totalRealizedProfitCents >= 0 ? "positive" : "negative",
+            subtext: "Total dos vendidos",
+          },
+          {
+            id: "margin",
+            label: "Margem média",
+            value: stats.marginStr,
+            subtext: "Retorno sobre faturamento",
+          },
+        ]}
+      />
 
       {/* Barra de Filtros e Busca */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -279,7 +256,7 @@ export function NotebooksTracker({
 
             // Cálculo de Dias em Estoque
             const createdTime = new Date(nb.created_at).getTime();
-            const endTime = nb.sold_at ? new Date(nb.sold_at).getTime() : Date.now();
+            const endTime = nb.sold_at ? new Date(nb.sold_at).getTime() : now;
             const daysInStock = Math.max(0, Math.floor((endTime - createdTime) / (1000 * 60 * 60 * 24)));
             const isStale = !isSold && daysInStock > 30;
 
@@ -290,14 +267,14 @@ export function NotebooksTracker({
               const warrantyDays = nb.warranty_days ?? 90;
               const saleDate = new Date(nb.sold_at);
               const endDate = new Date(saleDate.getTime() + warrantyDays * 86400000);
-              isWarrantyActive = Date.now() <= endDate.getTime();
+              isWarrantyActive = now <= endDate.getTime();
               warrantyEndDateStr = endDate.toLocaleDateString("pt-BR", { timeZone: "America/Cuiaba" });
             }
 
             return (
               <div
                 key={nb.id}
-                className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-border/70 bg-card/60 p-4 shadow-sm backdrop-blur-sm transition-all hover:border-cyan-500/40"
+                className="group relative flex flex-col justify-between overflow-hidden rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/25"
               >
                 <div>
                   {/* Topo do Card: Marca, Modelo e Status */}

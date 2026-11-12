@@ -37,6 +37,8 @@ import { AccountsCardsView } from "./accounts-cards-view";
 import { BudgetsView } from "./budgets-view";
 import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
+import { ConsolidatedOverview } from "./consolidated-overview";
+import { FinanceHero, FinanceKpiStrip } from "./finance-hierarchy";
 import { HouseholdOverview } from "./household-overview";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthlyChart } from "./monthly-chart";
@@ -420,94 +422,55 @@ export function FinanceDashboard({
           />
         )}
 
-        {/* Resumo Trust Care (será promovido na Etapa 3 com FinanceHero + Strip) */}
+        {/* Resumo Trust Care */}
         {activeTab === "visao" && currentLedger === "trustcare" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 divide-y divide-border rounded-lg border border-border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <div className="p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Entradas Trust Care
-                </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-400">
-                  {formatCentsToBrl(initialSummary.totalIncomeCents)}
-                </p>
-              </div>
-              <div className="p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Saídas &amp; Custos
-                </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-rose-400">
-                  {formatCentsToBrl(initialSummary.totalExpenseCents)}
-                </p>
-              </div>
-              <div className="p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Resultado do Mês
-                </p>
-                <p
-                  className={`mt-1 text-2xl font-semibold tabular-nums ${
-                    initialSummary.netBalanceCents >= 0 ? "text-emerald-400" : "text-rose-400"
-                  }`}
-                >
-                  {formatCentsToBrl(initialSummary.netBalanceCents)}
-                </p>
-              </div>
-            </div>
-            <MonthlyChart data={initialSummary.monthlyTrend} />
+          <div className="space-y-5">
+            <FinanceHero
+              eyebrow="Resultado Trust Care no mês"
+              value={`${initialSummary.netBalanceCents >= 0 ? "+" : ""}${formatCentsToBrl(initialSummary.netBalanceCents)}`}
+              tone={initialSummary.netBalanceCents >= 0 ? "positive" : "negative"}
+              subtitle={
+                <span className="tabular-nums">
+                  Entradas {formatCentsToBrl(initialSummary.totalIncomeCents)} − Saídas{" "}
+                  {formatCentsToBrl(initialSummary.totalExpenseCents)} ·{" "}
+                  {initialSummary.transactionCount}{" "}
+                  {initialSummary.transactionCount === 1 ? "lançamento" : "lançamentos"}
+                </span>
+              }
+            />
+            <FinanceKpiStrip
+              columns={3}
+              items={[
+                {
+                  id: "tc-income",
+                  label: "Entradas",
+                  value: formatCentsToBrl(initialSummary.totalIncomeCents),
+                  tone: initialSummary.totalIncomeCents > 0 ? "positive" : "default",
+                  subtext: "Recebimentos e vendas no mês",
+                },
+                {
+                  id: "tc-expense",
+                  label: "Saídas & custos",
+                  value: formatCentsToBrl(initialSummary.totalExpenseCents),
+                  tone: initialSummary.totalExpenseCents > 0 ? "negative" : "default",
+                  subtext: "Compras, peças e operação",
+                },
+                {
+                  id: "tc-pending",
+                  label: "Contas pendentes",
+                  value: formatCentsToBrl(initialSummary.pendingExpenseCents),
+                  tone: initialSummary.pendingExpenseCents > 0 ? "warning" : "default",
+                  subtext: `Margem ${initialSummary.profitMarginPercent}% no mês`,
+                },
+              ]}
+            />
+            <MonthlyChart data={initialSummary.monthlyTrend} currentMonth={currentMonth} />
           </div>
         )}
 
         {/* Resumo Geral Consolidado (Pessoal + Trust Care) */}
         {activeTab === "visao" && currentLedger === "all" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Pessoal &amp; Familiar
-                </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                  {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.netCents)}
-                </p>
-                <div className="mt-3 flex items-center gap-4 text-xs tabular-nums text-muted-foreground">
-                  <span>
-                    Entradas:{" "}
-                    <strong className="font-medium text-emerald-400">
-                      {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.incomeCents)}
-                    </strong>
-                  </span>
-                  <span>
-                    Saídas:{" "}
-                    <strong className="font-medium text-rose-400">
-                      {formatCentsToBrl(initialSummary.ledgerSplit.pessoal.expenseCents)}
-                    </strong>
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border bg-card p-4">
-                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Trust Care (Empresa)
-                </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
-                  {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.netCents)}
-                </p>
-                <div className="mt-3 flex items-center gap-4 text-xs tabular-nums text-muted-foreground">
-                  <span>
-                    Entradas:{" "}
-                    <strong className="font-medium text-emerald-400">
-                      {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.incomeCents)}
-                    </strong>
-                  </span>
-                  <span>
-                    Saídas:{" "}
-                    <strong className="font-medium text-rose-400">
-                      {formatCentsToBrl(initialSummary.ledgerSplit.trustcare.expenseCents)}
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-            <MonthlyChart data={initialSummary.monthlyTrend} />
-          </div>
+          <ConsolidatedOverview summary={initialSummary} currentMonth={currentMonth} />
         )}
 
         {/* Tela 2: Contas & Cartões */}
@@ -518,11 +481,15 @@ export function FinanceDashboard({
 
         {/* Tela 4: Relatórios, KPIs & Categorias */}
         {activeTab === "relatorios" && currentLedger === "pessoal" && (
-          <ReportsComparisonsView data={householdData} />
+          <ReportsComparisonsView
+            data={householdData}
+            categoriesBreakdown={initialSummary.categoriesBreakdown}
+            currentMonth={currentMonth}
+          />
         )}
         {activeTab === "relatorios" && currentLedger !== "pessoal" && (
-          <div className="space-y-6">
-            <MonthlyChart data={initialSummary.monthlyTrend} />
+          <div className="space-y-5">
+            <MonthlyChart data={initialSummary.monthlyTrend} currentMonth={currentMonth} />
             <CategoryBreakdown categoriesBreakdown={initialSummary.categoriesBreakdown} />
           </div>
         )}
@@ -548,8 +515,6 @@ export function FinanceDashboard({
         {activeTab === "notebooks" && (
           <NotebooksTracker
             notebooks={initialNotebooks}
-            categories={categories}
-            paymentMethods={paymentMethods}
             onNewNotebook={handleOpenNewNotebook}
             onEditNotebook={handleEditNotebook}
             onAddCostToNotebook={handleAddCostToNotebook}
