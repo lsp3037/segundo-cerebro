@@ -1,6 +1,6 @@
 # Segundo Cérebro: documento de produto (PRD)
 
-> Atualizado em 2026-11-01, com as Fases 1 a 4 concluídas.
+> Atualizado em 2026-11-12, com as Fases 1 a 5 concluídas.
 > Fonte: a especificação original do Luan ([`especificacao-original.md`](especificacao-original.md)) e as decisões tomadas durante o projeto ([`PLANO.md`](PLANO.md)).
 > Este documento diz **o que** o sistema faz e **por quê**. O **como** (tecnologia, banco, telas) fica no PLANO.md, e o dia a dia (rodar, testar, resolver problemas) no [`OPERACAO.md`](OPERACAO.md).
 
@@ -24,18 +24,19 @@ Consequências para o produto:
 | Objetivo | Como saber que funcionou |
 |---|---|
 | Capturar sem atrito | Qualquer coisa entra na Caixa de Entrada em poucos segundos (`Alt+N`, `Ctrl+K` ou, na Fase 6, pelo Telegram). |
-| Ver o que fazer hoje | A aba **Hoje** junta tarefas do dia, atrasadas, hábitos e agenda. |
+| Ver o que fazer hoje | A aba **Hoje** junta tarefas do dia, atrasadas, hábitos, agenda e contas da semana. |
 | Uma agenda só | Os eventos do Gmail pessoal e da conta da SES aparecem juntos e mudam nos dois sentidos. |
 | Atender leads da Trust Care melhor e mais rápido | O Assistente devolve respostas prontas para o WhatsApp, e o histórico mostra o que fecha. |
-| Saber se a Trust Care dá lucro | Resumo mensal e lucro por notebook revendido (Fase 5). |
-| Manter o sistema em dia | Revisão Semanal guiada no domingo (Fase 5). |
+| Saber se a Trust Care dá lucro | Resumo mensal e lucro por notebook revendido com custos e garantias (Fase 5 ✅). |
+| Ter controle financeiro familiar claro | Cockpit Minhas Finanças com contas fixas, dízimo 10%, cartões, orçamentos e relatórios (Fase 5 ✅). |
+| Manter o sistema em dia | Revisão Semanal guiada no domingo (Fase 5 ✅). |
 
 ## 4. Fora do escopo
 
 - **Loja online** e **sistema de precificação de notebooks**: são projetos separados. Aqui aparecem só como atalho e como ideias.
 - **Gerenciador de O.S.**: é outro sistema. Aqui só lemos um resumo (números), sem editar nada.
 - **Enviar mensagens a clientes**: o Assistente de Respostas só sugere. Quem envia é o Luan, no WhatsApp.
-- **Integração bancária**: lançamentos manuais. Importar CSV fica como bônus futuro.
+- **Integração bancária via API aberta**: lançamentos manuais e importador local de extrato `.ofx` sem envio para terceiros ou IA.
 - **Uso por outras pessoas**.
 
 ## 5. Regras que valem para o sistema todo
@@ -53,8 +54,10 @@ Consequências para o produto:
 
 ## 6. Organização
 
-- **Abas no topo:** Hoje · Agenda · Caixa de Entrada · Ideias · Conhecimento · Aprender · Finanças · Revisão Semanal.
+- **Abas no topo:** Hoje · Agenda · Caixa de Entrada · Ideias · Conhecimento · Aprender · Marketing · Finanças · Revisão Semanal.
 - **Busca `Ctrl+K`** sempre disponível.
+- **Menu lateral retrátil no desktop:** alterna suavemente entre árvore expandida (`w-64`) e trilho compacto de ícones (`w-14` / 56px) com tooltips explicativos ao passar o mouse. O estado é persistido no navegador (`localStorage`). No celular, mantém o drawer móvel acessível via ícone de menu.
+- **Ícones minimalistas por área:** as áreas utilizam ícones outline Lucide (`briefcase`, `user`, `wrench`, `wallet`) no mesmo estilo e peso dos subícones das pastas, com destaque sutil de cor apenas no estado ativo.
 - **Árvore lateral por área**, com pastas personalizáveis (criar, renomear, reordenar, subpastas):
   - Profissional › Demandas · Reuniões
   - Pessoal › Demandas · Rotina · Coisas a aprender
@@ -119,19 +122,26 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 - Fase 6: modo "perguntar", com respostas baseadas no próprio conteúdo, citando as notas. Áreas travadas para a IA nem são indexadas.
 
 ### 7.12 Finanças ✅ Fase 5 (Pessoal/Familiar + Trust Care)
-- **Pessoal & Familiar:** cockpit financeiro inspirado no *Minhas Finanças* e calibrado pela planilha da casa (`Casa`, `Luan`, `Rayzza`), com **Contas & Cartões** (saldos reais e limites/faturas separados), **Contas Fixas Mensais & Dízimo Automático (10%)**, **Baixa em 1 clique** (Pago / Pendente / Atrasado), **Parcelamentos (`1/N`)**, **Orçamentos por Categoria**, **KPIs e Comparativos entre Períodos** (Taxa de Poupança, Comprometimento Fixo, Burn Rate, MoM e Média 3M) e alertas de vencimento na tela `/financas` e no card **Contas da Semana** em `/hoje`.
-- **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + garantia).
-- Resumo mensal por área e importação local de extrato `.ofx`. A área nasce travada para a IA (`ai_enabled = false`).
+- **Pessoal & Familiar:** cockpit financeiro inspirado no *Minhas Finanças* e calibrado pela planilha da casa (`Casa`, `Luan`, `Rayzza`), com 5 visões organizadas em hierarquia visual de 56px:
+  - `Visão Geral`: alerta de vencimentos, resposta principal do mês + faixa dividida de KPIs, baixa rápida em 1 clique (`Pago` ↔ `Pendente`), entradas base e distribuição por pessoa.
+  - `Contas & Cartões`: gestão de saldos reais, transferências entre contas e acompanhamento separado de faturas/limites de 4 cartões de crédito.
+  - `Orçamentos`: tetos mensais por categoria com barras proporcionais reais (sem barras mínimas enganosas) e cards responsivos no celular.
+  - `Relatórios & KPIs`: Taxa de Poupança, Comprometimento Fixo, Burn Rate, comparativo Mês Atual vs. Anterior vs. Média 3M, tendência de 6 meses ancorada no mês selecionado e diagnóstico mensal sob demanda (local/determinístico quando `ai_enabled = false`, via `assertAreaAllowsAi`).
+  - `Fluxo & Vencimentos`: tabela no desktop, linhas compactas de 2 linhas no celular e quitação direta.
+- **Contas Fixas & Dízimo Automático (10%):** carregamento guiado do modelo familiar com cálculo automático de 10% do dízimo sobre as entradas e geração em lote no mês.
+- **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + taxa de maquininha + custos pós-venda/garantia), com preço de vitrine e alerta para estoque parado (>30 dias).
+- **Importação OFX e Privacidade:** leitor local de extratos `.ofx` sem envio para IA, detecção de duplicidades via `FITID` e aprendizado automático de regras de categorização (`finance_rules`). Área nasce travada para IA (`ai_enabled = false`).
+- **Integração com `/hoje`:** card lateral **Contas da Semana** alertando vencimentos atrasados ou nos próximos 7 dias.
 
 ### 7.13 Revisão Semanal ✅ Fase 5
-- Checklist de domingo:
+- Checklist guiado de domingo (`/revisao`):
   - esvaziar a Caixa de Entrada;
   - revisar as atrasadas;
   - planejar a semana;
   - olhar a agenda;
   - revisar as ideias de conteúdo;
   - ver o resumo financeiro.
-- Cada revisão fica salva, com anotações.
+- Cada revisão fica salva, com anotações e data de conclusão.
 
 ### 7.14 Bot do Telegram ⏳ Fase 6
 - Recebe texto, link e foto e joga na Caixa de Entrada. Aceita só o chat do Luan.
@@ -152,8 +162,8 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 1. Fundação | Login fechado, layout, temas, cores, banco e RLS | ✅ 2026-10-31 |
 | 2. Núcleo | Tarefas, hábitos, Caixa de Entrada, Conhecimento, Aprender, Ideias, busca | ✅ 2026-11-01 |
 | 3. Agenda | Google Agenda nas duas contas, duas vias | ✅ 2026-11-01 |
-| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | ✅ 2026-11-01 |
-| 5. Finanças e Revisão Semanal | Fluxo de caixa, revenda de notebooks, importador OFX e revisão guiada | ✅ 2026-11-09 |
+| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente, Diretoria de Marketing | ✅ 2026-11-01 / 2026-11-02 |
+| 5. Finanças e Revisão Semanal | Cockpit Minhas Finanças, revenda de notebooks, importador OFX e revisão guiada | ✅ 2026-11-12 |
 | 6. Extras | Telegram, busca com IA, Agente de Marketing real, PWA | ⏳ |
 
 ## 9. Decisões de produto tomadas
@@ -170,12 +180,18 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-01 | O calendário de publicações principal é o do Segundo Cérebro. |
 | 2026-11-02 | O Assistente de Respostas aceita prints de conversas (Ctrl+V ou upload), analisados diretamente pelo Gemini com visão multimodal. |
 | 2026-11-02 | Criação da Diretoria de Marketing na Trust Care: Planejador de Conteúdo (Reels, Stories, Carrosséis), Matriz de Ângulos de Anúncios e Analisador Meta Ads via MCP com IA. |
+| 2026-11-09 | Notebooks de revenda controlados por ciclo de vida, preço de vitrine e lançamentos diretos de peças/garantia (ADR 0002), separados do gerenciador de O.S. |
+| 2026-11-09 | Leitura de extrato bancário `.ofx` inteiramente local sem tráfego para IA, com anti-duplicação por FITID e regras de categorização aprendidas (ADR 0001). |
+| 2026-11-09 | Revisão Semanal guiada aos domingos em 6 etapas persistidas por semana. |
+| 2026-11-12 | Evolução do módulo Finanças para o modelo pessoal/familiar ("Minhas Finanças"): contas e 4 cartões, contas fixas + dízimo automático de 10%, orçamentos por categoria e visão por membro (`Casa`, `Luan`, `Rayzza`). |
+| 2026-11-12 | Reorganização visual de Finanças em hierarquia única de 56px, reconciliação de filtros no servidor, gráficos ancorados no mês selecionado e responsividade móvel em 2 linhas. |
+| 2026-11-12 | Menu lateral desktop retrátil (`w-64` ↔ `w-14`) com trilho apenas de ícones + tooltips e troca dos pontos coloridos por ícones minimalistas outline nas áreas. |
 
 ## 10. Pendências e riscos
 
 | Item | Tipo | Onde decidir ou resolver |
 |---|---|---|
-| Busca `Ctrl+K` sem fluxos, eventos e ideias de conteúdo | Lacuna da especificação | Próxima fase (sugestão: junto da Fase 5) |
+| Busca `Ctrl+K` sem fluxos, eventos e ideias de conteúdo | Lacuna da especificação | Fase 6 (junto da busca com IA) |
 | API do Agente de Marketing | Depende do Agente | Fase 6 |
 | Tabela `order_status_transitions` sem RLS no Supabase "Trust Care" | Risco de segurança, **em outro projeto** | No projeto do Gerenciador de O.S. |
 | Plano gratuito do Gemini: limites e modelos que mudam | Risco operacional | Modelo reserva já configurado. Acompanhar. |

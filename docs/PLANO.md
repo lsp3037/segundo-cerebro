@@ -1,6 +1,6 @@
 # Segundo Cérebro: plano técnico e diário de decisões
 
-> Status (2026-11-09): **Fases 1 a 5 concluídas**; Fase 6 (Extras: Telegram, PWA e Busca com IA) a seguir. As seções 1 a 4 são a proposta inicial (com a estrutura de pastas atualizada); as seções 5 em diante registram respostas e entregas.
+> Status (2026-11-12): **Fases 1 a 5 concluídas**; Fase 6 (Extras: Telegram, PWA e Busca com IA) a seguir. As seções 1 a 4 são a proposta inicial (com estrutura de pastas e modelo de dados atualizados conforme as entregas); as seções 5 em diante registram respostas e entregas.
 > Fonte: [`especificacao-original.md`](especificacao-original.md). O "o quê" e o "porquê" estão no [`PRD.md`](PRD.md); o dia a dia, no [`OPERACAO.md`](OPERACAO.md).
 
 ---
@@ -83,16 +83,20 @@ Rotinas = eventos recorrentes com `kind = rotina`.
 
 **Assistente de Respostas e LGPD:** o assistente não envia nada para o cliente; ele só sugere. Mas, para sugerir, o texto colado vai para o Gemini. Por isso, antes de enviar, o app **mascara automaticamente** telefones, e-mails, CPF e endereços (ex.: `(65) 9xxxx-1234` vira `[TELEFONE]`) e mostra um aviso curto. O texto original fica salvo só no seu banco.
 
-### 2.5 Finanças (Fase 5)
+### 2.5 Finanças (Fase 5 + Minhas Finanças)
 
 | Tabela | Campos principais |
 |---|---|
 | `finance_categories` | `ledger` (pessoal/trustcare), `kind` (entrada/saída), `name`, `color`, `parent_id` |
 | `payment_methods` | `name` (Pix, crédito Nubank, dinheiro…), `type` |
-| `transactions` | `ledger`, `kind`, `amount_cents`, `date`, `category_id`, `payment_method_id`, `description`, `notes`, `notebook_id` (opcional) |
-| `notebooks` | `brand`, `model`, `specs`, `status` (comprado/em reparo/à venda/vendido), `notes` |
+| `finance_accounts` | `name`, `kind` (checking/savings/cash/credit_card), `ledger`, `balance_cents`, `credit_limit_cents`, `closing_day`, `due_day`, `color`, `is_active` |
+| `finance_recurring_bills` | `name`, `ledger`, `kind`, `amount_cents`, `percentage_of_income` (ex.: `10%` Dízimo), `due_day`, `category_id`, `account_id`, `member_label` (Casa/Luan/Rayzza), `active` |
+| `finance_budgets` | `category_id`, `ledger`, `month` (YYYY-MM), `limit_cents`, `member_label` |
+| `finance_rules` | `pattern`, `ledger`, `kind`, `category_id`, `account_id`, `member_label` (regras aprendidas pelo importador OFX) |
+| `transactions` | `ledger`, `kind`, `amount_cents`, `date`, `status` (paid/pending), `due_date`, `paid_at`, `category_id`, `payment_method_id`, `account_id`, `member_label`, `recurring_bill_id`, `installment_group_id`, `installment_index`, `installment_total`, `bank_fitid`, `description`, `notes`, `notebook_id` (opcional) |
+| `notebooks` | `brand`, `model`, `specs`, `status` (comprado/em reparo/à venda/vendido), `asking_price_cents`, `buyer_name`, `buyer_contact`, `warranty_days`, `sold_at`, `machine_fee_cents`, `notes` |
 
-**Lucro por notebook:** a compra, as peças e a venda são lançamentos normais em `transactions` ligados ao notebook. O lucro é calculado (venda − compra − peças) por uma *view* `notebook_profit`. Assim, o caixa da Trust Care e o lucro por aparelho usam os mesmos lançamentos, sem digitar duas vezes.
+**Lucro por notebook:** a compra, as peças, eventuais custos pós-venda (garantia) e a venda (descontando taxa de maquininha) são lançamentos ligados ao notebook em `transactions` / `notebooks`. O lucro real e o de vitrine são calculados diretamente a partir dos mesmos dados, sem redigitação.
 
 ### 2.6 Revisão e busca (Fases 5 e 6)
 
@@ -128,7 +132,7 @@ attachments ──(qualquer entidade)
 
 ## 3. Estrutura de pastas do projeto
 
-> Atualizada em 2026-11-01 para refletir o código real. Diferenças em relação à proposta inicial: o Gerenciador de O.S. é lido pela **API dele** (não por um cliente Supabase), a integração com o Google ficou em `lib/google/`, as áreas e pastas padrão são criadas por gatilho na migration `auth_seed` (não há `seed.sql`), e a IA é chamada por Server Actions (não há `api/ai`). As pastas do Telegram e do PWA chegam na Fase 6.
+> Atualizada em 2026-11-12 para refletir o código real das Fases 1 a 5. Diferenças em relação à proposta inicial: o Gerenciador de O.S. é lido pela **API dele** (não por um cliente Supabase), a integração com o Google ficou em `lib/google/`, as áreas e pastas padrão são criadas por gatilho na migration `auth_seed` (não há `seed.sql`), e a IA é chamada por Server Actions (não há `api/ai`). As pastas do Telegram e do PWA chegam na Fase 6.
 
 ```
 segundo-cerebro/
@@ -138,9 +142,10 @@ segundo-cerebro/
 │  ├─ acesso-negado/           e-mail fora da lista
 │  ├─ (legal)/privacidade/ termos/   páginas públicas exigidas pelo Google
 │  ├─ (app)/                   tudo que exige login
-│  │  ├─ layout.tsx            barra superior (abas + Ctrl+K) e árvore lateral
+│  │  ├─ layout.tsx            shell (topbar + sidebar retrátil + Ctrl+K)
 │  │  ├─ hoje/  agenda/  entrada/  ideias/  conhecimento/  aprender/
-│  │  ├─ financas/  revisao/   (Fase 5)
+│  │  ├─ marketing/            Diretoria de Marketing (conteúdo, campanhas, Meta Ads)
+│  │  ├─ financas/  revisao/   Finanças (Minhas Finanças + Trust Care) e Revisão Semanal
 │  │  ├─ configuracoes/        áreas, trava de IA, lixeira, Google Agenda
 │  │  └─ p/[folderId]/         telas das pastas (Atalhos, Fluxos, Publicações…)
 │  └─ api/
@@ -149,14 +154,19 @@ segundo-cerebro/
 │     └─ arquivos/[...path]/   entrega anexos privados do Storage
 ├─ components/
 │  ├─ ui/                      componentes do shadcn
-│  ├─ app-shell/               barra superior, árvore lateral, busca Ctrl+K
+│  ├─ app-shell/               barra superior com botão retrátil, árvore lateral e Ctrl+K
 │  ├─ tasks/ habits/ inbox/ notes/ learning/ ideas/ agenda/
+│  ├─ marketing/               planejador de conteúdo, matriz de ângulos e Meta Ads
+│  ├─ finance/                 cockpit Minhas Finanças, notebooks, orçamentos, relatórios e OFX
+│  ├─ review/                  checklist guiado de revisão semanal
 │  └─ trustcare/               atalhos, conteúdo, publicações, fluxos, assistente
 ├─ lib/
 │  ├─ supabase/                client (navegador), server, admin (só servidor), tipos
 │  ├─ actions/                 Server Actions (gravam no banco)
 │  ├─ data/                    leituras do banco
 │  ├─ ai/                      interface do provedor + gemini.ts + trava por área
+│  ├─ finance/                 motor OFX, regras, cálculos familiares e diagnóstico local
+│  ├─ motion/                  animações sob demanda (ui-generation)
 │  ├─ google/                  API do Calendar, sincronização, criptografia dos tokens
 │  ├─ integrations/
 │  │  ├─ os-manager.ts         resumo das O.S. pela API do Gerenciador (só leitura)
@@ -166,7 +176,7 @@ segundo-cerebro/
 │  └─ dates.ts recurrence.ts events-expand.ts …   datas em Cuiabá e repetições
 ├─ supabase/migrations/        banco versionado (tabelas, RLS, seed por usuário, cron)
 ├─ scripts/set-vault.mjs       grava app_url e cron_secret no Vault do Supabase
-├─ docs/                       PRD, plano, operação e especificação original
+├─ docs/                       PRD, plano, operação, ADRs e especificação original
 ├─ .env.example
 └─ README.md
 ```
@@ -260,10 +270,10 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 
 ---
 
-## 10. Plano da Fase 5: Finanças e Controle de Notebooks da Trust Care (2026-11-09)
+## 10. Fase 5 concluída: Finanças, Notebooks e Revisão Semanal (2026-11-09)
 
-> Definido e alinhado via `/grill-with-docs` com GLOSSARY.md e ADRs 0001 e 0002.
-> O app foca na gestão do fluxo de caixa e no controle ponta a ponta dos notebooks de revenda da Trust Care, adicionando importação de extratos bancários locais via OFX.
+> Definido e alinhado via `/grill-with-docs` com ADRs 0001 e 0002.
+> O app entrega gestão do fluxo de caixa, controle ponta a ponta dos notebooks de revenda da Trust Care, importação local de extratos bancários OFX e revisão guiada de domingo.
 
 ### 10.1 Decisões e Modelo de Domínio
 1. **Notebooks de Revenda**: Ativos próprios de estoque para compra, reforma e revenda com margem (separados das O.S. de clientes da assistência técnica).
@@ -273,12 +283,12 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 5. **Importador de Extrato Bancário (OFX)**: Leitor local de arquivos `.ofx` no servidor Next.js sem envio para modelos de IA externos (`ai_enabled = false`), com anti-duplicação por `FITID`, correspondência com lançamentos manuais já existentes e aprendizado automático de categorias via `finance_rules` (ver ADR 0001).
 6. **Ledger e Salários**: Salário da SES e gastos pessoais ficam em `pessoal`. Retiradas da Trust Care para uso pessoal são transferências internas (pró-labore), sem inflar o consolidado.
 
-### 10.2 Etapas de Implementação (1 commit por etapa)
-1. **Migration e Tipos**: Adicionar `asking_price_cents`, `buyer_name`, `buyer_contact`, `warranty_days`, `sold_at`, `machine_fee_cents` em `public.notebooks`; adicionar `bank_fitid` em `public.transactions`; criar tabela `finance_rules` com RLS e policies; atualizar `lib/supabase/database.types.ts`.
-2. **Ciclo de Vida de Notebooks**: Implementar preço anunciado, dias em estoque (alerta >30 dias), modal de venda com taxa de maquininha e comprador, e suporte a despesas de garantia pós-venda no `NotebooksTracker`.
-3. **Parser e Motor de Extrato OFX**: Criar utilitário TypeScript de parsing local de `.ofx` (SGML/XML) extraindo `FITID`, data, valor em centavos e descrição, com lógica de correspondência com lançamentos existentes.
-4. **Interface de Importação e Regras**: Desenvolver modal/gaveta de importação de extrato bancário com prévia interativa, auto-categorização via `finance_rules`, salvamento em lote e aprendizado de regras.
-5. **Revisão Semanal**: Implementar a tela `/revisao` com o checklist guiado de domingo integrando tarefas pendentes, Caixa de Entrada e o resumo financeiro da semana.
+### 10.2 Etapas Entregues
+1. **Migration e Tipos (`20261109103000_finance_phase5.sql`)**: `asking_price_cents`, `buyer_name`, `buyer_contact`, `warranty_days`, `sold_at`, `machine_fee_cents` em `public.notebooks`; `bank_fitid` em `public.transactions`; tabela `finance_rules` com RLS e atualização de `lib/supabase/database.types.ts`.
+2. **Ciclo de Vida de Notebooks**: Preço anunciado, dias em estoque (alerta >30 dias), modal de venda com taxa de maquininha e comprador, e suporte a despesas de garantia pós-venda no `NotebooksTracker`.
+3. **Parser e Motor de Extrato OFX**: Parsing local de `.ofx` (SGML/XML) extraindo `FITID`, data, valor em centavos e descrição, com lógica de reconciliação.
+4. **Interface de Importação e Regras**: Modal interativo com prévia, auto-categorização via `finance_rules`, salvamento em lote e aprendizado de regras.
+5. **Revisão Semanal**: Tela `/revisao` com checklist guiado de domingo integrando tarefas pendentes, Caixa de Entrada e resumo financeiro da semana.
 
 ---
 
@@ -294,5 +304,17 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
   - Reconciliação completa de dados: filtro por pessoa aplicado no servidor em `getFinanceSummary` e `getTransactions`, gráficos ancorados no mês selecionado (`?m=`) sem barras mínimas falsas em meses zerados, e resumo dividido real no `Consolidado`.
   - Efeito `transitions-ui-generation` em `lib/motion/ui-generation/` restrito a dois momentos intencionais sob demanda: geração do diagnóstico mensal e primeiro carregamento do modelo de contas fixas.
 - **Integração com `/hoje`:** Card lateral **Contas da Semana** destacando contas atrasadas ou vencendo nos próximos 7 dias.
+
+---
+
+## 12. Shell Desktop Retrátil e Ícones Minimalistas (2026-11-12)
+
+- **Menu lateral retrátil (`components/app-shell/`):**
+  - O `<aside>` desktop em `app-shell.tsx` alterna suavemente entre `w-64` (expandido) e `w-14` / `56px` (retraído, modo apenas ícones) com `transition-[width] duration-200 ease-out`.
+  - Persistência sincronizada via `useSyncExternalStore` em `localStorage` (`segundo-cerebro:sidebar-collapsed`), evitando erros de hidratação SSR e efeitos colaterais de `setState`.
+  - O atalho `Ctrl+B` não foi associado de propósito para preservar o negrito do editor BlockNote em `/conhecimento`; o controle fica em botão acessível (`hidden md:inline-flex`, `aria-expanded`) na `topbar.tsx`.
+- **Ícones minimalistas e rail recolhido (`sidebar.tsx`):**
+  - Os pontos coloridos (`span.size-2.rounded-full`) nos cabeçalhos das áreas foram substituídos pelos ícones outline Lucide (`briefcase`, `user`, `wrench`, `wallet`, com fallback em `AREA_DEFAULT_ICON`), combinando com os subícones das pastas (`size-3.5` expandido, `size-4` recolhido) e destacando `text-(--area)` apenas quando ativo.
+  - No estado recolhido, as áreas, subpastas (`CollapsedFolderRail`) e `Configurações` exibem apenas ícones centralizados com `<Tooltip side="right">` utilizando o `<TooltipProvider>` raiz do layout.
 
 

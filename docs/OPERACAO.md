@@ -60,14 +60,19 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
   - [ ] Campanhas & Ângulos: cadastrar campanha com orçamento e datas; criar ângulos de teste e usar "Sugerir com IA".
   - [ ] Analisador Meta Ads: visualizar KPIs (Spend, Cliques, CTR, CPC, Leads, CPL); testar botão de sincronização e diagnóstico da IA.
 
-### Fase 5: Finanças, Pessoal/Familiar e Revisão Semanal
+### Fase 5: Finanças, Pessoal/Familiar e Revisão Semanal ✅
 - [x] Migration `supabase/migrations/20261112120000_finance_family.sql` executada no SQL Editor do Supabase.
-- [ ] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Configurar ▾ → Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
-- [ ] Conferir cálculo automático de `10%` do Dízimo ao alterar Entradas, filtro por Pessoa (`Casa`, `Luan`, `Rayzza`), baixa rápida em 1 clique (`Pagar` ↔ `Pago`) e card **Contas da Semana** em `/hoje`.
-- [ ] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado), conferir comparativos entre períodos, distribuição por categoria e testar **Gerar diagnóstico do mês** (resumo local enquanto `ai_enabled = false` em Finanças).
-- [ ] Alternar entre `Pessoal`, `Trust Care` e `Consolidado` (e testar também via `/p/[folderId]` e no celular `390×844`): conferir cabeçalho único sem título duplicado, linhas responsivas de 2 linhas em `Fluxo & Vencimentos` / `Orçamentos`, cadastro de notebook com preço de vitrine e venda com garantia/taxa de maquininha.
-- [ ] Importador OFX (`Configurar ▾ → Importar Extrato (.OFX)`): subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
-- [ ] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo e concluir.
+- [x] Finanças Pessoal & Familiar: abrir `/financas`, clicar em **Configurar ▾ → Contas Fixas & Dízimo** → **Carregar Modelo da Planilha**, preencher os valores de Entradas/Saídas e clicar em **Salvar & Gerar no Mês**.
+- [x] Conferir cálculo automático de `10%` do Dízimo ao alterar Entradas, filtro por Pessoa (`Casa`, `Luan`, `Rayzza`), baixa rápida em 1 clique (`Pagar` ↔ `Pago`) e card **Contas da Semana** em `/hoje`.
+- [x] Contas & Cartões, Orçamentos e Relatórios: cadastrar saldo inicial/transferência, definir metas de orçamento (ex.: Supermercado), conferir comparativos entre períodos, distribuição por categoria e testar **Gerar diagnóstico do mês** (resumo local determinístico enquanto `ai_enabled = false` em Finanças).
+- [x] Alternar entre `Pessoal`, `Trust Care` e `Consolidado` (e testar também via `/p/[folderId]` e no celular `390×844`): conferir cabeçalho único sem título duplicado, linhas responsivas de 2 linhas em `Fluxo & Vencimentos` / `Orçamentos`, cadastro de notebook com preço de vitrine e venda com garantia/taxa de maquininha.
+- [x] Importador OFX (`Configurar ▾ → Importar Extrato (.OFX)`): subir arquivo de extrato bancário, conferir detecção de novos e memorização de regras.
+- [x] Revisão Semanal (/revisao): percorrer os 6 passos guiados de domingo e concluir.
+
+### Shell Desktop e Usabilidade ✅
+- [x] Menu lateral retrátil no desktop: alternar pelo botão da barra superior (`PanelLeftCloseIcon` / `PanelLeftOpenIcon`), transição suave entre `w-64` e `w-14` (apenas ícones), tooltips explicativos à direita e persistência no navegador via `localStorage`.
+- [x] Ícones minimalistas outline Lucide nas áreas (`briefcase`, `user`, `wrench`, `wallet`) em substituição aos pontos coloridos, com destaque sutil de cor apenas no estado ativo.
+- [x] Drawer lateral mantido no celular via botão de menu, sem conflitos com o modo desktop.
 
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
@@ -94,7 +99,8 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 | API do Agente de Marketing | Ainda é versão de teste. Combinar rotas, formato e chave na Fase 6. |
 | RLS no Gerenciador de O.S. | A tabela `order_status_transitions` do Supabase "Trust Care" está sem RLS: com a chave pública daquele app, dá para alterar as regras de status. Corrigir **no projeto do Gerenciador**, ligando o RLS e criando uma regra de leitura (ligar sem a regra bloqueia o próprio Gerenciador). |
 | Variável sobrando na Vercel | `NEXT_PUBLIC_SUPABASE` (sem uso) pode ser apagada. |
-| Fases 5 e 6 | Finanças e Revisão Semanal; Telegram, busca com IA, Agente real e PWA. |
+| Fases 1 a 5 | Concluídas e em produção (Vercel). |
+| Fase 6 (Próxima) | Telegram, busca semântica com IA, integração real do Agente de Marketing e PWA. |
 
 ## 6. Como trabalhamos
 

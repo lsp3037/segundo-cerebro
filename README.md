@@ -11,9 +11,9 @@ Sistema pessoal do Luan para organizar a vida profissional (SES-MT), pessoal, a 
 | 1. Fundação | Login fechado, layout com abas e árvore lateral, temas, cores por área, banco e RLS | ✅ |
 | 2. Núcleo | Tarefas, Caixa de Entrada, Conhecimento, Aprender, Ideias, hábitos, busca no conteúdo | ✅ |
 | 3. Agenda | Google Agenda nos dois sentidos, duas contas (pessoal e SES), blocos de tarefa | ✅ |
-| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente | ✅ |
-| 5. Finanças e Revisão Semanal | | — |
-| 6. Extras | Telegram, busca com IA, Agente de Marketing, PWA | — |
+| 4. Trust Care | Atalhos e O.S., conteúdo, publicações, fluxos, assistente, Diretoria de Marketing | ✅ |
+| 5. Finanças e Revisão Semanal | Fluxo familiar/pessoal ("Minhas Finanças"), revenda de notebooks, extrato OFX e revisão guiada | ✅ |
+| 6. Extras | Telegram, busca com IA, Agente de Marketing real, PWA | ⏳ |
 
 ---
 
@@ -133,8 +133,21 @@ Configuração:
 1. No Gerenciador de O.S. (https://trustcare-one.vercel.app) › Configurações › API: crie uma chave marcando **só** "Consultar Ordens de Serviço" (`orders:read`).
 2. Coloque `OS_API_URL=https://trustcare-one.vercel.app` e `OS_API_KEY=tc_live_…` no `.env.local` e na Vercel.
 
+### 10. Finanças e Revisão Semanal (Fase 5) ✅
+
+- **Finanças Pessoal & Familiar ("Minhas Finanças"):** cockpit completo inspirado no *Minhas Finanças* e integrado com a planilha da casa (`Casa`, `Luan`, `Rayzza`), contemplando:
+  - **Contas & Cartões:** controle de saldos reais e faturas/limites de 4 cartões de crédito.
+  - **Contas Fixas & Dízimo (10%):** modelo mensal predefinido com cálculo automático do dízimo sobre as entradas e geração no mês em lote.
+  - **Baixa em 1 clique:** alternância rápida entre Pago e Pendente na listagem de vencimentos e card **Contas da Semana** integrado em `/hoje`.
+  - **Orçamentos:** tetos mensais por categoria com comparativo planejado vs. realizado em tempo real.
+  - **Relatórios & KPIs:** taxa de poupança, comprometimento fixo, burn rate e comparativo MoM / 3M. Diagnóstico mensal sob demanda com geração local determinística (respeitando a trava `ai_enabled = false`).
+- **Revenda de Notebooks (Trust Care):** gestão do ciclo de vida dos aparelhos (`comprado`, `em reparo`, `à venda`, `vendido`) com preço anunciado de vitrine, alerta de capital parado (>30 dias), modal de venda com taxa de maquininha, registro de garantia de balcão e abatimento de despesas pós-venda.
+- **Importador de Extrato Bancário (.OFX):** leitura local de arquivos `.ofx` sem tráfego de dados para IA externa, reconciliação inteligente por `FITID` e aprendizado automático de categorias via `finance_rules`.
+- **Revisão Semanal (`/revisao`):** checklist guiado de 6 passos aos domingos (Caixa de Entrada, atrasadas, planejamento da semana, agenda, ideias de conteúdo e resumo financeiro).
+- **Menu Lateral Retrátil no Desktop:** alternância suave entre árvore expandida (`w-64`) e trilho somente com ícones (`w-14` / 56px) com tooltips à direita, persistido no navegador, e ícones outline minimalistas substituindo os pontos coloridos das áreas.
+
 ### Próximas fases
-- **Telegram (Fase 6):** criar o bot com o [@BotFather](https://t.me/BotFather).
+- **Telegram, busca semântica com IA, Agente de Marketing real e PWA (Fase 6):** criar o bot com o [@BotFather](https://t.me/BotFather).
 
 ---
 
@@ -155,19 +168,24 @@ app/
   (auth)/login/         tela de login
   auth/callback/        retorno do login
   (legal)/              privacidade e termos (públicas, exigidas pelo Google)
-  (app)/                telas que exigem login (abas, pastas, configurações)
+  (app)/                telas que exigem login (hoje, agenda, entrada, ideias, conhecimento, aprender, marketing, financas, revisao, configuracoes, p/[folderId])
   api/google/           conectar a agenda e receber avisos do Google
   api/cron/             chamado pelo pg_cron a cada 15 min (protegido por segredo)
   api/arquivos/         entrega anexos privados
 components/
-  app-shell/            barra superior, árvore lateral, busca Ctrl+K
-  trustcare/            atalhos, conteúdo, publicações, fluxos, assistente
+  app-shell/            barra superior (com botão retrátil), árvore lateral e busca Ctrl+K
+  finance/              cockpit Minhas Finanças, cartões, orçamentos, relatórios, notebooks e OFX
+  review/               revisão semanal guiada de domingo
+  marketing/            Diretoria de Marketing (conteúdo, campanhas e Meta Ads)
+  trustcare/            atalhos, O.S., conteúdo, publicações, fluxos, assistente
   tasks/ notes/ agenda/ …  uma pasta por módulo
   ui/                   componentes do shadcn/ui
 lib/
   actions/              Server Actions (gravam no banco)
   data/                 leituras do banco
   ai/                   camada de IA (Gemini) com trava por área
+  finance/              motor OFX, regras, diagnóstico local e cálculos familiares
+  motion/               animações intencionais (transitions-ui-generation)
   google/               Google Agenda: API, sincronização, criptografia dos tokens
   integrations/         Gerenciador de O.S. (só leitura) e Agente de Marketing (teste)
   mask.ts               esconde dados pessoais antes de ir para a IA
@@ -178,6 +196,7 @@ docs/
   PRD.md                o que o sistema faz e por quê
   PLANO.md              plano técnico e diário de decisões
   OPERACAO.md           rodar, testar, resolver problemas, pendências
+  adr/                  Architecture Decision Records (OFX, peças de notebook)
   especificacao-original.md   o pedido original do Luan
 ```
 
