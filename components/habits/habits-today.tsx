@@ -1,8 +1,8 @@
 "use client";
 
-import { CheckIcon, FlameIcon } from "lucide-react";
-import Link from "next/link";
+import { CheckIcon, FlameIcon, TargetIcon } from "lucide-react";
 
+import { AsideCard, AsideEmpty } from "@/components/today/aside-card";
 import type { IsoDate } from "@/lib/dates";
 import { currentStreak, doneInWeek, type Habit, type HabitLog, isScheduled } from "@/lib/habits";
 import { cn } from "@/lib/utils";
@@ -25,29 +25,18 @@ export function HabitsToday({
   const doneCount = todays.filter((h) => daysOf(h.id).has(today)).length;
 
   return (
-    <section className="rounded-xl border">
-      <header className="flex items-center justify-between border-b px-4 py-2.5">
-        <h2 className="text-sm font-semibold">
-          Hábitos de hoje
-          {todays.length > 0 && (
-            <span className="ml-2 font-normal text-muted-foreground tabular-nums">
-              {doneCount}/{todays.length}
-            </span>
-          )}
-        </h2>
-        {manageHref && (
-          <Link href={manageHref} className="text-xs text-muted-foreground hover:text-foreground">
-            Gerenciar
-          </Link>
-        )}
-      </header>
-
+    <AsideCard
+      icon={TargetIcon}
+      title="Hábitos de hoje"
+      meta={todays.length > 0 ? `${doneCount}/${todays.length}` : undefined}
+      action={manageHref ? { label: habits.length === 0 ? "Criar" : "Gerenciar", href: manageHref } : undefined}
+    >
       {todays.length === 0 ? (
-        <p className="px-4 py-4 text-sm text-muted-foreground">
-          {habits.length === 0 ? "Nenhum hábito cadastrado ainda." : "Nenhum hábito para hoje."}
-        </p>
+        <AsideEmpty>
+          {habits.length === 0 ? "Seus hábitos aparecem aqui para você marcar no dia." : "Nenhum hábito para hoje."}
+        </AsideEmpty>
       ) : (
-        <ul className="p-1.5">
+        <ul>
           {todays.map((habit) => {
             const days = daysOf(habit.id);
             const done = days.has(today);
@@ -89,6 +78,6 @@ export function HabitsToday({
           })}
         </ul>
       )}
-    </section>
+    </AsideCard>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useOpenParam } from "@/components/use-open-param";
@@ -36,6 +37,7 @@ export function TasksBoard({
   views = TASK_VIEWS.map((v) => v.value),
   defaultAreaId,
   folderId = null,
+  greeting,
   aside,
 }: {
   initialTasks: Task[];
@@ -44,6 +46,8 @@ export function TasksBoard({
   views?: TaskView[];
   defaultAreaId: string;
   folderId?: string | null;
+  // "Bom dia" etc., calculado no servidor (relógio de Cuiabá). Só a visão Hoje usa.
+  greeting?: string;
   aside?: React.ReactNode;
 }) {
   const list = useTaskList(initialTasks);
@@ -65,7 +69,7 @@ export function TasksBoard({
 
       <div className={cn("mt-4", aside && "grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]")}>
         <div className="min-w-0 order-2 xl:order-1">
-          {view === "hoje" && <TodayView {...props} />}
+          {view === "hoje" && <TodayView {...props} greeting={greeting} />}
           {view === "semana" && <WeekView {...props} />}
           {view === "mes" && <MonthView {...props} />}
           {view === "lista" && <ListView {...props} />}
@@ -129,17 +133,26 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-1">
+    <section className="space-y-1.5">
       <h2
         className={cn(
-          "flex items-center gap-2 px-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase",
+          "flex items-center gap-2 px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase",
           tone === "danger" && "text-red-600 dark:text-red-400",
         )}
       >
         {title}
-        {count !== undefined && <span className="font-normal tabular-nums">{count}</span>}
+        {count !== undefined && (
+          <span
+            className={cn(
+              "rounded-full bg-muted px-1.5 py-px text-[11px] font-medium tabular-nums",
+              tone === "danger" && "bg-red-500/10",
+            )}
+          >
+            {count}
+          </span>
+        )}
       </h2>
-      <div>{children}</div>
+      <div className="rounded-xl border bg-card p-1">{children}</div>
     </section>
   );
 }
@@ -150,7 +163,70 @@ function Empty({ children }: { children: React.ReactNode }) {
 
 // ---------------------------------------------------------------------------
 
-function TodayView({ list, today, defaultAreaId, folderId, onOpen, onToggle }: ViewProps) {
+function plural(n: number, one: string, many: string) {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+// Resumo do dia: o que falta, o que já foi e o que está atrasado, numa olhada.
+function DayBrief({ greeting, overdue, pending, done }: { greeting?: string; overdue: number; pending: number; done: number }) {
+  const total = pending + done;
+  const headline =
+    pending > 0
+      ? `${plural(pending, "tarefa", "tarefas")} para hoje`
+      : done > 0
+        ? "Tudo concluído por hoje"
+        : "Nada marcado para hoje";
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border bg-card px-5 py-4">
+      <div className="min-w-0">
+        {greeting && <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{greeting}</p>}
+        <p className="text-xl font-semibold tracking-tight">{headline}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        {overdue > 0 && (
+          <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-600 dark:text-red-400">
+            {plural(overdue, "atrasada", "atrasadas")}
+          </span>
+        )}
+        {total > 0 && (
+          <div className="flex items-center gap-2.5 text-xs text-muted-foreground tabular-nums">
+            <div
+              role="progressbar"
+              aria-label="Tarefas de hoje concluídas"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={done}
+              className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
+            >
+              <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500 ease-out" style={{ width: `${(done / total) * 100}%` }} />
+            </div>
+            <span>
+              {done} de {total}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyToday({ hasOverdue, allDone }: { hasOverdue: boolean; allDone: boolean }) {
+  const Icon = allDone ? CircleCheckIcon : SunIcon;
+  return (
+    <div className="flex flex-col items-center gap-1 px-4 py-7 text-center">
+      <Icon className="mb-1 size-5 text-muted-foreground" aria-hidden="true" />
+      <p className="text-sm font-medium">{allDone ? "Dia em dia" : "Dia livre por enquanto"}</p>
+      <p className="max-w-xs text-xs text-muted-foreground">
+        {hasOverdue
+          ? "Passe o mouse numa atrasada e toque em “Hoje” para trazê-la para cá, ou adicione algo acima."
+          : "Adicione uma tarefa acima quando algo surgir."}
+      </p>
+    </div>
+  );
+}
+
+function TodayView({ list, today, defaultAreaId, folderId, greeting, onOpen, onToggle }: ViewProps & { greeting?: string }) {
   const { overdue, todays, doneToday } = useMemo(() => {
     const open = list.tasks.filter(isOpen);
     return {
@@ -166,18 +242,35 @@ function TodayView({ list, today, defaultAreaId, folderId, onOpen, onToggle }: V
     <TaskRow key={task.id} task={task} today={today} showDate={showDate} onOpen={() => onOpen(task)} onToggle={() => onToggle(task)} />
   );
 
+  const moveToToday = (task: Task) => {
+    const previous = task.due_date;
+    list.update(task.id, { due_date: today });
+    toast("Movida para hoje.", { action: { label: "Desfazer", onClick: () => list.update(task.id, { due_date: previous }) } });
+  };
+
   return (
     <div className="space-y-6">
+      <DayBrief greeting={greeting} overdue={overdue.length} pending={todays.length} done={doneToday.length} />
+
       <TaskQuickAdd list={list} today={today} defaultAreaId={defaultAreaId} folderId={folderId} defaultDate={today} placeholder="Nova tarefa para hoje…" />
 
       {overdue.length > 0 && (
         <Section title="Atrasadas" count={overdue.length} tone="danger">
-          {overdue.map((t) => row(t, true))}
+          {overdue.map((t) => (
+            <TaskRow
+              key={t.id}
+              task={t}
+              today={today}
+              onOpen={() => onOpen(t)}
+              onToggle={() => onToggle(t)}
+              onReschedule={() => moveToToday(t)}
+            />
+          ))}
         </Section>
       )}
 
       <Section title="Hoje" count={todays.length}>
-        {todays.length ? todays.map((t) => row(t)) : <Empty>Nada marcado para hoje.</Empty>}
+        {todays.length ? todays.map((t) => row(t)) : <EmptyToday hasOverdue={overdue.length > 0} allDone={doneToday.length > 0} />}
       </Section>
 
       {doneToday.length > 0 && (

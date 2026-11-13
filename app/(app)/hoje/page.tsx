@@ -15,7 +15,7 @@ import { getHabits } from "@/lib/data/habits";
 import { countOpenInbox } from "@/lib/data/inbox";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
-import { addDays, formatLongDate, fromWallParts, todayIso } from "@/lib/dates";
+import { addDays, formatGreeting, formatLongDate, fromWallParts, todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[0];
@@ -63,11 +63,12 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
         today={today}
         view={view}
         defaultAreaId={defaultArea.id}
+        greeting={formatGreeting()}
         aside={
           view === "hoje" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-3.5">
-              <UpcomingBillsCard bills={upcomingBills} />
+            <div className="grid grid-cols-1 items-start gap-3.5 sm:grid-cols-2 xl:grid-cols-1">
               <TodayAgenda occurrences={todayEvents} areas={areas} connected={calendars.some((c) => c.sync_enabled)} />
+              <UpcomingBillsCard bills={upcomingBills} />
               <HabitsToday
                 habits={habits}
                 logs={logs}
@@ -76,13 +77,17 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
               />
               <Link
                 href="/entrada"
-                className="flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm hover:bg-accent/50 sm:col-span-2 xl:col-span-1"
+                className="group flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm transition-colors hover:bg-accent/50 sm:col-span-2 xl:col-span-1"
               >
-                <InboxIcon className="size-4 text-muted-foreground" />
-                <span className="flex-1">Caixa de Entrada</span>
-                <span className={inboxCount > 0 ? "font-semibold tabular-nums" : "text-muted-foreground"}>
-                  {inboxCount > 0 ? `${inboxCount} para organizar` : "vazia"}
-                </span>
+                <InboxIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+                <span className="flex-1 font-semibold">Caixa de Entrada</span>
+                {inboxCount > 0 ? (
+                  <span className="rounded-full bg-foreground px-2 py-0.5 text-xs font-semibold text-background tabular-nums">
+                    {inboxCount} para organizar
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">vazia</span>
+                )}
               </Link>
             </div>
           ) : undefined

@@ -20,6 +20,16 @@ export function formatDateTime(date: Date | string) {
   return shortDateTime.format(typeof date === "string" ? new Date(date) : date);
 }
 
+const hourInZone = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "numeric", hourCycle: "h23" });
+
+// "Bom dia", "Boa tarde" ou "Boa noite", pelo relógio de Cuiabá.
+export function formatGreeting(now = new Date()) {
+  const hour = Number(hourInZone.format(now));
+  if (hour < 12) return "Bom dia";
+  if (hour < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
 // ---------------------------------------------------------------------------
 // Datas de calendário (sem hora)
 // ---------------------------------------------------------------------------
@@ -102,6 +112,13 @@ export function formatRelativeDay(iso: IsoDate, today = todayIso()) {
   if (iso.slice(0, 4) !== today.slice(0, 4)) return clean(dayMonthYear.format(d));
   if (diff > 1 && diff < 7) return clean(weekdayShort.format(d));
   return `${clean(weekdayShort.format(d))}, ${clean(dayMonth.format(d))}`;
+}
+
+// Para prazo vencido: "ontem", "há 5 dias". Passando de um mês, volta para a data ("ter, 3 out").
+export function formatOverdue(iso: IsoDate, today = todayIso()) {
+  const days = daysBetween(iso, today);
+  if (days <= 1 || days > 30) return formatRelativeDay(iso, today);
+  return `há ${days} dias`;
 }
 
 // "26 out"

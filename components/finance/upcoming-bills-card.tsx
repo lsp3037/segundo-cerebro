@@ -1,10 +1,10 @@
 "use client";
 
 import { useTransition } from "react";
-import Link from "next/link";
 import { AlertTriangleIcon, CheckIcon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { AsideCard } from "@/components/today/aside-card";
 import { toggleTransactionPaid } from "@/lib/actions/finance-family";
 import type { UpcomingBill } from "@/lib/data/finance-family";
 import { formatCentsToBrl } from "@/lib/money";
@@ -29,49 +29,39 @@ export function UpcomingBillsCard({ bills }: UpcomingBillsCardProps) {
   };
 
   return (
-    <div className="rounded-xl border border-amber-500/30 bg-amber-950/10 p-3.5">
-      <div className="flex items-center justify-between gap-2 pb-2 border-b border-border/40">
-        <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-          {overdueCount > 0 ? (
-            <AlertTriangleIcon className="size-4 text-rose-400" />
-          ) : (
-            <WalletIcon className="size-4 text-amber-400" />
-          )}
-          <span>Contas da Semana</span>
-        </div>
-        <Link href="/financas?ledger=pessoal&tab=fluxo" className="text-xs font-medium text-primary hover:underline">
-          Ver todas
-        </Link>
-      </div>
-
-      <div className="mt-2 space-y-2">
+    <AsideCard
+      icon={overdueCount > 0 ? AlertTriangleIcon : WalletIcon}
+      title="Contas da semana"
+      tone={overdueCount > 0 ? "danger" : "warning"}
+      action={{ label: "Ver todas", href: "/financas?ledger=pessoal&tab=fluxo" }}
+    >
+      <ul>
         {bills.map((b) => {
           const isOverdue = b.billStatus === "overdue";
           const dLabel = b.due_date ? `${b.due_date.slice(8)}/${b.due_date.slice(5, 7)}` : "Sem dia";
           return (
-            <div key={b.id} className="flex items-center justify-between gap-2 text-xs">
+            <li key={b.id} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm">
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium text-foreground">{b.description}</div>
-                <div className={`text-xs ${isOverdue ? "text-rose-400 font-medium" : "text-muted-foreground"}`}>
+                <p className="truncate leading-5 font-medium">{b.description}</p>
+                <p className={`text-xs ${isOverdue ? "font-medium text-rose-400" : "text-muted-foreground"}`}>
                   {isOverdue ? `Atrasada (${dLabel})` : `Vence ${dLabel}`}
-                </div>
+                </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="font-mono font-semibold tabular-nums">{formatCentsToBrl(b.amount_cents)}</span>
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => handlePay(b)}
-                  title="Marcar como pago"
-                  className="inline-flex size-6 items-center justify-center rounded-md border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500 hover:text-emerald-950"
-                >
-                  <CheckIcon className="size-3.5" />
-                </button>
-              </div>
-            </div>
+              <span className="shrink-0 font-semibold tabular-nums">{formatCentsToBrl(b.amount_cents)}</span>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => handlePay(b)}
+                title="Marcar como pago"
+                aria-label={`Marcar "${b.description}" como paga`}
+                className="inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-emerald-500/40 bg-emerald-500/15 text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-emerald-950 disabled:opacity-50"
+              >
+                <CheckIcon className="size-3.5" />
+              </button>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+    </AsideCard>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
-import { CheckIcon, ClockIcon, RepeatIcon } from "lucide-react";
+import { CalendarArrowUpIcon, CheckIcon, ClockIcon, RepeatIcon } from "lucide-react";
 
 import { useWorkspace } from "@/components/workspace";
-import { formatRelativeDay, formatTime, type IsoDate } from "@/lib/dates";
+import { formatOverdue, formatRelativeDay, formatTime, type IsoDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { isOpen, priorityOf, type Task } from "./meta";
 
@@ -50,6 +50,7 @@ export function TaskRow({
   showDate = true,
   showArea = true,
   compact = false,
+  onReschedule,
 }: {
   task: Task;
   today: IsoDate;
@@ -58,6 +59,8 @@ export function TaskRow({
   showDate?: boolean;
   showArea?: boolean;
   compact?: boolean;
+  // Botão "Hoje" (aparece ao passar o mouse) para trazer uma tarefa atrasada para o dia.
+  onReschedule?: () => void;
 }) {
   const { areaById, folderById } = useWorkspace();
   const area = areaById.get(task.area_id);
@@ -71,7 +74,7 @@ export function TaskRow({
       tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onOpen();
+        if (e.key === "Enter" && e.target === e.currentTarget) onOpen();
       }}
       className={cn(
         "group flex cursor-default items-start gap-2.5 rounded-md px-2 text-sm hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none",
@@ -86,8 +89,11 @@ export function TaskRow({
         {!compact && (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-xs text-muted-foreground">
             {showDate && task.due_date && (
-              <span className={cn(overdue && "font-medium text-red-600 dark:text-red-400")}>
-                {formatRelativeDay(task.due_date, today)}
+              <span
+                className={cn(overdue && "font-medium text-red-600 dark:text-red-400")}
+                title={overdue ? formatRelativeDay(task.due_date, today) : undefined}
+              >
+                {overdue ? formatOverdue(task.due_date, today) : formatRelativeDay(task.due_date, today)}
               </span>
             )}
             {task.start_time && (
@@ -106,6 +112,21 @@ export function TaskRow({
           </div>
         )}
       </div>
+      {onReschedule && open && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReschedule();
+          }}
+          title="Mover para hoje"
+          aria-label={`Mover "${task.title}" para hoje`}
+          className="flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-accent hover:text-foreground focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+        >
+          <CalendarArrowUpIcon className="size-3.5" aria-hidden="true" />
+          Hoje
+        </button>
+      )}
     </div>
   );
 }
