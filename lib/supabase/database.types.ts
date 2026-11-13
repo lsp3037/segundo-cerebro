@@ -638,6 +638,113 @@ export type Database = {
           },
         ]
       }
+      finance_cdi_daily: {
+        Row: {
+          daily_percent: number
+          date: string
+          fetched_at: string
+          user_id: string
+        }
+        Insert: {
+          daily_percent: number
+          date: string
+          fetched_at?: string
+          user_id?: string
+        }
+        Update: {
+          daily_percent?: number
+          date?: string
+          fetched_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_investment_movements: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          date: string
+          deleted_at: string | null
+          id: string
+          investment_id: string
+          kind: string
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          date: string
+          deleted_at?: string | null
+          id?: string
+          investment_id: string
+          kind: string
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          date?: string
+          deleted_at?: string | null
+          id?: string
+          investment_id?: string
+          kind?: string
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "finance_investment_movements_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "finance_investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      finance_investments: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          notes: string | null
+          owner_label: string | null
+          rate_changes: Json
+          sort_order: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          owner_label?: string | null
+          rate_changes?: Json
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          owner_label?: string | null
+          rate_changes?: Json
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       finance_recurring_bills: {
         Row: {
           account_id: string | null
@@ -2015,13 +2122,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "transactions_recurring_bill_id_fkey"
-            columns: ["recurring_bill_id"]
-            isOneToOne: false
-            referencedRelation: "finance_recurring_bills"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "transactions_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
@@ -2047,6 +2147,13 @@ export type Database = {
             columns: ["payment_method_id"]
             isOneToOne: false
             referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_bill_id_fkey"
+            columns: ["recurring_bill_id"]
+            isOneToOne: false
+            referencedRelation: "finance_recurring_bills"
             referencedColumns: ["id"]
           },
         ]
