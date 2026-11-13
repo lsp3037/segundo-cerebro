@@ -81,7 +81,7 @@ export function SlidingTabs<T extends string>({
 
 interface SoftTextProps {
   text: string;
-  align?: "start" | "end";
+  align?: "start" | "center" | "end";
   className?: string;
 }
 

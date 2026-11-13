@@ -54,6 +54,21 @@
   --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
   --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
   --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 08-page-side-by-side */
+  --page-slide-dur: 250ms;
+  --page-fade-dur: 250ms;
+  --page-slide-distance: 8px;
+  --page-blur: 3px;
+  --page-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --page-fade-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 14-skeleton-reveal */
+  --pulse-dur: 1000ms;
+  --pulse-min: 0.35;
+  --reveal-dur: 400ms;
+  --reveal-blur: 2px;
+  --reveal-ease: ease-in-out;
 }
 
 /* 16-tabs-sliding */
@@ -240,6 +255,107 @@
   to { stroke-dashoffset: 0; }
 }
 
+/* 08-page-side-by-side + 14-skeleton-reveal: transição direcional do mês vigente */
+.t-month-stage {
+  position: relative;
+  transition:
+    opacity var(--duration-quick) var(--ease-in-out),
+    filter var(--duration-quick) var(--ease-in-out);
+}
+.t-month-stage[data-pending="true"] {
+  opacity: 0.58;
+  filter: blur(1.5px);
+  pointer-events: none;
+}
+.t-month-stage[data-enter="next"] {
+  animation: t-month-slide-next var(--page-slide-dur) var(--page-slide-ease) both;
+}
+.t-month-stage[data-enter="prev"] {
+  animation: t-month-slide-prev var(--page-slide-dur) var(--page-slide-ease) both;
+}
+.t-month-stage[data-enter="fade"] {
+  animation: t-month-reveal var(--page-fade-dur) var(--page-fade-ease) both;
+}
+
+@keyframes t-month-slide-next {
+  from {
+    opacity: 0.72;
+    transform: translate3d(var(--page-slide-distance), 0, 0);
+    filter: blur(var(--page-blur));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+@keyframes t-month-slide-prev {
+  from {
+    opacity: 0.72;
+    transform: translate3d(calc(var(--page-slide-distance) * -1), 0, 0);
+    filter: blur(var(--page-blur));
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+@keyframes t-month-reveal {
+  from {
+    opacity: 0.82;
+    filter: blur(var(--reveal-blur));
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* Hairline de progresso para fetch RSC enquanto isPending está ativo */
+.t-pending-bar {
+  position: relative;
+  height: 2px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: transparent;
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-in-out);
+  pointer-events: none;
+}
+.t-pending-bar[data-active="true"] {
+  opacity: 1;
+}
+.t-pending-bar::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: -40%;
+  width: 40%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, oklch(0.765 0.177 163.223 / 0.85), transparent);
+  animation: t-pending-indeterminate var(--pulse-dur) var(--ease-in-out) infinite;
+}
+@keyframes t-pending-indeterminate {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(350%, 0, 0);
+  }
+}
+
+/* transitions-polish: morphing uniforme de barras e colunas nos gráficos */
+.t-bar-morph {
+  transition: width var(--duration-slow) var(--ease-smooth-out);
+}
+.t-col-morph {
+  transition:
+    height var(--duration-slow) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .t-tabs-pill,
   .t-tab,
@@ -248,8 +364,20 @@
   .t-acc-panel,
   .t-acc-panel-inner,
   .t-acc-chevron,
-  .t-donut-seg {
+  .t-donut-seg,
+  .t-month-stage,
+  .t-pending-bar,
+  .t-bar-morph,
+  .t-col-morph {
     transition: none !important;
+  }
+  .t-month-stage[data-enter],
+  .t-pending-bar::after {
+    animation: none !important;
+  }
+  .t-month-stage[data-pending="true"] {
+    filter: none !important;
+    opacity: 0.72 !important;
   }
   .t-success-check {
     animation: none !important;

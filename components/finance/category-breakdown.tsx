@@ -246,7 +246,7 @@ export function CategoryBreakdown({ categoriesBreakdown, compact = false }: Cate
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
                       <div
                         style={{ width: `${widthPct}%`, backgroundColor: barColor }}
-                        className="h-full rounded-full transition-[width] duration-300 ease-out"
+                        className="t-bar-morph h-full rounded-full"
                       />
                     </div>
                   )}

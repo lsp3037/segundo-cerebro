@@ -374,13 +374,13 @@ export function HouseholdOverview({
             aria-label={`Saídas ${formatPercentPtBr(expenseSharePct)}%, Dízimo a lançar ${formatPercentPtBr(titheSharePct)}%, Livre ${formatPercentPtBr(freeSharePct)}%`}
           >
             {expenseSharePct > 0 && (
-              <div style={{ width: `${expenseSharePct}%` }} className="h-full bg-rose-500 transition-[width] duration-300" />
+              <div style={{ width: `${expenseSharePct}%` }} className="t-bar-morph h-full bg-rose-500" />
             )}
             {titheSharePct > 0 && (
-              <div style={{ width: `${titheSharePct}%` }} className="h-full bg-amber-400 transition-[width] duration-300" />
+              <div style={{ width: `${titheSharePct}%` }} className="t-bar-morph h-full bg-amber-400" />
             )}
             {freeSharePct > 0 && (
-              <div style={{ width: `${freeSharePct}%` }} className="h-full bg-emerald-500 transition-[width] duration-300" />
+              <div style={{ width: `${freeSharePct}%` }} className="t-bar-morph h-full bg-emerald-500" />
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
@@ -614,7 +614,7 @@ export function HouseholdOverview({
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/60">
                           <div
                             style={{ width: `${m.percent > 0 ? Math.min(100, Math.max(2, m.percent)) : 0}%` }}
-                            className={`h-full rounded-full transition-[width] duration-300 ease-out ${barCls}`}
+                            className={`t-bar-morph h-full rounded-full ${barCls}`}
                           />
                         </div>
                       </button>

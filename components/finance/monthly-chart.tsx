@@ -138,13 +138,13 @@ export function MonthlyChart({ data, currentMonth, onSelectMonth }: MonthlyChart
                 <div className="flex h-24 w-full items-end justify-center gap-1 sm:gap-1.5">
                   <div
                     style={{ height: `${incomePct}%` }}
-                    className={`w-2.5 rounded-t-[3px] transition-[height,background-color] duration-300 ease-out sm:w-3.5 ${
+                    className={`t-col-morph w-2.5 rounded-t-[3px] sm:w-3.5 ${
                       isSelected ? "bg-emerald-500" : "bg-emerald-500/75 group-hover:bg-emerald-400"
                     }`}
                   />
                   <div
                     style={{ height: `${expensePct}%` }}
-                    className={`w-2.5 rounded-t-[3px] transition-[height,background-color] duration-300 ease-out sm:w-3.5 ${
+                    className={`t-col-morph w-2.5 rounded-t-[3px] sm:w-3.5 ${
                       isSelected ? "bg-rose-500" : "bg-rose-500/75 group-hover:bg-rose-400"
                     }`}
                   />

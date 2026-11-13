@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDownIcon,
@@ -52,7 +52,7 @@ import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
-import { SlidingTabs } from "./transitions";
+import { SlidingTabs, SoftText } from "./transitions";
 
 interface FinanceDashboardProps {
   initialSummary: FinanceSummary;
@@ -84,6 +84,10 @@ export function FinanceDashboard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const stageRef = useRef<HTMLDivElement>(null);
+  const prevMonthRef = useRef(currentMonth);
+  const prevTabRef = useRef<FinanceTab | null>(null);
+  const prevLedgerRef = useRef<LedgerType | null>(null);
 
   const allowedTabs = LEDGER_TABS[currentLedger];
   const rawTab = searchParams.get("tab") as FinanceTab | null;
@@ -112,6 +116,38 @@ export function FinanceDashboard({
 
   // Mês atual real em Cuiabá
   const realCurrentMonth = todayIso().slice(0, 7);
+
+  // Dispara transição direcional suave (08-page-side-by-side) ao concluir troca de mês, aba ou escopo
+  useLayoutEffect(() => {
+    const firstMount = prevTabRef.current === null || prevLedgerRef.current === null;
+    if (firstMount) {
+      prevMonthRef.current = currentMonth;
+      prevTabRef.current = activeTab;
+      prevLedgerRef.current = currentLedger;
+      return;
+    }
+
+    const monthChanged = prevMonthRef.current !== currentMonth;
+    const tabChanged = prevTabRef.current !== activeTab;
+    const ledgerChanged = prevLedgerRef.current !== currentLedger;
+    if (!monthChanged && !tabChanged && !ledgerChanged) return;
+
+    const dir: "next" | "prev" | "fade" = monthChanged
+      ? currentMonth > prevMonthRef.current
+        ? "next"
+        : "prev"
+      : "fade";
+
+    prevMonthRef.current = currentMonth;
+    prevTabRef.current = activeTab;
+    prevLedgerRef.current = currentLedger;
+
+    const el = stageRef.current;
+    if (!el) return;
+    el.removeAttribute("data-enter");
+    void el.offsetWidth;
+    el.setAttribute("data-enter", dir);
+  }, [currentMonth, activeTab, currentLedger]);
 
   // Atualiza parâmetros de navegação na URL
   const updateParams = useCallback(
@@ -286,8 +322,8 @@ export function FinanceDashboard({
               >
                 <ChevronLeftIcon className="size-3.5" />
               </Button>
-              <span className="min-w-[74px] px-1.5 text-center text-xs font-medium tabular-nums text-foreground">
-                {formattedMonthLabel}
+              <span className="inline-flex min-w-[78px] items-center justify-center px-1.5 text-center text-xs font-medium tabular-nums text-foreground">
+                <SoftText text={formattedMonthLabel} align="center" />
               </span>
               <Button
                 variant="ghost"
@@ -414,8 +450,15 @@ export function FinanceDashboard({
         </div>
       </div>
 
-      {/* 3. Conteúdo da Aba Ativa (com feedback de transição isPending) */}
-      <div className={`pt-4 transition-opacity duration-200 ${isPending ? "pointer-events-none opacity-60" : "opacity-100"}`}>
+      <div className="t-pending-bar" data-active={isPending ? "true" : "false"} aria-hidden="true" />
+
+      {/* 3. Conteúdo da Aba Ativa (transição direcional 08-page-side-by-side + feedback isPending) */}
+      <div
+        ref={stageRef}
+        data-pending={isPending ? "true" : "false"}
+        aria-busy={isPending}
+        className="t-month-stage pt-4"
+      >
         {/* Visão Geral Pessoal / Familiar */}
         {activeTab === "visao" && currentLedger === "pessoal" && (
           <HouseholdOverview
