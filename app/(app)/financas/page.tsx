@@ -12,6 +12,7 @@ import {
   getTransactions,
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
+import { getInvestmentsData } from "@/lib/data/finance-investments";
 import { todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
@@ -44,14 +45,16 @@ export default async function Page(props: PageProps<"/financas">) {
 
   const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
   const effectiveMember = currentLedger === "pessoal" ? currentMember : null;
+  const showInvestments = currentLedger === "pessoal" && searchParams.tab === "investimentos";
 
-  const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
+  const [summary, transactions, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
     getFinanceSummary({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     getTransactions({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     getNotebooks(),
     getFinanceCategories(),
     getPaymentMethods(),
     getHouseholdData({ month: currentMonth, member: effectiveMember }),
+    showInvestments ? getInvestmentsData({ month: currentMonth, member: effectiveMember }) : null,
   ]);
 
   return (
@@ -60,6 +63,7 @@ export default async function Page(props: PageProps<"/financas">) {
       initialTransactions={transactions}
       initialNotebooks={notebooks}
       householdData={householdData}
+      investmentsData={investmentsData}
       categories={categories}
       paymentMethods={paymentMethods}
       currentMonth={currentMonth}

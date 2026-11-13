@@ -45,16 +45,27 @@ export async function setTransactionPaid(
 }
 
 const restoreSchema = z.object({
-  kind: z.enum(["transaction", "notebook", "category", "account", "recurring_bill"]),
+  kind: z.enum([
+    "transaction",
+    "notebook",
+    "category",
+    "account",
+    "recurring_bill",
+    "investment",
+    "investment_movement",
+  ]),
   id: uuidSchema,
 });
 
+// TODO(investimentos, etapa 4): restaurar um movimento deve recusar se deixar o saldo negativo (firstOverdrawnDate).
 const TABLE_BY_KIND = {
   transaction: "transactions",
   notebook: "notebooks",
   category: "finance_categories",
   account: "finance_accounts",
   recurring_bill: "finance_recurring_bills",
+  investment: "finance_investments",
+  investment_movement: "finance_investment_movements",
 } as const;
 
 export type RestorableFinanceKind = z.infer<typeof restoreSchema>["kind"];

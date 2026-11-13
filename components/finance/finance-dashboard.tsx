@@ -26,6 +26,7 @@ import type {
 import type { HouseholdData } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
+import type { InvestmentView, InvestmentsData } from "@/lib/finance/investments-data";
 import { formatCentsToBrl } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/database.types";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ import { ConsolidatedOverview } from "./consolidated-overview";
 import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { EmptyMonth, monthNameLong } from "./getting-started";
 import { HouseholdOverview } from "./household-overview";
+import { InvestmentDialog } from "./investment-dialog";
+import { InvestmentsView } from "./investments-view";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthDiagnosticCard } from "./month-diagnostic-card";
 import { MonthlyChart } from "./monthly-chart";
@@ -62,6 +65,7 @@ interface FinanceDashboardProps {
   initialTransactions: Transaction[];
   initialNotebooks: Notebook[];
   householdData: HouseholdData;
+  investmentsData: InvestmentsData | null;
   categories: FinanceCategory[];
   paymentMethods: PaymentMethod[];
   currentMonth: string; // YYYY-MM
@@ -76,6 +80,7 @@ export function FinanceDashboard({
   initialTransactions,
   initialNotebooks,
   householdData,
+  investmentsData,
   categories,
   paymentMethods,
   currentMonth,
@@ -127,6 +132,8 @@ export function FinanceDashboard({
   const [ofxDialogOpen, setOfxDialogOpen] = useState(false);
   const [catDialogOpen, setCatDialogOpen] = useState(false);
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
+  const [invDialogOpen, setInvDialogOpen] = useState(false);
+  const [invToEdit, setInvToEdit] = useState<InvestmentView | null>(null);
   const [fluxoStatusFilter, setFluxoStatusFilter] = useState<"all" | "pending" | "paid">("all");
 
   // Mês atual real em Cuiabá
@@ -210,7 +217,13 @@ export function FinanceDashboard({
   // Atalhos ← e → para navegar entre meses quando nenhum diálogo/campo estiver focado
   useEffect(() => {
     const anyDialogOpen =
-      txDialogOpen || nbDialogOpen || saleDialogOpen || ofxDialogOpen || catDialogOpen || recurringDialogOpen;
+      txDialogOpen ||
+      nbDialogOpen ||
+      saleDialogOpen ||
+      ofxDialogOpen ||
+      catDialogOpen ||
+      recurringDialogOpen ||
+      invDialogOpen;
     if (anyDialogOpen) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -235,6 +248,7 @@ export function FinanceDashboard({
     ofxDialogOpen,
     catDialogOpen,
     recurringDialogOpen,
+    invDialogOpen,
     handlePrevMonth,
     handleNextMonth,
   ]);
@@ -299,7 +313,23 @@ export function FinanceDashboard({
     setNbDialogOpen(true);
   };
 
+  const handleOpenNewInvestment = () => {
+    setInvToEdit(null);
+    setInvDialogOpen(true);
+  };
+
+  const handleEditInvestment = (investment: InvestmentView) => {
+    setInvToEdit(investment);
+    setInvDialogOpen(true);
+  };
+
   const isNotebooksPrimary = currentLedger === "trustcare" && activeTab === "notebooks";
+  const isInvestmentsPrimary = currentLedger === "pessoal" && activeTab === "investimentos";
+  const primaryAction = isNotebooksPrimary
+    ? { label: "Novo Notebook", onClick: handleOpenNewNotebook }
+    : isInvestmentsPrimary
+      ? { label: "Novo investimento", onClick: handleOpenNewInvestment }
+      : { label: "Lançamento", onClick: () => handleOpenNewTransaction() };
 
   return (
     <div className="px-4 pb-8 md:px-6">
@@ -404,15 +434,11 @@ export function FinanceDashboard({
 
           <Button
             size="sm"
-            onClick={
-              isNotebooksPrimary
-                ? handleOpenNewNotebook
-                : () => handleOpenNewTransaction()
-            }
+            onClick={primaryAction.onClick}
             className="h-8 gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background hover:bg-foreground/90"
           >
             <PlusIcon className="size-3.5" />
-            <span>{isNotebooksPrimary ? "Novo Notebook" : "Lançamento"}</span>
+            <span>{primaryAction.label}</span>
           </Button>
         </div>
       </header>
@@ -584,6 +610,17 @@ export function FinanceDashboard({
         {/* Tela 2: Contas & Cartões */}
         {activeTab === "contas" && <AccountsCardsView accounts={householdData.accounts} />}
 
+        {/* Investimentos (só Pessoal) */}
+        {activeTab === "investimentos" && currentLedger === "pessoal" && (
+          <InvestmentsView
+            data={investmentsData}
+            month={currentMonth}
+            memberFilter={activeMember}
+            onNewInvestment={handleOpenNewInvestment}
+            onEditInvestment={handleEditInvestment}
+          />
+        )}
+
         {/* Tela 3: Orçamentos da Casa */}
         {activeTab === "orcamentos" && <BudgetsView budgets={householdData.budgets} categories={categories} />}
 
@@ -696,6 +733,15 @@ export function FinanceDashboard({
         categories={categories}
         paymentMethods={paymentMethods}
         defaultLedger={currentLedger === "trustcare" ? "trustcare" : "pessoal"}
+      />
+
+      <InvestmentDialog
+        open={invDialogOpen}
+        onOpenChange={setInvDialogOpen}
+        investmentToEdit={invToEdit}
+        cdiDailyPercent={investmentsData?.cdi.dailyPercent ?? null}
+        today={investmentsData?.today ?? null}
+        defaultOwner={activeMember}
       />
 
       <CategoriesDialog

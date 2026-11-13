@@ -30,6 +30,7 @@ import {
   getTransactions,
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
+import { getInvestmentsData } from "@/lib/data/finance-investments";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getMarketingCampaigns, getCampaignAngles, getMetaAdsMetrics, getMarketingContentScripts } from "@/lib/data/marketing";
@@ -184,16 +185,18 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
 
       const currentMember = typeof searchParams.member === "string" && searchParams.member.trim() ? searchParams.member.trim() : null;
       const effectiveMember = targetLedger === "pessoal" ? currentMember : null;
+      const showInvestments = targetLedger === "pessoal" && searchParams.tab === "investimentos";
 
       await ensureMonthBills(user.id, currentMonth);
 
-      const [summary, transactions, notebooks, categories, paymentMethods, householdData] = await Promise.all([
+      const [summary, transactions, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
         getFinanceSummary({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         getTransactions({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         getNotebooks(),
         getFinanceCategories(),
         getPaymentMethods(),
         getHouseholdData({ month: currentMonth, member: effectiveMember }),
+        showInvestments ? getInvestmentsData({ month: currentMonth, member: effectiveMember }) : null,
       ]);
 
       content = (
@@ -202,6 +205,7 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           initialTransactions={transactions}
           initialNotebooks={notebooks}
           householdData={householdData}
+          investmentsData={investmentsData}
           categories={categories}
           paymentMethods={paymentMethods}
           currentMonth={currentMonth}

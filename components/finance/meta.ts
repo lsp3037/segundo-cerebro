@@ -16,16 +16,18 @@ export type FinanceTab =
   | "orcamentos"
   | "relatorios"
   | "fluxo"
-  | "notebooks";
+  | "notebooks"
+  | "investimentos";
 
 // Abas com nomes e posições fixos: Resumo e Lançamentos sempre primeiro, Análises sempre por último.
-// O que muda entre Pessoal e Trust Care fica no meio (Orçamento e Bancos e cartões / Notebooks).
+// O que muda entre Pessoal e Trust Care fica no meio (Orçamento, Bancos e cartões e Investimentos / Notebooks).
 export const LEDGER_TABS: Record<LedgerType, Array<{ id: FinanceTab; label: string }>> = {
   pessoal: [
     { id: "visao", label: "Resumo" },
     { id: "fluxo", label: "Lançamentos" },
     { id: "orcamentos", label: "Orçamento" },
     { id: "contas", label: "Bancos e cartões" },
+    { id: "investimentos", label: "Investimentos" },
     { id: "relatorios", label: "Análises" },
   ],
   trustcare: [
