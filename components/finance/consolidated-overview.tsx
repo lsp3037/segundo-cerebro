@@ -4,6 +4,7 @@ import type { FinanceSummary } from "@/lib/data/finance";
 import { formatCentsToBrl } from "@/lib/money";
 import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { MonthlyChart } from "./monthly-chart";
+import { AnimatedBrl } from "./transitions";
 
 interface ConsolidatedOverviewProps {
   summary: FinanceSummary;
@@ -22,7 +23,7 @@ export function ConsolidatedOverview({
     <div className="space-y-5">
       <FinanceHero
         eyebrow="Pessoal + Trust Care: resultado do mês"
-        value={signedResult(summary.netBalanceCents).value}
+        value={<AnimatedBrl cents={summary.netBalanceCents} signed resetKey={currentMonth} />}
         tone={signedResult(summary.netBalanceCents).tone}
         subtitle={
           <span className="tabular-nums">
@@ -43,7 +44,7 @@ export function ConsolidatedOverview({
           {
             id: "pessoal",
             label: "Pessoal",
-            value: signedResult(pessoal.netCents).value,
+            value: <AnimatedBrl cents={pessoal.netCents} signed resetKey={currentMonth} />,
             tone: signedResult(pessoal.netCents).tone,
             badge: (
               <span className="text-xs tabular-nums text-muted-foreground">
@@ -75,7 +76,7 @@ export function ConsolidatedOverview({
           {
             id: "trustcare",
             label: "Trust Care",
-            value: signedResult(trustcare.netCents).value,
+            value: <AnimatedBrl cents={trustcare.netCents} signed resetKey={currentMonth} />,
             tone: signedResult(trustcare.netCents).tone,
             badge: (
               <span className="text-xs tabular-nums text-muted-foreground">

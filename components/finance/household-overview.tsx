@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 import {
   AlertTriangleIcon,
+  ArrowDownRightIcon,
   ArrowRightIcon,
+  ArrowUpRightIcon,
   CheckCircle2Icon,
   ChevronDownIcon,
+  HeartHandshakeIcon,
   ListChecksIcon,
+  RepeatIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,7 +25,7 @@ import { CategoryBreakdown } from "./category-breakdown";
 import { EmptyMonth, GettingStarted, monthNameLong } from "./getting-started";
 import { MonthlyChart } from "./monthly-chart";
 import { PayCheck, usePayToggle } from "./pay-toggle";
-import { SoftText, SuccessCheckIcon } from "./transitions";
+import { AnimatedBrl, AnimatedPercent, SuccessCheckIcon } from "./transitions";
 
 interface HouseholdOverviewProps {
   data: HouseholdData;
@@ -283,7 +287,6 @@ export function HouseholdOverview({
     );
   };
 
-  const heroValueText = heroCents < 0 ? `-${formatCentsToBrl(-heroCents)}` : formatCentsToBrl(heroCents);
   const heroTone = heroCents > 0 ? "text-emerald-400" : heroCents < 0 ? "text-rose-400" : "text-foreground";
   const heroBadge =
     heroCents > 0
@@ -315,14 +318,15 @@ export function HouseholdOverview({
         </div>
       )}
 
-      {/* 1. Hero Executivo: Saldo livre pós-Dízimo + destino visual das entradas (zero duplicação com KPIs) */}
+      {/* 1. Hero Executivo: Saldo livre pós-Dízimo + destino visual das entradas (estilo cartões Trust Care) */}
       <section
         aria-labelledby="month-answer"
-        className="grid grid-cols-1 items-center gap-4 rounded-xl border border-border bg-gradient-to-b from-emerald-500/[0.04] to-card p-4 lg:grid-cols-12"
+        style={{ "--stagger-i": 0 } as CSSProperties}
+        className="t-cascade-item t-kpi-card grid grid-cols-1 items-center gap-4 rounded-xl border border-border bg-gradient-to-b from-emerald-500/[0.04] to-card p-4 lg:grid-cols-12"
       >
         <div className="min-w-0 lg:col-span-7">
           <div className="flex flex-wrap items-center gap-2">
-            <p id="month-answer" className="text-xs font-medium text-muted-foreground">
+            <p id="month-answer" className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               {hasUnbookedTithe
                 ? `Saldo livre previsto de ${monthTitle} (após Dízimo)`
                 : `Saldo previsto de ${monthTitle}`}
@@ -332,10 +336,11 @@ export function HouseholdOverview({
             </span>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-baseline gap-3">
-            <SoftText
-              text={heroValueText}
-              className={`text-3xl font-bold tracking-tight tabular-nums sm:text-4xl ${heroTone}`}
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-3">
+            <AnimatedBrl
+              cents={heroCents}
+              resetKey={month}
+              className={`text-3xl font-bold tracking-tight sm:text-4xl ${heroTone}`}
             />
             <DeltaPill current={projectedGrossCents} previous={data.previousKpis.projectedBalanceCents} />
           </div>
@@ -344,17 +349,25 @@ export function HouseholdOverview({
             {hasUnbookedTithe && (
               <>
                 <span>
-                  Previsto bruto: <strong className="font-semibold text-foreground">{formatCentsToBrl(projectedGrossCents)}</strong>
+                  Previsto bruto:{" "}
+                  <strong className="font-semibold text-foreground">
+                    <AnimatedBrl cents={projectedGrossCents} resetKey={month} durationMs={480} />
+                  </strong>
                 </span>
                 <span>
-                  Dízimo a lançar: <strong className="font-semibold text-amber-400">−{formatCentsToBrl(titheUnbookedCents)}</strong>
+                  Dízimo a lançar:{" "}
+                  <strong className="font-semibold text-amber-400">
+                    −<AnimatedBrl cents={titheUnbookedCents} resetKey={month} durationMs={480} />
+                  </strong>
                 </span>
               </>
             )}
             {data.kpis.incomeCents > 0 && (
               <span>
                 Poupança {hasUnbookedTithe ? "líquida" : "prevista"}:{" "}
-                <strong className="font-semibold text-foreground">{formatPercentPtBr(netSavingsPct)}%</strong>
+                <strong className="font-semibold text-foreground">
+                  <AnimatedPercent value={netSavingsPct} resetKey={month} durationMs={480} />
+                </strong>
               </span>
             )}
           </div>
@@ -402,16 +415,25 @@ export function HouseholdOverview({
         </div>
       </section>
 
-      {/* 2. Faixa de 4 KPIs sem redundância nem 0% enganoso */}
+      {/* 2. Faixa de 4 KPIs estilo Trust Care (rótulo caixa alta + ícone + contagem animada) */}
       <section aria-label="Indicadores principais do mês" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="flex flex-col justify-between gap-2 rounded-xl border border-border bg-card p-3.5">
+        <article
+          style={{ "--stagger-i": 1 } as CSSProperties}
+          className="t-cascade-item t-kpi-card flex flex-col justify-between gap-2.5 rounded-xl border border-border bg-card p-3.5 hover:border-emerald-500/25"
+        >
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Entradas no mês</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex size-4 items-center justify-center rounded bg-emerald-500/15 text-emerald-400">
+                <ArrowUpRightIcon className="size-3" />
+              </span>
+              Entradas
+            </span>
             <DeltaPill current={data.kpis.incomeCents} previous={data.previousKpis.incomeCents} />
           </div>
-          <SoftText
-            text={formatCentsToBrl(data.kpis.incomeCents)}
-            className={`text-xl font-bold tracking-tight tabular-nums ${
+          <AnimatedBrl
+            cents={data.kpis.incomeCents}
+            resetKey={month}
+            className={`text-2xl font-bold tracking-tight ${
               data.kpis.incomeCents > 0 ? "text-emerald-400" : "text-foreground"
             }`}
           />
@@ -429,14 +451,23 @@ export function HouseholdOverview({
           </div>
         </article>
 
-        <article className="flex flex-col justify-between gap-2 rounded-xl border border-border bg-card p-3.5">
+        <article
+          style={{ "--stagger-i": 2 } as CSSProperties}
+          className="t-cascade-item t-kpi-card flex flex-col justify-between gap-2.5 rounded-xl border border-border bg-card p-3.5 hover:border-rose-500/25"
+        >
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Saídas no mês</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex size-4 items-center justify-center rounded bg-rose-500/15 text-rose-400">
+                <ArrowDownRightIcon className="size-3" />
+              </span>
+              Saídas
+            </span>
             <DeltaPill current={data.kpis.expenseCents} previous={data.previousKpis.expenseCents} invertGood />
           </div>
-          <SoftText
-            text={formatCentsToBrl(data.kpis.expenseCents)}
-            className={`text-xl font-bold tracking-tight tabular-nums ${
+          <AnimatedBrl
+            cents={data.kpis.expenseCents}
+            resetKey={month}
+            className={`text-2xl font-bold tracking-tight ${
               data.kpis.expenseCents > 0 ? "text-rose-400" : "text-foreground"
             }`}
           />
@@ -450,12 +481,20 @@ export function HouseholdOverview({
         </article>
 
         <article
-          className={`flex flex-col justify-between gap-2 rounded-xl border bg-card p-3.5 ${
-            titheRemainingCents > 0 ? "border-amber-500/35 bg-gradient-to-b from-amber-500/[0.04] to-card" : "border-border"
+          style={{ "--stagger-i": 3 } as CSSProperties}
+          className={`t-cascade-item t-kpi-card flex flex-col justify-between gap-2.5 rounded-xl border bg-card p-3.5 ${
+            titheRemainingCents > 0
+              ? "border-amber-500/35 bg-gradient-to-b from-amber-500/[0.04] to-card hover:border-amber-500/50"
+              : "border-border hover:border-border/95"
           }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Dízimo ({(titheBp / 100).toFixed(0)}%)</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex size-4 items-center justify-center rounded bg-amber-500/15 text-amber-400">
+                <HeartHandshakeIcon className="size-3" />
+              </span>
+              Dízimo ({(titheBp / 100).toFixed(0)}%)
+            </span>
             {titheExpectedCents > 0 &&
               (titheRemainingCents === 0 ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-400">
@@ -468,9 +507,10 @@ export function HouseholdOverview({
                 </span>
               ))}
           </div>
-          <SoftText
-            text={formatCentsToBrl(titheExpectedCents)}
-            className={`text-xl font-bold tracking-tight tabular-nums ${
+          <AnimatedBrl
+            cents={titheExpectedCents}
+            resetKey={month}
+            className={`text-2xl font-bold tracking-tight ${
               titheRemainingCents === 0 && titheExpectedCents > 0 ? "text-emerald-400" : "text-amber-400"
             }`}
           />
@@ -503,16 +543,25 @@ export function HouseholdOverview({
           </div>
         </article>
 
-        <article className="flex flex-col justify-between gap-2 rounded-xl border border-border bg-card p-3.5">
+        <article
+          style={{ "--stagger-i": 4 } as CSSProperties}
+          className="t-cascade-item t-kpi-card flex flex-col justify-between gap-2.5 rounded-xl border border-border bg-card p-3.5 hover:border-border/95"
+        >
           <div className="flex flex-wrap items-center justify-between gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Fixas &amp; Recorrentes</span>
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex size-4 items-center justify-center rounded bg-muted text-foreground/80">
+                <RepeatIcon className="size-3" />
+              </span>
+              Fixas
+            </span>
             <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
               {formatPercentPtBr(data.kpis.fixedShareOfExpensesPercent)}% das saídas
             </span>
           </div>
-          <SoftText
-            text={formatCentsToBrl(data.kpis.fixedExpenseCents)}
-            className="text-xl font-bold tracking-tight tabular-nums text-foreground"
+          <AnimatedBrl
+            cents={data.kpis.fixedExpenseCents}
+            resetKey={month}
+            className="text-2xl font-bold tracking-tight text-foreground"
           />
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground tabular-nums">
             <span className="truncate">
@@ -574,7 +623,10 @@ export function HouseholdOverview({
 
       {/* 3. Indicadores visuais acima da dobra (Esquerda) + Operacional compacto (Direita) */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-7 xl:col-span-8">
+        <div
+          style={{ "--stagger-i": 5 } as CSSProperties}
+          className="t-cascade-item space-y-4 lg:col-span-7 xl:col-span-8"
+        >
           <MonthlyChart data={data.trend} currentMonth={month} onSelectMonth={onSelectMonth} />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
@@ -627,7 +679,10 @@ export function HouseholdOverview({
         </div>
 
         {/* Coluna Direita: Contas (com Accordion #21) + Entradas + Cartões */}
-        <div className="space-y-4 lg:col-span-5 xl:col-span-4">
+        <div
+          style={{ "--stagger-i": 6 } as CSSProperties}
+          className="t-cascade-item space-y-4 lg:col-span-5 xl:col-span-4"
+        >
           <section aria-labelledby="bills-title" className="rounded-xl border border-border bg-card px-4 pb-3 pt-4">
             <div className="flex items-center justify-between gap-2">
               <h3 id="bills-title" className="text-sm font-medium text-foreground">

@@ -1,5 +1,7 @@
 "use client";
 
+import { FlameIcon, PercentIcon, RepeatIcon } from "lucide-react";
+
 import type { FinanceSummary } from "@/lib/data/finance";
 import type { HouseholdData } from "@/lib/data/finance-family";
 import { formatPercentPtBr } from "@/lib/finance/household";
@@ -7,6 +9,7 @@ import { formatCentsToBrl } from "@/lib/money";
 import { CategoryBreakdown } from "./category-breakdown";
 import { FinanceKpiStrip } from "./finance-hierarchy";
 import { MonthlyChart } from "./monthly-chart";
+import { AnimatedBrl, AnimatedPercent } from "./transitions";
 
 interface ReportsComparisonsViewProps {
   data: HouseholdData;
@@ -32,7 +35,8 @@ export function ReportsComparisonsView({
           {
             id: "savings-rate",
             label: "Taxa de poupança",
-            value: `${formatPercentPtBr(data.kpis.savingsRatePercent)}%`,
+            icon: <PercentIcon className="size-3.5 text-emerald-400" />,
+            value: <AnimatedPercent value={data.kpis.savingsRatePercent} resetKey={currentMonth} />,
             tone: data.kpis.savingsRatePercent > 0 ? "positive" : data.kpis.savingsRatePercent < 0 ? "negative" : "default",
             subtext:
               data.previousKpis.incomeCents > 0 ? (
@@ -48,13 +52,15 @@ export function ReportsComparisonsView({
           {
             id: "fixed-commitment",
             label: "Contas fixas levam",
-            value: `${formatPercentPtBr(data.kpis.fixedCommitmentPercent)}%`,
+            icon: <RepeatIcon className="size-3.5 text-muted-foreground" />,
+            value: <AnimatedPercent value={data.kpis.fixedCommitmentPercent} resetKey={currentMonth} />,
             subtext: `da renda · fixas ${formatCentsToBrl(data.kpis.fixedExpenseCents)}, variáveis ${formatCentsToBrl(variableCents)}`,
           },
           {
             id: "burn-rate",
             label: "Gasto por dia",
-            value: formatCentsToBrl(data.kpis.dailyBurnCents),
+            icon: <FlameIcon className="size-3.5 text-amber-400" />,
+            value: <AnimatedBrl cents={data.kpis.dailyBurnCents} resetKey={currentMonth} />,
             subtext: "média diária das saídas no mês",
           },
         ]}

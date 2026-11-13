@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { formatCentsToBrl } from "@/lib/money";
 
@@ -38,13 +38,16 @@ export function FinanceHero({
   action,
 }: FinanceHeroProps) {
   return (
-    <section className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card px-5 py-4">
+    <section
+      style={{ "--stagger-i": 0 } as CSSProperties}
+      className="t-cascade-item t-kpi-card flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border bg-gradient-to-b from-emerald-500/[0.03] to-card px-5 py-4"
+    >
       <div className="min-w-0 space-y-1">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           {eyebrow}
         </p>
         <div
-          className={`text-3xl font-semibold tracking-tight tabular-nums ${TONE_CLASS[tone]}`}
+          className={`text-3xl font-bold tracking-tight tabular-nums ${TONE_CLASS[tone]}`}
         >
           {value}
         </div>
@@ -61,6 +64,7 @@ export interface FinanceKpiItem {
   id: string;
   label: string;
   value: ReactNode;
+  icon?: ReactNode;
   tone?: FinanceTone;
   subtext?: ReactNode;
   badge?: ReactNode;
@@ -81,28 +85,33 @@ const GRID_COLS: Record<2 | 3 | 4, string> = {
 export function FinanceKpiStrip({ items, columns = 3 }: FinanceKpiStripProps) {
   return (
     <section
-      className={`grid grid-cols-1 divide-y divide-border rounded-lg border border-border bg-card sm:divide-x sm:divide-y-0 ${GRID_COLS[columns]}`}
+      className={`grid grid-cols-1 gap-3 ${GRID_COLS[columns]}`}
     >
-      {items.map((item) => (
-        <div key={item.id} className="flex flex-col justify-between px-4 py-3.5">
+      {items.map((item, idx) => (
+        <article
+          key={item.id}
+          style={{ "--stagger-i": idx + 1 } as CSSProperties}
+          className="t-cascade-item t-kpi-card flex flex-col justify-between gap-2 rounded-xl border border-border bg-card p-3.5 hover:border-border/95"
+        >
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[13px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              {item.icon}
               {item.label}
             </span>
             {item.badge}
           </div>
           <div
-            className={`mt-1.5 text-xl font-semibold tracking-tight tabular-nums ${TONE_CLASS[item.tone ?? "default"]}`}
+            className={`text-2xl font-bold tracking-tight tabular-nums ${TONE_CLASS[item.tone ?? "default"]}`}
           >
             {item.value}
           </div>
           {(item.subtext || item.action) && (
-            <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <div className="min-w-0 truncate">{item.subtext}</div>
               {item.action && <div className="shrink-0">{item.action}</div>}
             </div>
           )}
-        </div>
+        </article>
       ))}
     </section>
   );

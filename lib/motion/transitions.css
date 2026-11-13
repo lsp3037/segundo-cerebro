@@ -255,45 +255,41 @@
   to { stroke-dashoffset: 0; }
 }
 
-/* 08-page-side-by-side + 14-skeleton-reveal: transição direcional do mês vigente */
+/* oil-ui ("流淌"): transição fluida e escalonada de mês sem empurrar a página inteira */
 .t-month-stage {
   position: relative;
-  transition:
-    opacity var(--duration-quick) var(--ease-in-out),
-    filter var(--duration-quick) var(--ease-in-out);
+  transition: opacity var(--duration-quick) var(--ease-in-out);
 }
 .t-month-stage[data-pending="true"] {
-  opacity: 0.58;
-  filter: blur(1.5px);
+  opacity: 0.68;
   pointer-events: none;
 }
-.t-month-stage[data-enter="next"] {
-  animation: t-month-slide-next var(--page-slide-dur) var(--page-slide-ease) both;
-}
-.t-month-stage[data-enter="prev"] {
-  animation: t-month-slide-prev var(--page-slide-dur) var(--page-slide-ease) both;
+.t-month-stage[data-enter="settle"] {
+  animation: t-stage-settle var(--duration-medium) var(--ease-smooth-out) both;
 }
 .t-month-stage[data-enter="fade"] {
-  animation: t-month-reveal var(--page-fade-dur) var(--page-fade-ease) both;
+  animation: t-month-reveal var(--duration-medium) var(--ease-smooth-out) both;
 }
 
-@keyframes t-month-slide-next {
+/* Cascata calma dos cartões quando o mês ou aba entra (Hero -> KPIs -> Painéis) */
+.t-month-stage[data-enter="settle"] .t-cascade-item,
+.t-month-stage[data-enter="fade"] .t-cascade-item {
+  animation: t-cascade-in 380ms var(--ease-smooth-out) calc(var(--stagger-i, 0) * 42ms) both;
+}
+
+@keyframes t-stage-settle {
   from {
-    opacity: 0.72;
-    transform: translate3d(var(--page-slide-distance), 0, 0);
-    filter: blur(var(--page-blur));
+    opacity: 0.85;
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-    filter: blur(0);
   }
 }
-@keyframes t-month-slide-prev {
+@keyframes t-cascade-in {
   from {
-    opacity: 0.72;
-    transform: translate3d(calc(var(--page-slide-distance) * -1), 0, 0);
-    filter: blur(var(--page-blur));
+    opacity: 0;
+    transform: translate3d(0, 7px, 0);
+    filter: blur(2.5px);
   }
   to {
     opacity: 1;
@@ -303,13 +299,87 @@
 }
 @keyframes t-month-reveal {
   from {
-    opacity: 0.82;
+    opacity: 0.78;
     filter: blur(var(--reveal-blur));
   }
   to {
     opacity: 1;
     filter: blur(0);
   }
+}
+
+/* Troca direcional contida no seletor < Out 2026 > */
+.t-month-slot {
+  display: inline-grid;
+  justify-items: center;
+  overflow: hidden;
+  min-width: 78px;
+}
+.t-month-slot > span {
+  grid-area: 1 / 1;
+  white-space: pre;
+}
+.t-month-slot[data-dir="next"] .t-month-slot-old {
+  animation: t-slot-out-left 220ms var(--ease-smooth-out) forwards;
+}
+.t-month-slot[data-dir="next"] .t-month-slot-new {
+  animation: t-slot-in-right 240ms var(--ease-smooth-out) forwards;
+}
+.t-month-slot[data-dir="prev"] .t-month-slot-old {
+  animation: t-slot-out-right 220ms var(--ease-smooth-out) forwards;
+}
+.t-month-slot[data-dir="prev"] .t-month-slot-new {
+  animation: t-slot-in-left 240ms var(--ease-smooth-out) forwards;
+}
+.t-month-slot[data-dir="fade"] .t-month-slot-old {
+  animation: t-slot-fade-out 180ms var(--ease-in-out) forwards;
+}
+.t-month-slot[data-dir="fade"] .t-month-slot-new {
+  animation: t-slot-fade-in 220ms var(--ease-smooth-out) forwards;
+}
+@keyframes t-slot-out-left {
+  to { opacity: 0; transform: translate3d(-10px, 0, 0); filter: blur(2px); }
+}
+@keyframes t-slot-in-right {
+  from { opacity: 0; transform: translate3d(10px, 0, 0); filter: blur(2px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); }
+}
+@keyframes t-slot-out-right {
+  to { opacity: 0; transform: translate3d(10px, 0, 0); filter: blur(2px); }
+}
+@keyframes t-slot-in-left {
+  from { opacity: 0; transform: translate3d(-10px, 0, 0); filter: blur(2px); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); filter: blur(0); }
+}
+@keyframes t-slot-fade-out {
+  to { opacity: 0; filter: blur(2px); }
+}
+@keyframes t-slot-fade-in {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: blur(0); }
+}
+
+/* Superfície e shimmer estilo cartões Trust Care */
+.t-kpi-card {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 55%);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.035);
+  transition:
+    border-color var(--duration-fast) var(--ease-smooth-out),
+    background-color var(--duration-fast) var(--ease-smooth-out);
+}
+.t-skel-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.075) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: t-skel-sweep 1200ms var(--ease-in-out) infinite;
+}
+@keyframes t-skel-sweep {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 /* Hairline de progresso para fetch RSC enquanto isPending está ativo */
@@ -366,18 +436,23 @@
   .t-acc-chevron,
   .t-donut-seg,
   .t-month-stage,
+  .t-kpi-card,
   .t-pending-bar,
   .t-bar-morph,
   .t-col-morph {
     transition: none !important;
   }
   .t-month-stage[data-enter],
+  .t-month-stage[data-enter] .t-cascade-item,
+  .t-month-slot > span,
+  .t-skel-shimmer,
   .t-pending-bar::after {
     animation: none !important;
   }
   .t-month-stage[data-pending="true"] {
-    filter: none !important;
-    opacity: 0.72 !important;
+    opacity: 0.78 !important;
+  }
+  .t-success-check {
   }
   .t-success-check {
     animation: none !important;

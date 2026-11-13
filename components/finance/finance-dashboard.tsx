@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  ArrowDownRightIcon,
+  ArrowUpRightIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClockIcon,
   FileSpreadsheetIcon,
   ListChecksIcon,
   PlusIcon,
@@ -52,7 +55,7 @@ import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
-import { SlidingTabs, SoftText } from "./transitions";
+import { AnimatedBrl, FinanceMonthSkeleton, MonthSlotLabel, SlidingTabs } from "./transitions";
 
 interface FinanceDashboardProps {
   initialSummary: FinanceSummary;
@@ -84,10 +87,22 @@ export function FinanceDashboard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const [navDir, setNavDir] = useState<"next" | "prev" | "fade">("fade");
+  const [pendingSkeletonReady, setPendingSkeletonReady] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
   const prevMonthRef = useRef(currentMonth);
   const prevTabRef = useRef<FinanceTab | null>(null);
   const prevLedgerRef = useRef<LedgerType | null>(null);
+  const showSkeleton = isPending && pendingSkeletonReady;
+
+  useEffect(() => {
+    if (!isPending) return;
+    const timer = setTimeout(() => setPendingSkeletonReady(true), 110);
+    return () => {
+      clearTimeout(timer);
+      setPendingSkeletonReady(false);
+    };
+  }, [isPending]);
 
   const allowedTabs = LEDGER_TABS[currentLedger];
   const rawTab = searchParams.get("tab") as FinanceTab | null;
@@ -117,7 +132,7 @@ export function FinanceDashboard({
   // Mês atual real em Cuiabá
   const realCurrentMonth = todayIso().slice(0, 7);
 
-  // Dispara transição direcional suave (08-page-side-by-side) ao concluir troca de mês, aba ou escopo
+  // Dispara entrada escalonada fluida ("流淌") ao concluir troca de mês, aba ou escopo
   useLayoutEffect(() => {
     const firstMount = prevTabRef.current === null || prevLedgerRef.current === null;
     if (firstMount) {
@@ -127,16 +142,14 @@ export function FinanceDashboard({
       return;
     }
 
+    if (showSkeleton) return;
+
     const monthChanged = prevMonthRef.current !== currentMonth;
     const tabChanged = prevTabRef.current !== activeTab;
     const ledgerChanged = prevLedgerRef.current !== currentLedger;
     if (!monthChanged && !tabChanged && !ledgerChanged) return;
 
-    const dir: "next" | "prev" | "fade" = monthChanged
-      ? currentMonth > prevMonthRef.current
-        ? "next"
-        : "prev"
-      : "fade";
+    const enterMode: "settle" | "fade" = monthChanged ? "settle" : "fade";
 
     prevMonthRef.current = currentMonth;
     prevTabRef.current = activeTab;
@@ -146,12 +159,17 @@ export function FinanceDashboard({
     if (!el) return;
     el.removeAttribute("data-enter");
     void el.offsetWidth;
-    el.setAttribute("data-enter", dir);
-  }, [currentMonth, activeTab, currentLedger]);
+    el.setAttribute("data-enter", enterMode);
+  }, [currentMonth, activeTab, currentLedger, showSkeleton]);
 
   // Atualiza parâmetros de navegação na URL
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
+      if (typeof updates.m === "string" && updates.m !== currentMonth) {
+        setNavDir(updates.m > currentMonth ? "next" : "prev");
+      } else if (!("m" in updates)) {
+        setNavDir("fade");
+      }
       const params = new URLSearchParams(searchParams.toString());
       for (const [key, val] of Object.entries(updates)) {
         if (val === null) params.delete(key);
@@ -161,7 +179,7 @@ export function FinanceDashboard({
         router.push(`${pathname}?${params.toString()}`);
       });
     },
-    [pathname, router, searchParams],
+    [currentMonth, pathname, router, searchParams],
   );
 
   // Navegação de Mês
@@ -323,7 +341,7 @@ export function FinanceDashboard({
                 <ChevronLeftIcon className="size-3.5" />
               </Button>
               <span className="inline-flex min-w-[78px] items-center justify-center px-1.5 text-center text-xs font-medium tabular-nums text-foreground">
-                <SoftText text={formattedMonthLabel} align="center" />
+                <MonthSlotLabel label={formattedMonthLabel} direction={navDir} />
               </span>
               <Button
                 variant="ghost"
@@ -452,97 +470,104 @@ export function FinanceDashboard({
 
       <div className="t-pending-bar" data-active={isPending ? "true" : "false"} aria-hidden="true" />
 
-      {/* 3. Conteúdo da Aba Ativa (transição direcional 08-page-side-by-side + feedback isPending) */}
+      {/* 3. Conteúdo da Aba Ativa (cascata fluida + skeleton estilo Trust Care se demorar) */}
       <div
         ref={stageRef}
-        data-pending={isPending ? "true" : "false"}
+        data-pending={isPending && !showSkeleton ? "true" : "false"}
         aria-busy={isPending}
         className="t-month-stage pt-4"
       >
-        {/* Visão Geral Pessoal / Familiar */}
-        {activeTab === "visao" && currentLedger === "pessoal" && (
-          <HouseholdOverview
-            data={householdData}
-            categoriesBreakdown={householdData.categoriesBreakdown}
-            onGoToPendingFluxo={() => {
-              setFluxoStatusFilter("pending");
-              updateParams({ tab: "fluxo" });
-            }}
-            onGoToAllFluxo={() => {
-              setFluxoStatusFilter("all");
-              updateParams({ tab: "fluxo" });
-            }}
-            onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
-            onEditTransaction={handleEditTransaction}
-            month={currentMonth}
-            memberFilter={activeMember}
-            onSelectMonth={(m) => updateParams({ m })}
-            onSelectMember={(m) => updateParams({ member: m })}
-            onAddAccount={() => updateParams({ tab: "contas" })}
-            onNewIncome={() => handleOpenNewTransaction("pessoal", "income")}
-            onNewExpense={() => handleOpenNewTransaction("pessoal", "expense")}
-            onImportOfx={() => setOfxDialogOpen(true)}
-          />
-        )}
+        {showSkeleton ? (
+          <FinanceMonthSkeleton />
+        ) : (
+          <>
+            {/* Visão Geral Pessoal / Familiar */}
+            {activeTab === "visao" && currentLedger === "pessoal" && (
+              <HouseholdOverview
+                data={householdData}
+                categoriesBreakdown={householdData.categoriesBreakdown}
+                onGoToPendingFluxo={() => {
+                  setFluxoStatusFilter("pending");
+                  updateParams({ tab: "fluxo" });
+                }}
+                onGoToAllFluxo={() => {
+                  setFluxoStatusFilter("all");
+                  updateParams({ tab: "fluxo" });
+                }}
+                onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
+                onEditTransaction={handleEditTransaction}
+                month={currentMonth}
+                memberFilter={activeMember}
+                onSelectMonth={(m) => updateParams({ m })}
+                onSelectMember={(m) => updateParams({ member: m })}
+                onAddAccount={() => updateParams({ tab: "contas" })}
+                onNewIncome={() => handleOpenNewTransaction("pessoal", "income")}
+                onNewExpense={() => handleOpenNewTransaction("pessoal", "expense")}
+                onImportOfx={() => setOfxDialogOpen(true)}
+              />
+            )}
 
-        {/* Resumo Trust Care */}
-        {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount === 0 && (
-          <EmptyMonth message={`Nenhum lançamento da Trust Care em ${monthNameLong(currentMonth)}.`}>
-            <Button size="sm" onClick={() => handleOpenNewTransaction("trustcare", "income")}>
-              Lançar venda ou serviço
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleOpenNewTransaction("trustcare", "expense")}>
-              Lançar custo
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => updateParams({ tab: "notebooks" })}>
-              Ver notebooks
-            </Button>
-          </EmptyMonth>
-        )}
-        {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount > 0 && (
-          <div className="space-y-5">
-            <FinanceHero
-              eyebrow="Resultado da Trust Care no mês"
-              value={signedResult(initialSummary.netBalanceCents).value}
-              tone={signedResult(initialSummary.netBalanceCents).tone}
-              subtitle={
-                <span className="tabular-nums">
-                  Entradas {formatCentsToBrl(initialSummary.totalIncomeCents)} − Saídas{" "}
-                  {formatCentsToBrl(initialSummary.totalExpenseCents)} ·{" "}
-                  {initialSummary.transactionCount}{" "}
-                  {initialSummary.transactionCount === 1 ? "lançamento" : "lançamentos"}
-                </span>
-              }
-            />
-            <FinanceKpiStrip
-              columns={3}
-              items={[
-                {
-                  id: "tc-income",
-                  label: "Entradas",
-                  value: formatCentsToBrl(initialSummary.totalIncomeCents),
-                  tone: initialSummary.totalIncomeCents > 0 ? "positive" : "default",
-                  subtext: "Recebimentos e vendas no mês",
-                },
-                {
-                  id: "tc-expense",
-                  label: "Saídas & custos",
-                  value: formatCentsToBrl(initialSummary.totalExpenseCents),
-                  tone: initialSummary.totalExpenseCents > 0 ? "negative" : "default",
-                  subtext: "Compras, peças e operação",
-                },
-                {
-                  id: "tc-pending",
-                  label: "Contas pendentes",
-                  value: formatCentsToBrl(initialSummary.pendingExpenseCents),
-                  tone: initialSummary.pendingExpenseCents > 0 ? "warning" : "default",
-                  subtext: `Margem ${initialSummary.profitMarginPercent}% no mês`,
-                },
-              ]}
-            />
-            <MonthlyChart data={initialSummary.monthlyTrend} currentMonth={currentMonth} />
-          </div>
-        )}
+            {/* Resumo Trust Care */}
+            {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount === 0 && (
+              <EmptyMonth message={`Nenhum lançamento da Trust Care em ${monthNameLong(currentMonth)}.`}>
+                <Button size="sm" onClick={() => handleOpenNewTransaction("trustcare", "income")}>
+                  Lançar venda ou serviço
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleOpenNewTransaction("trustcare", "expense")}>
+                  Lançar custo
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => updateParams({ tab: "notebooks" })}>
+                  Ver notebooks
+                </Button>
+              </EmptyMonth>
+            )}
+            {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount > 0 && (
+              <div className="space-y-5">
+                <FinanceHero
+                  eyebrow="Resultado da Trust Care no mês"
+                  value={<AnimatedBrl cents={initialSummary.netBalanceCents} signed resetKey={currentMonth} />}
+                  tone={signedResult(initialSummary.netBalanceCents).tone}
+                  subtitle={
+                    <span className="tabular-nums">
+                      Entradas {formatCentsToBrl(initialSummary.totalIncomeCents)} − Saídas{" "}
+                      {formatCentsToBrl(initialSummary.totalExpenseCents)} ·{" "}
+                      {initialSummary.transactionCount}{" "}
+                      {initialSummary.transactionCount === 1 ? "lançamento" : "lançamentos"}
+                    </span>
+                  }
+                />
+                <FinanceKpiStrip
+                  columns={3}
+                  items={[
+                    {
+                      id: "tc-income",
+                      label: "Entradas",
+                      icon: <ArrowUpRightIcon className="size-3.5 text-emerald-400" />,
+                      value: <AnimatedBrl cents={initialSummary.totalIncomeCents} resetKey={currentMonth} />,
+                      tone: initialSummary.totalIncomeCents > 0 ? "positive" : "default",
+                      subtext: "Recebimentos e vendas no mês",
+                    },
+                    {
+                      id: "tc-expense",
+                      label: "Saídas & custos",
+                      icon: <ArrowDownRightIcon className="size-3.5 text-rose-400" />,
+                      value: <AnimatedBrl cents={initialSummary.totalExpenseCents} resetKey={currentMonth} />,
+                      tone: initialSummary.totalExpenseCents > 0 ? "negative" : "default",
+                      subtext: "Compras, peças e operação",
+                    },
+                    {
+                      id: "tc-pending",
+                      label: "Contas pendentes",
+                      icon: <ClockIcon className="size-3.5 text-amber-400" />,
+                      value: <AnimatedBrl cents={initialSummary.pendingExpenseCents} resetKey={currentMonth} />,
+                      tone: initialSummary.pendingExpenseCents > 0 ? "warning" : "default",
+                      subtext: `Margem ${initialSummary.profitMarginPercent}% no mês`,
+                    },
+                  ]}
+                />
+                <MonthlyChart data={initialSummary.monthlyTrend} currentMonth={currentMonth} />
+              </div>
+            )}
 
         {/* Resumo Geral Consolidado (Pessoal + Trust Care) */}
         {activeTab === "visao" && currentLedger === "all" && initialSummary.transactionCount === 0 && (
@@ -615,6 +640,8 @@ export function FinanceDashboard({
             onAddCostToNotebook={handleAddCostToNotebook}
             onRecordSale={handleRecordSale}
           />
+        )}
+          </>
         )}
       </div>
 
