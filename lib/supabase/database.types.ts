@@ -643,17 +643,21 @@ export type Database = {
           account_id: string | null
           active: boolean
           amount_cents: number
+          amount_changes: Json
           amount_mode: string
           category_id: string | null
           created_at: string
           deleted_at: string | null
           description: string
           due_day: number | null
+          end_month: string | null
           id: string
           kind: string
           member_label: string | null
           percent_bp: number | null
+          skipped_months: string[]
           sort_order: number
+          start_month: string | null
           updated_at: string
           user_id: string
         }
@@ -661,17 +665,21 @@ export type Database = {
           account_id?: string | null
           active?: boolean
           amount_cents?: number
+          amount_changes?: Json
           amount_mode?: string
           category_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description: string
           due_day?: number | null
+          end_month?: string | null
           id?: string
           kind?: string
           member_label?: string | null
           percent_bp?: number | null
+          skipped_months?: string[]
           sort_order?: number
+          start_month?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -679,17 +687,21 @@ export type Database = {
           account_id?: string | null
           active?: boolean
           amount_cents?: number
+          amount_changes?: Json
           amount_mode?: string
           category_id?: string | null
           created_at?: string
           deleted_at?: string | null
           description?: string
           due_day?: number | null
+          end_month?: string | null
           id?: string
           kind?: string
           member_label?: string | null
           percent_bp?: number | null
+          skipped_months?: string[]
           sort_order?: number
+          start_month?: string | null
           updated_at?: string
           user_id?: string
         }

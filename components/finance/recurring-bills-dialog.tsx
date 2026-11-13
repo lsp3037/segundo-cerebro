@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2Icon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react";
+import { ChevronDownIcon, Loader2Icon, PlusIcon, SparklesIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -9,11 +9,13 @@ import {
   deleteRecurringBill,
   saveRecurringBill,
   saveRecurringValuesBatch,
+  updateRecurringSchedule,
 } from "@/lib/actions/finance-family";
 import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { FinanceCategory } from "@/lib/data/finance";
 import type { AccountWithBalance, RecurringBill } from "@/lib/data/finance-family";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
+import { billAmountForMonth, formatMonthShortYear, parseAmountChanges } from "@/lib/finance/recurring";
 import { centsToInput, inputToCents } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -32,7 +34,7 @@ interface RecurringBillsDialogProps {
 }
 
 export function RecurringBillsDialog(props: RecurringBillsDialogProps) {
-  const formKey = `${props.open}-${props.bills.map((b) => `${b.id}:${b.amount_cents}:${b.due_day}`).join("|")}`;
+  const formKey = `${props.open}-${props.bills.map((b) => `${b.id}:${b.amount_cents}:${b.due_day}:${JSON.stringify(b.amount_changes)}:${b.start_month}:${b.end_month}:${b.skipped_months.join(",")}`).join("|")}`;
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
@@ -51,8 +53,16 @@ function RecurringBillsForm({
 }: RecurringBillsDialogProps) {
   const [isPending, startTransition] = useTransition();
   const [valuesById, setValuesById] = useState<Record<string, string>>(() =>
-    Object.fromEntries(bills.map((b) => [b.id, b.amount_cents > 0 ? centsToInput(b.amount_cents) : ""])),
+    Object.fromEntries(
+      bills.map((b) => {
+        const now = billAmountForMonth(b, currentMonth);
+        return [b.id, now > 0 ? centsToInput(now) : ""];
+      }),
+    ),
   );
+  // Mês a partir do qual um valor novo passa a valer (padrão: o mês da tela).
+  const [fromById, setFromById] = useState<Record<string, string>>({});
+  const [openId, setOpenId] = useState<string | null>(null);
   const [daysById, setDaysById] = useState<Record<string, string>>(() =>
     Object.fromEntries(bills.map((b) => [b.id, b.due_day ? String(b.due_day) : ""])),
   );
@@ -99,6 +109,7 @@ function RecurringBillsForm({
           amount_cents: valuesById[b.id]?.trim() ? inputToCents(valuesById[b.id]) : 0,
           due_day: dayNum && dayNum >= 1 && dayNum <= 31 ? dayNum : null,
           active: true,
+          from_month: fromById[b.id] || currentMonth,
         };
       });
 
@@ -235,14 +246,17 @@ function RecurringBillsForm({
         ) : (
           bills.map((b) => (
             <div key={b.id} className="grid grid-cols-12 items-center gap-2 py-2 text-xs">
-              <div className="col-span-5 min-w-0">
+              <div className="col-span-4 min-w-0">
                 <div className="truncate font-medium text-foreground">
                   <span className={b.kind === "income" ? "text-emerald-400" : "text-rose-400"}>
                     {b.kind === "income" ? "+ " : "- "}
                   </span>
                   {b.description}
                 </div>
-                <div className="text-xs text-muted-foreground">{b.member_label ?? "Casa"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {b.member_label ?? "Casa"}
+                  {scheduleNote(b, currentMonth) && <span className="text-amber-500"> · {scheduleNote(b, currentMonth)}</span>}
+                </div>
               </div>
               <div className="col-span-2">
                 <Input
@@ -250,6 +264,7 @@ function RecurringBillsForm({
                   min={1}
                   max={31}
                   placeholder="Dia"
+                  title={b.kind === "income" ? "Dia do mês em que você recebe" : "Dia do vencimento"}
                   value={daysById[b.id] ?? ""}
                   onChange={(e) => setDaysById((prev) => ({ ...prev, [b.id]: e.target.value }))}
                   className="h-7 font-mono text-xs"
@@ -269,11 +284,32 @@ function RecurringBillsForm({
                   />
                 )}
               </div>
-              <div className="col-span-1 text-right">
+              <div className="col-span-2 flex justify-end gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="size-7 p-0 text-muted-foreground"
+                  aria-expanded={openId === b.id}
+                  aria-label={"Período e reajuste de " + b.description}
+                  title="Período, reajuste e pular mês"
+                  onClick={() => setOpenId(openId === b.id ? null : b.id)}
+                >
+                  <ChevronDownIcon className={"size-3.5 transition-transform " + (openId === b.id ? "rotate-180" : "")} />
+                </Button>
                 <Button type="button" variant="ghost" size="sm" className="size-7 p-0 text-rose-400" onClick={() => handleDelete(b.id, b.description)}>
                   <Trash2Icon className="size-3.5" />
                 </Button>
               </div>
+              {openId === b.id && (
+                <ScheduleDetails
+                  bill={b}
+                  currentMonth={currentMonth}
+                  fromMonth={fromById[b.id] || currentMonth}
+                  onFromMonth={(m) => setFromById((prev) => ({ ...prev, [b.id]: m }))}
+                  showFrom={b.amount_mode === "fixed"}
+                />
+              )}
             </div>
           ))
         )}
@@ -289,5 +325,87 @@ function RecurringBillsForm({
         )}
       </DialogFooter>
     </>
+  );
+}
+
+// Resumo curto do período, mostrado sob o nome ("até dez/2026", "pulada neste mês").
+function scheduleNote(b: RecurringBill, month: string): string | null {
+  const parts: string[] = [];
+  if (b.start_month && b.start_month > month) parts.push("começa em " + formatMonthShortYear(b.start_month));
+  if (b.end_month) parts.push((b.end_month < month ? "terminou em " : "até ") + formatMonthShortYear(b.end_month));
+  if (b.skipped_months.includes(month)) parts.push("pulada neste mês");
+  return parts.length ? parts.join(", ") : null;
+}
+
+// Linha extra de cada item: quando começa/termina, a partir de que mês o valor novo vale e pular o mês.
+function ScheduleDetails({
+  bill,
+  currentMonth,
+  fromMonth,
+  onFromMonth,
+  showFrom,
+}: {
+  bill: RecurringBill;
+  currentMonth: string;
+  fromMonth: string;
+  onFromMonth: (month: string) => void;
+  showFrom: boolean;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [start, setStart] = useState(bill.start_month ?? "");
+  const [end, setEnd] = useState(bill.end_month ?? "");
+  const skipped = bill.skipped_months.includes(currentMonth);
+  const changes = parseAmountChanges(bill.amount_changes);
+
+  const save = (skippedMonths: string[]) =>
+    startTransition(async () => {
+      const res = await updateRecurringSchedule({
+        id: bill.id,
+        month: currentMonth,
+        start_month: start || null,
+        end_month: end || null,
+        skipped_months: skippedMonths,
+      });
+      if (res.ok) toast.success("Período salvo.");
+      else toast.error(res.error);
+    });
+
+  const toggleSkip = () =>
+    save(skipped ? bill.skipped_months.filter((m) => m !== currentMonth) : [...bill.skipped_months, currentMonth]);
+
+  return (
+    <div className="col-span-12 grid gap-2.5 rounded-lg border border-border/60 bg-muted/20 p-3 sm:grid-cols-2">
+      <label className="grid gap-1 text-muted-foreground">
+        Começa em
+        <Input type="month" value={start} onChange={(e) => setStart(e.target.value)} className="h-7 text-xs" />
+      </label>
+      <label className="grid gap-1 text-muted-foreground">
+        Termina em (vazio = sem fim)
+        <Input type="month" value={end} onChange={(e) => setEnd(e.target.value)} className="h-7 text-xs" />
+      </label>
+      {showFrom && (
+        <label className="grid gap-1 text-muted-foreground sm:col-span-2">
+          Se você mudar o valor acima, ele vale a partir de
+          <Input type="month" value={fromMonth} onChange={(e) => onFromMonth(e.target.value)} className="h-7 text-xs sm:max-w-44" />
+        </label>
+      )}
+      {changes.length > 0 && (
+        <ul className="text-muted-foreground sm:col-span-2">
+          {changes.map((c) => (
+            <li key={c.from}>
+              Desde {formatMonthShortYear(c.from)}: <span className="font-mono text-foreground">{centsToInput(c.amount_cents)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap justify-end gap-2 sm:col-span-2">
+        <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={isPending} onClick={toggleSkip}>
+          {skipped ? "Voltar a vencer neste mês" : "Pular este mês"}
+        </Button>
+        <Button type="button" size="sm" className="h-7 text-xs" disabled={isPending} onClick={() => save(bill.skipped_months)}>
+          Salvar período
+        </Button>
+      </div>
+    </div>
   );
 }

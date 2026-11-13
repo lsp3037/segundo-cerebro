@@ -12,6 +12,7 @@ import {
   type BillStatus,
   type MonthKpis,
 } from "@/lib/finance/household";
+import { billAmountForMonth, isBillActiveInMonth } from "@/lib/finance/recurring";
 import type { FinanceSummary } from "./finance";
 import { todayIso, addDays } from "@/lib/dates";
 import type { Tables, TablesInsert } from "@/lib/supabase/database.types";
@@ -108,7 +109,7 @@ export async function ensureMonthBills(
   let titheTouched = false;
   try {
     const supabase = await createClient();
-    const { data: bills } = await supabase
+    const { data: allBills } = await supabase
       .from("finance_recurring_bills")
       .select("*")
       .eq("user_id", userId)
@@ -116,7 +117,10 @@ export async function ensureMonthBills(
       .is("deleted_at", null)
       .order("sort_order");
 
-    if (!bills || bills.length === 0) return { titheTouched: false };
+    if (!allBills || allBills.length === 0) return { titheTouched: false };
+    // Só vale o que está dentro do período e não foi pulado neste mês.
+    const bills = allBills.filter((b) => isBillActiveInMonth(b, month));
+    const outOfPeriodIds = new Set(allBills.filter((b) => !isBillActiveInMonth(b, month)).map((b) => b.id));
 
     const { start, end } = monthBounds(month);
     const { data: existing } = await supabase
@@ -153,10 +157,18 @@ export async function ensureMonthBills(
 
     // 1. Contas de valor fixo (apenas no mês atual ou futuros)
     if (!isPastMonth) {
-      const fixedBills = bills.filter((b) => b.amount_mode === "fixed" && b.amount_cents > 0);
+      // Fim do período ou mês pulado: some o lançamento que ainda está pendente.
+      for (const id of outOfPeriodIds) {
+        const stale = existingByBill.get(id);
+        if (stale && stale.status === "pending") {
+          await supabase.from("transactions").delete().eq("id", stale.id).eq("user_id", userId);
+        }
+      }
+
+      const fixedBills = bills.filter((b) => b.amount_mode === "fixed" && billAmountForMonth(b, month) > 0);
       const fixedRows = fixedBills
         .filter((b) => !existingByBill.has(b.id))
-        .map((b) => rowFor(b, b.amount_cents));
+        .map((b) => rowFor(b, billAmountForMonth(b, month)));
       await insertIgnoringDuplicates(fixedRows);
 
       if (options?.syncPendingFixed) {
@@ -164,10 +176,11 @@ export async function ensureMonthBills(
           const cur = existingByBill.get(b.id);
           if (!cur || cur.status !== "pending") continue;
           const targetDue = dueDateFor(month, b.due_day);
-          if (cur.amount_cents !== b.amount_cents || cur.due_date !== targetDue) {
+          const target = billAmountForMonth(b, month);
+          if (cur.amount_cents !== target || cur.due_date !== targetDue) {
             await supabase
               .from("transactions")
-              .update({ amount_cents: b.amount_cents, due_date: targetDue, updated_at: new Date().toISOString() })
+              .update({ amount_cents: target, due_date: targetDue, updated_at: new Date().toISOString() })
               .eq("id", cur.id)
               .eq("user_id", userId);
           }

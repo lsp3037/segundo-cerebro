@@ -74,6 +74,12 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [x] Ícones minimalistas outline Lucide nas áreas (`briefcase`, `user`, `wrench`, `wallet`) em substituição aos pontos coloridos, com destaque sutil de cor apenas no estado ativo.
 - [x] Drawer lateral mantido no celular via botão de menu, sem conflitos com o modo desktop.
 
+### Recorrentes (Finanças › Configurar › Contas Fixas)
+- [x] Migration `20261113120000_finance_recurring_schedule.sql` executada no SQL Editor (início/fim, reajustes e meses pulados).
+- [ ] Setinha de cada item: definir "Começa em" / "Termina em" e conferir que o lançamento pendente some fora do período.
+- [ ] Mudar o valor de uma conta com "vale a partir de" num mês futuro: o mês atual não muda e o futuro vem com o valor novo (o histórico aparece na linha).
+- [ ] "Pular este mês" e "Voltar a vencer neste mês"; dia de recebimento nas entradas (Salário, Bolsa).
+
 ### Notificações (sino da barra superior)
 - [ ] Conferir o número vermelho no sino e o balanço quando chega aviso novo (atualiza ao abrir, a cada minuto e ao voltar para a aba).
 - [ ] No painel: filtros, `Hoje` numa tarefa atrasada, `Pagar` numa conta, `Concluir` numa tarefa com horário e o `Desfazer` de cada um.

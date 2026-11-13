@@ -7,7 +7,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensureMonthBills } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { HOUSEHOLD_TEMPLATE } from "@/lib/finance/household-template";
-import type { Tables } from "@/lib/supabase/database.types";
+import { billAmountForMonth, parseAmountChanges } from "@/lib/finance/recurring";
+import type { Tables, TablesUpdate } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
 
@@ -433,6 +434,8 @@ const bulkValuesSchema = z.object({
       amount_cents: z.number().int().min(0),
       due_day: z.number().int().min(1).max(31).nullable().optional(),
       active: z.boolean().optional(),
+      // Mês a partir do qual um valor novo passa a valer (padrão: o mês que está na tela).
+      from_month: monthSchema.optional(),
     }),
   ),
 });
@@ -445,20 +448,82 @@ export async function saveRecurringValuesBatch(input: z.infer<typeof bulkValuesS
   const supabase = await createClient();
   const now = new Date().toISOString();
 
+  const { data: current } = await supabase
+    .from("finance_recurring_bills")
+    .select("id, amount_cents, amount_changes")
+    .eq("user_id", user.id)
+    .in(
+      "id",
+      parsed.data.items.map((i) => i.id),
+    );
+  const byId = new Map((current ?? []).map((b) => [b.id, b]));
+
   for (const item of parsed.data.items) {
-    await supabase
-      .from("finance_recurring_bills")
-      .update({
-        amount_cents: item.amount_cents,
-        due_day: item.due_day ?? null,
-        active: item.active ?? true,
-        updated_at: now,
-      })
-      .eq("id", item.id)
-      .eq("user_id", user.id);
+    const bill = byId.get(item.id);
+    if (!bill) continue;
+    const from = item.from_month ?? parsed.data.month;
+    const changes = parseAmountChanges(bill.amount_changes);
+    const effective = billAmountForMonth({ amount_cents: bill.amount_cents, amount_changes: changes }, from);
+
+    const patch: TablesUpdate<"finance_recurring_bills"> = {
+      due_day: item.due_day ?? null,
+      active: item.active ?? true,
+      updated_at: now,
+    };
+    if (item.amount_cents !== effective) {
+      if (bill.amount_cents === 0 && changes.length === 0) {
+        // Primeira vez que o valor é preenchido: vira o valor da conta.
+        patch.amount_cents = item.amount_cents;
+      } else {
+        // Reajuste: vale a partir do mês escolhido; os meses anteriores continuam como estavam.
+        patch.amount_changes = [...changes.filter((c) => c.from !== from), { from, amount_cents: item.amount_cents }].sort(
+          (x, y) => x.from.localeCompare(y.from),
+        );
+      }
+    }
+    await supabase.from("finance_recurring_bills").update(patch).eq("id", item.id).eq("user_id", user.id);
   }
 
   await ensureMonthBills(user.id, parsed.data.month, { syncPendingFixed: true });
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+// Período (começa/termina) e meses pulados de um item recorrente.
+const scheduleSchema = z.object({
+  id: uuidSchema,
+  month: monthSchema,
+  start_month: monthSchema.nullable(),
+  end_month: monthSchema.nullable(),
+  skipped_months: z.array(monthSchema).max(60),
+});
+
+export async function updateRecurringSchedule(input: z.infer<typeof scheduleSchema>): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  const parsed = scheduleSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const d = parsed.data;
+  if (d.start_month && d.end_month && d.start_month > d.end_month) {
+    return fail("O mês de início não pode ser depois do mês de fim.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("finance_recurring_bills")
+    .update({
+      start_month: d.start_month,
+      end_month: d.end_month,
+      skipped_months: [...new Set(d.skipped_months)].sort(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", d.id)
+    .eq("user_id", user.id);
+  if (error) {
+    console.error("updateRecurringSchedule error:", error);
+    return fail("Não foi possível salvar o período.");
+  }
+
+  await ensureMonthBills(user.id, d.month);
   revalidatePath("/", "layout");
   return ok();
 }
