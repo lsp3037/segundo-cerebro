@@ -74,6 +74,11 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [x] Ícones minimalistas outline Lucide nas áreas (`briefcase`, `user`, `wrench`, `wallet`) em substituição aos pontos coloridos, com destaque sutil de cor apenas no estado ativo.
 - [x] Drawer lateral mantido no celular via botão de menu, sem conflitos com o modo desktop.
 
+### Notificações (sino da barra superior)
+- [ ] Conferir o número vermelho no sino e o balanço quando chega aviso novo (atualiza ao abrir, a cada minuto e ao voltar para a aba).
+- [ ] No painel: filtros, `Hoje` numa tarefa atrasada, `Pagar` numa conta, `Concluir` numa tarefa com horário e o `Desfazer` de cada um.
+- [ ] `Marcar todas como lidas`, recarregar a página e ver que continuam lidas (fica em `profiles.settings.notifications_read`, vale no PC e no celular).
+
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
 ## 4. Problemas comuns

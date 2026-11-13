@@ -31,6 +31,7 @@ import { signOut } from "@/lib/actions/auth";
 import { type Area, TABS } from "@/lib/modules";
 import { cn } from "@/lib/utils";
 import type { ShellUser } from "./app-shell";
+import { NotificationBell } from "./notification-bell";
 
 export function Topbar({
   user,
@@ -139,6 +140,7 @@ export function Topbar({
         <SearchIcon />
       </Button>
 
+      <NotificationBell />
       <ThemeToggle />
 
       <DropdownMenu>
