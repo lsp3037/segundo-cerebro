@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "../lib/motion/ui-generation/ui-generation.css";
 @import "../lib/motion/ui-generation/text-image-generation.css";
+@import "../lib/motion/transitions.css";
 
 /* Classes usadas pelos componentes do editor de notas (BlockNote). */
 @source "../node_modules/@blocknote/shadcn";

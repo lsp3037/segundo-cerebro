@@ -505,7 +505,10 @@ export async function syncMonthTithe(month: string): Promise<ActionResult> {
     }
   }
 
-  await ensureMonthBills(user.id, month);
+  const { titheTouched } = await ensureMonthBills(user.id, month, { allowPastTithe: true });
   revalidatePath("/", "layout");
+  if (!titheTouched) {
+    return fail("Nenhuma diferença de Dízimo para gerar neste mês.");
+  }
   return ok();
 }

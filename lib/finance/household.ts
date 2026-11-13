@@ -64,6 +64,9 @@ export type KpiTransaction = {
   amount_cents: number;
   status: string;
   due_date: string | null;
+  recurring_bill_id?: string | null;
+  installment_group_id?: string | null;
+  description?: string | null;
 };
 
 export type MonthKpis = {
@@ -77,17 +80,35 @@ export type MonthKpis = {
   savingsRatePercent: number;
   fixedExpenseCents: number;
   fixedCommitmentPercent: number;
+  fixedShareOfExpensesPercent: number;
   dailyBurnCents: number;
 };
 
-// KPIs do mês. Entradas e saídas contam pagos + pendentes (o previsto, como na planilha).
-// "Fixo" = saída com dia de vencimento.
-export function computeMonthKpis(txs: KpiTransaction[], days: number): MonthKpis {
+export type ComputeMonthKpisOptions = {
+  fixedDescriptions?: Set<string>;
+};
+
+// Formata percentuais no padrão brasileiro (vírgula decimal, ex.: "21,2").
+export function formatPercentPtBr(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  });
+}
+
+// KPIs do mês. Entradas e saídas contam pagos + pendentes (o previsto).
+// "Fixo" = saída ligada a conta recorrente, descrição de conta fixa cadastrada ou vencimento não-parcelado.
+export function computeMonthKpis(
+  txs: KpiTransaction[],
+  days: number,
+  options?: ComputeMonthKpisOptions,
+): MonthKpis {
   let paidIncomeCents = 0;
   let pendingIncomeCents = 0;
   let paidExpenseCents = 0;
   let pendingExpenseCents = 0;
   let fixedExpenseCents = 0;
+  const fixedNames = options?.fixedDescriptions;
 
   for (const t of txs) {
     const paid = t.status === "paid";
@@ -97,7 +118,13 @@ export function computeMonthKpis(txs: KpiTransaction[], days: number): MonthKpis
     } else {
       if (paid) paidExpenseCents += t.amount_cents;
       else pendingExpenseCents += t.amount_cents;
-      if (t.due_date) fixedExpenseCents += t.amount_cents;
+      const descNorm = t.description?.trim().toLowerCase() ?? "";
+      const isFixedByBill = Boolean(t.recurring_bill_id);
+      const isFixedByDueDate = Boolean(t.due_date) && !t.installment_group_id;
+      const isFixedByName = Boolean(descNorm && fixedNames?.has(descNorm));
+      if (isFixedByBill || isFixedByDueDate || isFixedByName) {
+        fixedExpenseCents += t.amount_cents;
+      }
     }
   }
 
@@ -116,6 +143,7 @@ export function computeMonthKpis(txs: KpiTransaction[], days: number): MonthKpis
     savingsRatePercent: incomeCents > 0 ? round1((projectedBalanceCents / incomeCents) * 100) : 0,
     fixedExpenseCents,
     fixedCommitmentPercent: incomeCents > 0 ? round1((fixedExpenseCents / incomeCents) * 100) : 0,
+    fixedShareOfExpensesPercent: expenseCents > 0 ? round1((fixedExpenseCents / expenseCents) * 100) : 0,
     dailyBurnCents: days > 0 ? Math.round(expenseCents / days) : 0,
   };
 }

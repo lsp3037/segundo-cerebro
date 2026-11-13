@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDownIcon,
@@ -52,6 +52,7 @@ import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import { TransactionsTable } from "./transactions-table";
+import { SlidingTabs } from "./transitions";
 
 interface FinanceDashboardProps {
   initialSummary: FinanceSummary;
@@ -82,7 +83,7 @@ export function FinanceDashboard({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   const allowedTabs = LEDGER_TABS[currentLedger];
   const rawTab = searchParams.get("tab") as FinanceTab | null;
@@ -113,19 +114,22 @@ export function FinanceDashboard({
   const realCurrentMonth = todayIso().slice(0, 7);
 
   // Atualiza parâmetros de navegação na URL
-  const updateParams = (updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    for (const [key, val] of Object.entries(updates)) {
-      if (val === null) params.delete(key);
-      else params.set(key, val);
-    }
-    startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`);
-    });
-  };
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
+      for (const [key, val] of Object.entries(updates)) {
+        if (val === null) params.delete(key);
+        else params.set(key, val);
+      }
+      startTransition(() => {
+        router.push(`${pathname}?${params.toString()}`);
+      });
+    },
+    [pathname, router, searchParams],
+  );
 
   // Navegação de Mês
-  const handlePrevMonth = () => {
+  const handlePrevMonth = useCallback(() => {
     const [yStr, mStr] = currentMonth.split("-");
     let y = parseInt(yStr, 10);
     let m = parseInt(mStr, 10) - 1;
@@ -135,9 +139,9 @@ export function FinanceDashboard({
     }
     const nextMonthStr = `${y}-${String(m).padStart(2, "0")}`;
     updateParams({ m: nextMonthStr });
-  };
+  }, [currentMonth, updateParams]);
 
-  const handleNextMonth = () => {
+  const handleNextMonth = useCallback(() => {
     const [yStr, mStr] = currentMonth.split("-");
     let y = parseInt(yStr, 10);
     let m = parseInt(mStr, 10) + 1;
@@ -147,7 +151,39 @@ export function FinanceDashboard({
     }
     const nextMonthStr = `${y}-${String(m).padStart(2, "0")}`;
     updateParams({ m: nextMonthStr });
-  };
+  }, [currentMonth, updateParams]);
+
+  // Atalhos ← e → para navegar entre meses quando nenhum diálogo/campo estiver focado
+  useEffect(() => {
+    const anyDialogOpen =
+      txDialogOpen || nbDialogOpen || saleDialogOpen || ofxDialogOpen || catDialogOpen || recurringDialogOpen;
+    if (anyDialogOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handlePrevMonth();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleNextMonth();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    txDialogOpen,
+    nbDialogOpen,
+    saleDialogOpen,
+    ofxDialogOpen,
+    catDialogOpen,
+    recurringDialogOpen,
+    handlePrevMonth,
+    handleNextMonth,
+  ]);
 
   const handleResetCurrentMonth = () => {
     updateParams({ m: realCurrentMonth });
@@ -217,39 +253,25 @@ export function FinanceDashboard({
       <header className="flex min-h-14 flex-wrap items-center justify-between gap-2.5 border-b border-border/70 py-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-baseline gap-1.5">
-            {contextLabel && (
+            {contextLabel && contextLabel !== "Finanças" && (
               <span className="text-xs text-muted-foreground">{contextLabel} /</span>
             )}
-            <h1 className="text-sm font-semibold tracking-tight text-foreground">
+            <h1 className="text-base font-semibold tracking-tight text-foreground">
               Finanças
             </h1>
           </div>
 
-          {/* Seletor Pessoal / Trust Care. "Somando as duas" (ledger all) acende os dois. */}
-          <div
-            role="group"
-            aria-label="De quem são as finanças"
-            className="inline-flex h-8 items-center rounded-md border border-border bg-card p-0.5 text-xs"
-          >
-            {(["pessoal", "trustcare"] as const).map((ldg) => {
-              const isSelected = currentLedger === ldg || currentLedger === "all";
-              return (
-                <button
-                  key={ldg}
-                  type="button"
-                  aria-pressed={isSelected}
-                  onClick={() => handleSwitchLedger(ldg)}
-                  className={`h-7 cursor-pointer rounded-sm px-2.5 text-xs font-medium transition-colors ${
-                    isSelected
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {ldg === "pessoal" ? "Pessoal" : "Trust Care"}
-                </button>
-              );
-            })}
-          </div>
+          {/* Seletor único e inequívoco: Pessoal | Trust Care | Consolidado (transitions-dev #16) */}
+          <SlidingTabs
+            ariaLabel="Escopo financeiro"
+            value={currentLedger}
+            onChange={(ldg) => handleSwitchLedger(ldg)}
+            items={[
+              { id: "pessoal", label: "Pessoal" },
+              { id: "trustcare", label: "Trust Care" },
+              { id: "all", label: "Consolidado" },
+            ]}
+          />
 
           {/* Seletor de Mês compacto + Hoje inline */}
           <div className="flex items-center gap-1.5">
@@ -375,68 +397,30 @@ export function FinanceDashboard({
         </nav>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {currentLedger !== "trustcare" && LEDGER_TABS.all.some((t) => t.id === activeTab) && (
-          <label className="flex cursor-pointer items-center gap-2 py-1.5 text-xs text-muted-foreground">
-            <button
-              type="button"
-              role="switch"
-              aria-checked={currentLedger === "all"}
-              onClick={() =>
-                updateParams({ ledger: currentLedger === "all" ? "pessoal" : "all", member: null, tab: activeTab })
-              }
-              className={`relative h-4 w-7 shrink-0 cursor-pointer rounded-full transition-colors ${
-                currentLedger === "all" ? "bg-emerald-500" : "bg-muted"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 left-0.5 size-3 rounded-full bg-background transition-transform ${
-                  currentLedger === "all" ? "translate-x-3" : ""
-                }`}
+          {currentLedger === "pessoal" && (
+            <div className="flex items-center gap-2 py-1.5 text-xs">
+              <span className="text-xs text-muted-foreground">Pessoa:</span>
+              <SlidingTabs
+                ariaLabel="Filtrar por pessoa"
+                value={activeMember ?? "todos"}
+                onChange={(m) => updateParams({ member: m === "todos" ? null : m })}
+                items={[
+                  { id: "todos", label: "Todos" },
+                  ...HOUSEHOLD_MEMBERS.map((m) => ({ id: m, label: m })),
+                ]}
               />
-            </button>
-            Somar Trust Care
-          </label>
-        )}
-        {currentLedger === "pessoal" && (
-          <div className="flex items-center gap-1 py-1.5 text-xs">
-            <span className="mr-1 text-xs text-muted-foreground">Pessoa:</span>
-            <button
-              type="button"
-              onClick={() => updateParams({ member: null })}
-              className={`cursor-pointer rounded border px-2 py-0.5 text-xs font-medium transition-colors ${
-                !activeMember
-                  ? "border-foreground/30 bg-muted text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Todos
-            </button>
-            {HOUSEHOLD_MEMBERS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => updateParams({ member: m })}
-                className={`cursor-pointer rounded border px-2 py-0.5 text-xs font-medium transition-colors ${
-                  activeMember === m
-                    ? "border-foreground/30 bg-muted text-foreground"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 3. Conteúdo da Aba Ativa */}
-      <div className="pt-5">
+      {/* 3. Conteúdo da Aba Ativa (com feedback de transição isPending) */}
+      <div className={`pt-4 transition-opacity duration-200 ${isPending ? "pointer-events-none opacity-60" : "opacity-100"}`}>
         {/* Visão Geral Pessoal / Familiar */}
         {activeTab === "visao" && currentLedger === "pessoal" && (
           <HouseholdOverview
             data={householdData}
-            categoriesBreakdown={initialSummary.categoriesBreakdown}
+            categoriesBreakdown={householdData.categoriesBreakdown}
             onGoToPendingFluxo={() => {
               setFluxoStatusFilter("pending");
               updateParams({ tab: "fluxo" });
@@ -449,6 +433,8 @@ export function FinanceDashboard({
             onEditTransaction={handleEditTransaction}
             month={currentMonth}
             memberFilter={activeMember}
+            onSelectMonth={(m) => updateParams({ m })}
+            onSelectMember={(m) => updateParams({ member: m })}
             onAddAccount={() => updateParams({ tab: "contas" })}
             onNewIncome={() => handleOpenNewTransaction("pessoal", "income")}
             onNewExpense={() => handleOpenNewTransaction("pessoal", "expense")}
@@ -543,8 +529,9 @@ export function FinanceDashboard({
             />
             <ReportsComparisonsView
               data={householdData}
-              categoriesBreakdown={initialSummary.categoriesBreakdown}
+              categoriesBreakdown={householdData.categoriesBreakdown}
               currentMonth={currentMonth}
+              onSelectMonth={(m) => updateParams({ m })}
             />
           </div>
         )}

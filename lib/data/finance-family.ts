@@ -12,6 +12,7 @@ import {
   type BillStatus,
   type MonthKpis,
 } from "@/lib/finance/household";
+import type { FinanceSummary } from "./finance";
 import { todayIso, addDays } from "@/lib/dates";
 import type { Tables, TablesInsert } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -79,6 +80,7 @@ export type HouseholdData = {
   recurringBills: RecurringBill[];
   budgets: BudgetRow[];
   comparison: ComparisonRow[];
+  categoriesBreakdown: FinanceSummary["categoriesBreakdown"];
   trend: TrendPoint[];
   members: MemberSlice[];
   upcoming: UpcomingBill[];
@@ -92,13 +94,18 @@ function monthBounds(month: string) {
 
 // Cria os lançamentos pendentes do mês a partir das contas fixas (só mês atual e futuros)
 // e mantém o Dízimo pendente igual ao percentual das entradas do mês.
+// Quando `allowPastTithe` é true (ação explícita "Gerar 10%"), permite gerar o Dízimo em meses passados sem recriar contas fixas antigas.
 export async function ensureMonthBills(
   userId: string,
   month: string,
-  options?: { syncPendingFixed?: boolean },
-): Promise<void> {
-  if (month < monthKey(todayIso())) return;
+  options?: { syncPendingFixed?: boolean; allowPastTithe?: boolean },
+): Promise<{ titheTouched: boolean }> {
+  const isPastMonth = month < monthKey(todayIso());
+  if (isPastMonth && !options?.allowPastTithe) {
+    return { titheTouched: false };
+  }
 
+  let titheTouched = false;
   try {
     const supabase = await createClient();
     const { data: bills } = await supabase
@@ -109,13 +116,15 @@ export async function ensureMonthBills(
       .is("deleted_at", null)
       .order("sort_order");
 
-    if (!bills || bills.length === 0) return;
+    if (!bills || bills.length === 0) return { titheTouched: false };
 
     const { start, end } = monthBounds(month);
     const { data: existing } = await supabase
       .from("transactions")
-      .select("id, recurring_bill_id, status, amount_cents, due_date, description, category_id, deleted_at")
+      .select("id, recurring_bill_id, status, amount_cents, due_date, description, category_id")
       .eq("user_id", userId)
+      .eq("ledger", "pessoal")
+      .is("deleted_at", null)
       .gte("date", start)
       .lte("date", end);
 
@@ -142,31 +151,33 @@ export async function ensureMonthBills(
       };
     };
 
-    // 1. Contas de valor fixo (entradas primeiro, para o Dízimo usar o total certo)
-    const fixedBills = bills.filter((b) => b.amount_mode === "fixed" && b.amount_cents > 0);
-    const fixedRows = fixedBills
-      .filter((b) => !existingByBill.has(b.id))
-      .map((b) => rowFor(b, b.amount_cents));
-    await insertIgnoringDuplicates(fixedRows);
+    // 1. Contas de valor fixo (apenas no mês atual ou futuros)
+    if (!isPastMonth) {
+      const fixedBills = bills.filter((b) => b.amount_mode === "fixed" && b.amount_cents > 0);
+      const fixedRows = fixedBills
+        .filter((b) => !existingByBill.has(b.id))
+        .map((b) => rowFor(b, b.amount_cents));
+      await insertIgnoringDuplicates(fixedRows);
 
-    if (options?.syncPendingFixed) {
-      for (const b of fixedBills) {
-        const cur = existingByBill.get(b.id);
-        if (!cur || cur.deleted_at || cur.status !== "pending") continue;
-        const targetDue = dueDateFor(month, b.due_day);
-        if (cur.amount_cents !== b.amount_cents || cur.due_date !== targetDue) {
-          await supabase
-            .from("transactions")
-            .update({ amount_cents: b.amount_cents, due_date: targetDue, updated_at: new Date().toISOString() })
-            .eq("id", cur.id)
-            .eq("user_id", userId);
+      if (options?.syncPendingFixed) {
+        for (const b of fixedBills) {
+          const cur = existingByBill.get(b.id);
+          if (!cur || cur.status !== "pending") continue;
+          const targetDue = dueDateFor(month, b.due_day);
+          if (cur.amount_cents !== b.amount_cents || cur.due_date !== targetDue) {
+            await supabase
+              .from("transactions")
+              .update({ amount_cents: b.amount_cents, due_date: targetDue, updated_at: new Date().toISOString() })
+              .eq("id", cur.id)
+              .eq("user_id", userId);
+          }
         }
       }
     }
 
     // 2. Contas percentuais (Dízimo) sobre as entradas do mês
     const percentBills = bills.filter((b) => b.amount_mode === "percent_of_income" && b.percent_bp);
-    if (percentBills.length === 0) return;
+    if (percentBills.length === 0) return { titheTouched: false };
 
     const { data: incomes } = await supabase
       .from("transactions")
@@ -184,27 +195,30 @@ export async function ensureMonthBills(
       const current = existingByBill.get(bill.id);
       const complementRow = existingList.find(
         (t) =>
-          !t.deleted_at &&
           !t.recurring_bill_id &&
           t.status === "pending" &&
           t.description === `${bill.description} (complemento)`,
       );
 
-      // Soma tudo o que já foi pago no mês dessa conta/categoria (ex.: primeiro dízimo já quitado)
+      // Soma tudo o que já foi pago no mês dessa conta/categoria (inclui lançamentos manuais com descrição Dízimo)
       const paidTitheCents = existingList
         .filter(
           (t) =>
-            !t.deleted_at &&
             t.status === "paid" &&
-            (t.recurring_bill_id === bill.id || t.description === `${bill.description} (complemento)`),
+            (t.recurring_bill_id === bill.id ||
+              t.description === `${bill.description} (complemento)` ||
+              /^d[íi]zimo/i.test(t.description)),
         )
         .reduce((acc, t) => acc + t.amount_cents, 0);
 
       const remaining = Math.max(0, expectedTotal - paidTitheCents);
 
       if (!current) {
-        if (remaining > 0) await insertIgnoringDuplicates([rowFor(bill, remaining)]);
-      } else if (!current.deleted_at && current.status === "pending") {
+        if (remaining > 0) {
+          await insertIgnoringDuplicates([rowFor(bill, remaining)]);
+          titheTouched = true;
+        }
+      } else if (current.status === "pending") {
         if (remaining > 0) {
           if (current.amount_cents !== remaining) {
             await supabase
@@ -212,12 +226,14 @@ export async function ensureMonthBills(
               .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
               .eq("id", current.id)
               .eq("user_id", userId);
+            titheTouched = true;
           }
         } else {
           // Sem entradas suficientes no mês ou já totalmente quitado: remove o pendente vazio.
           await supabase.from("transactions").delete().eq("id", current.id).eq("user_id", userId);
+          titheTouched = true;
         }
-      } else if (!current.deleted_at && current.status === "paid") {
+      } else if (current.status === "paid") {
         // O dízimo principal já foi pago, mas entrou nova receita no mês: cria/atualiza o complemento.
         if (remaining > 0) {
           if (complementRow && complementRow.status === "pending") {
@@ -227,6 +243,7 @@ export async function ensureMonthBills(
                 .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
                 .eq("id", complementRow.id)
                 .eq("user_id", userId);
+              titheTouched = true;
             }
           } else if (!complementRow) {
             await supabase.from("transactions").insert({
@@ -243,15 +260,18 @@ export async function ensureMonthBills(
               recurring_bill_id: null,
               status: "pending",
             });
+            titheTouched = true;
           }
         } else if (complementRow && complementRow.status === "pending") {
           await supabase.from("transactions").delete().eq("id", complementRow.id).eq("user_id", userId);
+          titheTouched = true;
         }
       }
     }
   } catch (err) {
     console.error("ensureMonthBills error:", err);
   }
+  return { titheTouched };
 }
 
 async function insertIgnoringDuplicates(rows: TablesInsert<"transactions">[]) {
@@ -300,7 +320,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
     supabase.from("finance_recurring_bills").select("*").is("deleted_at", null).order("sort_order"),
     supabase
       .from("transactions")
-      .select("account_id, kind, amount_cents, status, date")
+      .select("account_id, kind, amount_cents, status, date, member_label")
       .not("account_id", "is", null)
       .is("deleted_at", null),
     getUpcomingHouseholdBills(50),
@@ -335,15 +355,21 @@ export async function getHouseholdData(params: { month: string; member?: string 
     byMonth.set(key, list);
   }
 
+  const fixedDescriptions = new Set(
+    (billsRes.data ?? [])
+      .filter((b) => b.kind === "expense")
+      .map((b) => b.description.trim().toLowerCase()),
+  );
+
   const current = byMonth.get(month) ?? [];
   const previous = byMonth.get(shiftMonth(month, -1)) ?? [];
-  const kpis = computeMonthKpis(current, daysInMonth(month));
-  const previousKpis = computeMonthKpis(previous, daysInMonth(shiftMonth(month, -1)));
+  const kpis = computeMonthKpis(current, daysInMonth(month), { fixedDescriptions });
+  const previousKpis = computeMonthKpis(previous, daysInMonth(shiftMonth(month, -1)), { fixedDescriptions });
 
   // Tendência de 6 meses (previsto: pagos + pendentes)
   const trend: TrendPoint[] = Array.from({ length: 6 }, (_, i) => {
     const m = shiftMonth(month, i - 5);
-    const k = computeMonthKpis(byMonth.get(m) ?? [], daysInMonth(m));
+    const k = computeMonthKpis(byMonth.get(m) ?? [], daysInMonth(m), { fixedDescriptions });
     const [y, mm] = m.split("-");
     return {
       month: m,
@@ -411,7 +437,37 @@ export async function getHouseholdData(params: { month: string; member?: string 
     .map(([m, cents]) => ({ member: m, expenseCents: cents, percent: memberSum > 0 ? Math.round((cents / memberSum) * 1000) / 10 : 0 }))
     .sort((a, b) => b.expenseCents - a.expenseCents);
 
-  // Saldo das contas e fatura dos cartões
+  // Distribuição por categoria sincronizada com o filtro de Pessoa atual
+  const buildBreakdown = (kind: "expense" | "income"): FinanceSummary["categoriesBreakdown"] => {
+    const kindTxs = current.filter((t) => t.kind === kind);
+    const kindTotal = kindTxs.reduce((acc, t) => acc + t.amount_cents, 0);
+    const grouped = new Map<string, { categoryId: string | null; categoryName: string; color: string | null; totalCents: number }>();
+    for (const t of kindTxs) {
+      const cat = t.category_id ? catsMap.get(t.category_id) : null;
+      const key = t.category_id ?? "none";
+      const cur = grouped.get(key) ?? {
+        categoryId: t.category_id,
+        categoryName: cat?.name ?? "Sem categoria",
+        color: cat?.color ?? null,
+        totalCents: 0,
+      };
+      cur.totalCents += t.amount_cents;
+      grouped.set(key, cur);
+    }
+    return [...grouped.values()]
+      .sort((a, b) => b.totalCents - a.totalCents)
+      .map((item) => ({
+        ...item,
+        kind,
+        percentage: kindTotal > 0 ? Math.round((item.totalCents / kindTotal) * 100) : 0,
+      }));
+  };
+  const categoriesBreakdown: FinanceSummary["categoriesBreakdown"] = [
+    ...buildBreakdown("expense"),
+    ...buildBreakdown("income"),
+  ];
+
+  // Saldo das contas e fatura dos cartões (respeitando filtro de Pessoa nas faturas)
   const accountTx = accountTxRes.data ?? [];
   const accountsWithBalance: AccountWithBalance[] = accounts.map((a) => {
     let balanceCents = a.opening_balance_cents;
@@ -419,7 +475,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
     for (const t of accountTx) {
       if (t.account_id !== a.id) continue;
       if (a.type === "credit_card") {
-        if (t.kind === "expense" && monthKey(t.date) === month) monthInvoiceCents += t.amount_cents;
+        if (t.kind === "expense" && monthKey(t.date) === month && byMember(t)) monthInvoiceCents += t.amount_cents;
       } else if (t.status === "paid") {
         balanceCents += t.kind === "income" ? t.amount_cents : -t.amount_cents;
       }
@@ -440,6 +496,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
     recurringBills: billsRes.data ?? [],
     budgets,
     comparison,
+    categoriesBreakdown,
     trend,
     members,
     upcoming,
