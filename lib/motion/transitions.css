@@ -484,8 +484,9 @@
 }
 .t-badge {
   position: absolute;
+  /* Ancorado no canto superior direito do ícone (não do botão), para não cobrir o sino. */
   top: 2px;
-  right: 1px;
+  left: calc(50% + 3px);
   pointer-events: none;
   will-change: transform;
 }
