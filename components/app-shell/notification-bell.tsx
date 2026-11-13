@@ -2,7 +2,6 @@
 
 import {
   AlertTriangleIcon,
-  BellIcon,
   CalendarArrowUpIcon,
   CalendarDaysIcon,
   CheckIcon,
@@ -15,7 +14,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toggleTransactionPaid } from "@/lib/actions/finance-family";
 import { markNotificationsRead } from "@/lib/actions/notifications";
@@ -48,6 +46,24 @@ const TONES: Record<NotificationTone, string> = {
   gray: "bg-muted text-muted-foreground",
 };
 
+// Som de aviso do componente original (duas notas curtas, Web Audio).
+function playChime(ctx: AudioContext) {
+  const now = ctx.currentTime;
+  [880, 1318.5].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    const t = now + i * 0.13;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.22, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.75);
+  });
+}
+
 const ACTION_LABEL = { "move-today": "Hoje", complete: "Concluir", pay: "Pagar" } as const;
 const DONE_MESSAGE = { "move-today": "Movida para hoje.", complete: "Tarefa concluída.", pay: "Conta marcada como paga." } as const;
 
@@ -60,8 +76,10 @@ export function NotificationBell() {
   const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
   const known = useRef<Set<string> | null>(null);
-  const lastUnread = useRef(0);
-  const bell = useRef<SVGSVGElement>(null);
+  const lastUnread = useRef<number | null>(null);
+  const audio = useRef<AudioContext | null>(null);
+  const [ring, setRing] = useState(0);
+  const [badgeLabel, setBadgeLabel] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +92,22 @@ export function NotificationBell() {
       }
       known.current = new Set(notifications.map((n) => n.key));
       setItems(notifications);
+
+      // Chegou aviso novo não lido: o sino balança e toca (o som só depois do primeiro carregamento).
+      const count = notifications.filter((n) => !n.read).length;
+      if (count > 0) setBadgeLabel(count > 9 ? "9+" : String(count));
+      if (count > (lastUnread.current ?? 0)) {
+        setRing((r) => r + 1);
+        if (lastUnread.current !== null && audio.current) {
+          try {
+            if (audio.current.state === "suspended") await audio.current.resume();
+            playChime(audio.current);
+          } catch {
+            // Sem som disponível: fica só a animação.
+          }
+        }
+      }
+      lastUnread.current = count;
     } catch {
       // Sem conexão: tenta de novo no próximo ciclo.
     }
@@ -96,17 +130,26 @@ export function NotificationBell() {
   const visible = items?.filter((n) => !leaving.has(n.key)) ?? [];
   const unread = visible.filter((n) => !n.read).length;
 
-  // O sino balança quando aparece aviso novo não lido.
+  // O navegador só libera som depois de um clique ou toque na página.
   useEffect(() => {
-    if (items === null) return;
-    if (unread > lastUnread.current && bell.current) {
-      const el = bell.current;
-      el.dataset.ring = "false";
-      void el.getBoundingClientRect();
-      el.dataset.ring = "true";
-    }
-    lastUnread.current = unread;
-  }, [unread, items]);
+    const unlock = () => {
+      if (audio.current) return;
+      try {
+        const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        audio.current = new AC();
+      } catch {
+        // Sem Web Audio.
+      }
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
+
+  const label = unread > 0 ? (unread > 9 ? "9+" : String(unread)) : badgeLabel;
 
   async function markRead(keys: string[]) {
     if (keys.length === 0) return;
@@ -182,24 +225,29 @@ export function NotificationBell() {
       }}
     >
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative shrink-0"
+        <button
+          type="button"
+          className="nb-bell mx-1 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={unread > 0 ? `Notificações: ${unread} ${unread === 1 ? "nova" : "novas"}` : "Notificações"}
           title="Notificações"
         >
-          <BellIcon ref={bell} className="t-bell" />
-          <span className="t-badge" data-open={unread > 0} aria-hidden="true">
-            <span className="t-badge-dot flex h-4 min-w-4 items-center justify-center overflow-hidden rounded-full bg-red-500 px-1 text-[10px] leading-none font-bold text-white tabular-nums ring-2 ring-background">
-              {unread > 0 && (
-                <span key={unread} className="t-badge-num" data-roll="true">
-                  {unread > 9 ? "9+" : unread}
-                </span>
-              )}
+          <span key={ring} className={cn("nb-ring", ring > 0 && "is-ringing")}>
+            <svg className="hi" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" aria-hidden="true">
+              <path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+            </svg>
+          </span>
+          <span className="t-badge" data-open={unread > 0 ? "true" : "false"} aria-hidden="true">
+            <span className="t-badge-dot">
+              <span key={label + "-" + ring} className="t-digit-group is-animating">
+                {label.split("").map((ch, i) => (
+                  <span className="t-digit" key={i}>
+                    {ch}
+                  </span>
+                ))}
+              </span>
             </span>
           </span>
-        </Button>
+        </button>
       </PopoverTrigger>
 
       <PopoverContent align="end" sideOffset={8} className="w-[min(25rem,calc(100vw-1rem))] gap-0 overflow-hidden rounded-xl p-0">

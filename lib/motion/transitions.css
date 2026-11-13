@@ -464,7 +464,8 @@
   }
 }
 
-/* 03-notification-badge (transitions.dev) + sino que balança: avisos da barra superior */
+/* Notification badge bell ring (transitions.dev studio c255dRhbki0), copiado sem mudanças de movimento.
+   Única adaptação: o círculo do sino tem 36px (a barra superior tem 48px de altura). */
 :root {
   --badge-slide-dur: 260ms;
   --badge-pop-dur: 500ms;
@@ -477,62 +478,92 @@
   --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
   --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+  --ring-dur: 900ms;
+  --ring-angle: 18deg;
+  --ring-ease: cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+.nb-bell {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--background);
+  box-shadow: 0 1px 3px 0 rgba(0,0,0,.04), inset 0 0 0 1px rgba(0,0,0,.08), inset 0 -1px 0 0 rgba(0,0,0,.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  transition: color 150ms var(--ease-smooth-out), background-color 150ms var(--ease-smooth-out);
+}
+.dark .nb-bell {
+  background: rgba(255,255,255,.04);
+  box-shadow: 0 1px 1px 0 rgba(0,0,0,.24), inset 0 0 0 1px rgba(255,255,255,.04), inset 0 1px 0 0 rgba(255,255,255,.06);
+}
+.nb-bell:hover, .nb-bell[aria-expanded="true"] { color: var(--foreground); }
+.dark .nb-bell:hover, .dark .nb-bell[aria-expanded="true"] { background: rgba(255,255,255,.08); }
+.nb-ring { display: flex; transform-origin: 50% 15%; }
+.nb-ring .hi { width: 20px; height: 20px; }
+.nb-ring.is-ringing { animation: nb-ring var(--ring-dur) var(--ring-ease); }
+@keyframes nb-ring {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(var(--ring-angle)); }
+  30% { transform: rotate(calc(var(--ring-angle) * -0.85)); }
+  45% { transform: rotate(calc(var(--ring-angle) * 0.6)); }
+  60% { transform: rotate(calc(var(--ring-angle) * -0.4)); }
+  78% { transform: rotate(calc(var(--ring-angle) * 0.18)); }
+  100% { transform: rotate(0); }
 }
 @keyframes t-badge-slide-in {
   from { transform: translate(var(--badge-offset-x), var(--badge-offset-y)); }
   to { transform: translate(0, 0); }
 }
-.t-badge {
-  position: absolute;
-  /* Ancorado no canto superior direito do ícone (não do botão), para não cobrir o sino. */
-  top: 2px;
-  left: calc(50% + 3px);
-  pointer-events: none;
-  will-change: transform;
-}
-.t-badge[data-open="true"] {
-  animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
-}
+.t-badge { position: absolute; top: -4px; right: -6px; pointer-events: none; }
+.t-badge[data-open="true"] { animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease); }
 .t-badge-dot {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-image: linear-gradient(-51.52deg, rgb(238, 41, 51) 13.929%, rgb(236, 2, 72) 112.7%);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0.338px 1.351px 0 rgba(0,0,0,.17), 0 0.676px 2.703px 0 rgba(0,0,0,.04), inset 0 -0.338px 0 0 rgba(0,0,0,.16);
   transform-origin: center;
   transform: scale(1);
   opacity: 1;
   filter: blur(0);
-  transition:
-    transform var(--badge-pop-dur) var(--badge-pop-ease),
-    opacity var(--badge-fade-dur) var(--badge-pop-ease),
-    filter var(--badge-pop-dur) var(--badge-pop-ease);
-  will-change: transform, opacity, filter;
+  transition: transform var(--badge-pop-dur) var(--badge-pop-ease), opacity var(--badge-fade-dur) var(--badge-pop-ease), filter var(--badge-pop-dur) var(--badge-pop-ease);
 }
 .t-badge[data-open="false"] .t-badge-dot {
   transform: scale(0);
   opacity: 0;
   filter: blur(var(--badge-blur));
-  transition:
-    transform var(--badge-pop-close-dur) var(--badge-close-ease),
-    opacity var(--badge-fade-close-dur) var(--badge-close-ease),
-    filter var(--badge-pop-close-dur) var(--badge-close-ease);
+  transition: transform var(--badge-pop-close-dur) var(--badge-close-ease), opacity var(--badge-fade-close-dur) var(--badge-close-ease), filter var(--badge-pop-close-dur) var(--badge-close-ease);
 }
-/* O número rola ao mudar */
-.t-badge-num { display: block; }
-.t-badge-num[data-roll="true"] { animation: t-badge-roll 320ms var(--ease-smooth-out); }
-@keyframes t-badge-roll {
-  from { transform: translateY(70%); opacity: 0; filter: blur(1px); }
-  to { transform: none; opacity: 1; filter: none; }
+@keyframes t-digit-pop-in {
+  0% { transform: translate(calc(var(--digit-distance) * var(--digit-dir-x)), calc(var(--digit-distance) * var(--digit-dir-y))); opacity: 0; filter: blur(var(--digit-blur)); }
+  100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
 }
-/* O sino balança quando chega aviso novo */
-.t-bell { transform-origin: 50% 2px; }
-.t-bell[data-ring="true"] { animation: t-bell-ring 700ms var(--ease-smooth-out); }
-@keyframes t-bell-ring {
-  0% { transform: rotate(0); }
-  12% { transform: rotate(16deg); }
-  26% { transform: rotate(-13deg); }
-  40% { transform: rotate(9deg); }
-  54% { transform: rotate(-6deg); }
-  68% { transform: rotate(3deg); }
-  100% { transform: rotate(0); }
+.t-digit-group { display: inline-flex; align-items: baseline; }
+.t-digit { display: inline-block; }
+.t-digit-group.is-animating .t-digit { animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both; }
+@media (prefers-reduced-motion: reduce) {
+  .nb-ring.is-ringing { animation: none; }
+  .t-badge, .t-badge-dot, .t-digit-group .t-digit { animation: none !important; transition: none !important; }
 }
+
 /* Aviso novo entra; aviso resolvido sai para a direita e fecha o espaço */
 .t-notif-item {
   display: grid;
@@ -550,5 +581,5 @@
   to { opacity: 1; transform: none; filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .t-badge, .t-badge-dot, .t-badge-num, .t-bell, .t-notif-item { animation: none !important; transition: none !important; }
+  .t-notif-item { animation: none !important; transition: none !important; }
 }
