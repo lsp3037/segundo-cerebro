@@ -6,14 +6,8 @@ import { toast } from "sonner";
 import { saveInvestment } from "@/lib/actions/finance-investments";
 import { todayIso, type IsoDate } from "@/lib/dates";
 import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
-import {
-  COFRINHO_DEFAULT_TIERS,
-  fixedDailyFactor,
-  tieredDailyYield,
-  type RateTier,
-} from "@/lib/finance/investments";
 import type { InvestmentRateInput, InvestmentView } from "@/lib/finance/investments-data";
-import { centsToInput, formatCentsToBrl, inputToCents } from "@/lib/money";
+import { formatCentsToBrl, inputToCents } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,11 +21,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { estimateDailyYield, RateFields, useRateFields, type RateResult } from "./investment-rate-fields";
 
 const NO_OWNER = "none";
 const DEFAULT_NAME = "Cofrinho";
-
-type RateMode = "cdi" | "annual";
 
 interface InvestmentDialogProps {
   open: boolean;
@@ -86,17 +79,6 @@ interface InvestmentFormProps {
   onDone: () => void;
 }
 
-function parsePercent(text: string): number {
-  const value = Number.parseFloat(text.trim().replace(",", "."));
-  return Number.isFinite(value) ? value : Number.NaN;
-}
-
-function formatPercentInput(value: number): string {
-  return String(value).replace(".", ",");
-}
-
-const [DEFAULT_LOW_TIER, DEFAULT_HIGH_TIER] = COFRINHO_DEFAULT_TIERS;
-
 function InvestmentForm({ investmentToEdit, cdiDailyPercent, today, defaultOwner, onDone }: InvestmentFormProps) {
   const [isPending, startTransition] = useTransition();
   const isEditing = investmentToEdit !== null;
@@ -109,14 +91,10 @@ function InvestmentForm({ investmentToEdit, cdiDailyPercent, today, defaultOwner
 
   const [amountStr, setAmountStr] = useState("");
   const [startDate, setStartDate] = useState<IsoDate>(today);
-  const [mode, setMode] = useState<RateMode>("cdi");
-  const [lowPercentStr, setLowPercentStr] = useState(formatPercentInput(DEFAULT_LOW_TIER.ofCdiPercent));
-  const [capStr, setCapStr] = useState(centsToInput(DEFAULT_LOW_TIER.upToCents));
-  const [highPercentStr, setHighPercentStr] = useState(formatPercentInput(DEFAULT_HIGH_TIER.ofCdiPercent));
-  const [annualStr, setAnnualStr] = useState("");
+  const rateFields = useRateFields();
+  const { rate } = rateFields;
 
   const amountCents = inputToCents(amountStr);
-  const rate = buildRate({ mode, lowPercentStr, capStr, highPercentStr, annualStr });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -247,18 +225,7 @@ function InvestmentForm({ investmentToEdit, cdiDailyPercent, today, defaultOwner
               : "Se não tiver certeza, deixe hoje. O valor começa a render no próximo dia útil."}
           </p>
 
-          <RateFields
-            mode={mode}
-            onModeChange={setMode}
-            lowPercentStr={lowPercentStr}
-            onLowPercentChange={setLowPercentStr}
-            capStr={capStr}
-            onCapChange={setCapStr}
-            highPercentStr={highPercentStr}
-            onHighPercentChange={setHighPercentStr}
-            annualStr={annualStr}
-            onAnnualChange={setAnnualStr}
-          />
+          <RateFields values={rateFields.values} onChange={rateFields.update} />
 
           <YieldPreview amountCents={amountCents} rate={rate.ok ? rate.value : null} cdiDailyPercent={cdiDailyPercent} />
         </>
@@ -274,119 +241,11 @@ function InvestmentForm({ investmentToEdit, cdiDailyPercent, today, defaultOwner
   );
 }
 
-type RateFieldsProps = {
-  mode: RateMode;
-  onModeChange: (mode: RateMode) => void;
-  lowPercentStr: string;
-  onLowPercentChange: (value: string) => void;
-  capStr: string;
-  onCapChange: (value: string) => void;
-  highPercentStr: string;
-  onHighPercentChange: (value: string) => void;
-  annualStr: string;
-  onAnnualChange: (value: string) => void;
-};
-
-function RateFields(props: RateFieldsProps) {
-  return (
-    <fieldset className="space-y-3 rounded-lg border border-border p-3">
-      <legend className="px-1 text-xs font-medium text-foreground">Quanto rende</legend>
-      <Select value={props.mode} onValueChange={(value) => props.onModeChange(value as RateMode)}>
-        <SelectTrigger className="w-full text-xs" aria-label="Tipo de taxa">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="cdi" className="text-xs">CDI em faixas (como o Cofrinho)</SelectItem>
-          <SelectItem value="annual" className="text-xs">Taxa fixa ao ano</SelectItem>
-        </SelectContent>
-      </Select>
-
-      {props.mode === "cdi" ? (
-        <>
-          <p className="text-xs text-muted-foreground">
-            O CDI é a taxa de referência dos bancos. Já vem com o padrão do Cofrinho: 120% do CDI até R$ 10.000 e 100% no que passar.
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <PercentField id="tier-low" label="% do CDI até o teto" value={props.lowPercentStr} onChange={props.onLowPercentChange} />
-            <div>
-              <Label htmlFor="tier-cap" className="text-xs">Teto (R$)</Label>
-              <Input
-                id="tier-cap"
-                inputMode="decimal"
-                value={props.capStr}
-                onChange={(e) => props.onCapChange(e.target.value)}
-                className="mt-1 font-mono text-sm"
-              />
-            </div>
-            <PercentField id="tier-high" label="% do CDI acima" value={props.highPercentStr} onChange={props.onHighPercentChange} />
-          </div>
-        </>
-      ) : (
-        <PercentField id="annual-rate" label="Taxa ao ano (%)" value={props.annualStr} onChange={props.onAnnualChange} placeholder="Ex: 10,5" />
-      )}
-    </fieldset>
-  );
-}
-
-function PercentField({
-  id,
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <Label htmlFor={id} className="text-xs">{label}</Label>
-      <Input
-        id={id}
-        inputMode="decimal"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="mt-1 font-mono text-sm"
-      />
-    </div>
-  );
-}
-
-type RateResult = { ok: true; value: InvestmentRateInput } | { ok: false; error: string };
-
 // Mensagem do primeiro problema do formulário de criação, ou null se estiver tudo certo.
 function validateCreation(amountCents: number, startDate: IsoDate, today: IsoDate, rate: RateResult): string | null {
   if (amountCents <= 0) return "Informe quanto você tem lá hoje (maior que R$ 0,00).";
   if (!startDate || startDate > today) return "Escolha um dia até hoje.";
   return rate.ok ? null : rate.error;
-}
-
-function buildRate(fields: {
-  mode: RateMode;
-  lowPercentStr: string;
-  capStr: string;
-  highPercentStr: string;
-  annualStr: string;
-}): RateResult {
-  if (fields.mode === "annual") {
-    const annualPercent = parsePercent(fields.annualStr);
-    if (!(annualPercent > 0)) return { ok: false, error: "Informe a taxa ao ano (maior que zero)." };
-    return { ok: true, value: { mode: "annual", annualPercent } };
-  }
-  const low = parsePercent(fields.lowPercentStr);
-  const high = parsePercent(fields.highPercentStr);
-  const capCents = inputToCents(fields.capStr);
-  if (!(low >= 0) || !(high >= 0)) return { ok: false, error: "Informe os percentuais do CDI." };
-  if (capCents <= 0) return { ok: false, error: "Informe o teto da primeira faixa (maior que R$ 0,00)." };
-  const tiers: RateTier[] = [
-    { upToCents: capCents, ofCdiPercent: low },
-    { upToCents: null, ofCdiPercent: high },
-  ];
-  return { ok: true, value: { mode: "cdi", tiers } };
 }
 
 function YieldPreview({
@@ -412,9 +271,6 @@ function previewMessage(amountCents: number, rate: InvestmentRateInput | null, c
   if (rate.mode === "cdi" && cdiDailyPercent === null) {
     return "A prévia aparece quando o CDI do Banco Central estiver disponível.";
   }
-  const daily =
-    rate.mode === "annual"
-      ? amountCents * fixedDailyFactor(rate.annualPercent)
-      : tieredDailyYield(amountCents, rate.tiers, (cdiDailyPercent ?? 0) / 100);
+  const daily = estimateDailyYield(amountCents, rate, cdiDailyPercent) ?? 0;
   return `Rende cerca de ${formatCentsToBrl(Math.round(daily))} por dia útil.`;
 }

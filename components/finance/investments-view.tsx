@@ -8,6 +8,7 @@ import {
   MoreHorizontalIcon,
   PencilIcon,
   PiggyBankIcon,
+  PercentIcon,
   PlusIcon,
   ScaleIcon,
   Trash2Icon,
@@ -17,7 +18,7 @@ import { toast } from "sonner";
 import { deleteInvestment } from "@/lib/actions/finance-investments";
 import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { IsoDate } from "@/lib/dates";
-import type { NonBusinessReason, RateEntry } from "@/lib/finance/investments";
+import type { NonBusinessReason } from "@/lib/finance/investments";
 import type {
   CdiInfo,
   InvestmentMovementView,
@@ -34,13 +35,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { monthNameLong } from "./getting-started";
-import { signedBrl } from "./investment-format";
+import { describeRate, formatPercent, signedBrl } from "./investment-format";
 import { InvestmentHistory } from "./investment-history";
 import {
   InvestmentMovementDialog,
   type MovementDialogTarget,
   type MovementKindInput,
 } from "./investment-movement-dialog";
+import { InvestmentRateDialog } from "./investment-rate-dialog";
+import { InvestmentRateHistory } from "./investment-rate-history";
 import { InvestmentReconcileDialog } from "./investment-reconcile-dialog";
 import { toastWithUndo } from "./pay-toggle";
 import { AnimatedBrl } from "./transitions";
@@ -61,33 +64,6 @@ const NON_BUSINESS_LABEL: Record<NonBusinessReason, string> = {
 // ---------------------------------------------------------------------------
 // Formatação
 // ---------------------------------------------------------------------------
-
-const wholeBrl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-
-// "R$ 10.000" quando não há centavos; senão "R$ 10.000,50".
-function formatBrlCompact(cents: number): string {
-  return cents % 100 === 0 ? wholeBrl.format(cents / 100) : formatCentsToBrl(cents);
-}
-
-function formatPercent(value: number, fractionDigits?: number): string {
-  return value.toLocaleString("pt-BR", {
-    minimumFractionDigits: fractionDigits ?? 0,
-    maximumFractionDigits: fractionDigits ?? 2,
-  });
-}
-
-// "120% do CDI até R$ 10.000, 100% acima" ou "10,00% ao ano".
-function describeRate(rate: RateEntry | null): string {
-  if (!rate) return "Taxa não informada";
-  if (rate.mode === "annual") return `${formatPercent(rate.annualPercent, 2)}% ao ano`;
-  if (rate.tiers.length === 1) return `${formatPercent(rate.tiers[0].ofCdiPercent)}% do CDI`;
-  return rate.tiers
-    .map((tier, index) => {
-      const percent = `${formatPercent(tier.ofCdiPercent)}%${index === 0 ? " do CDI" : ""}`;
-      return tier.upToCents === null ? `${percent} acima` : `${percent} até ${formatBrlCompact(tier.upToCents)}`;
-    })
-    .join(", ");
-}
 
 // "2026-11-12" → "12/11"
 function formatDayMonth(iso: IsoDate): string {
@@ -129,6 +105,7 @@ export function InvestmentsView({ data, month, memberFilter, onNewInvestment, on
                 investment={investment}
                 monthLabel={monthLabel}
                 today={data.today}
+                cdiDailyPercent={data.cdi.dailyPercent}
                 onEdit={() => onEditInvestment(investment)}
               />
             ))}
@@ -249,12 +226,13 @@ function CdiLine({ cdi }: { cdi: CdiInfo }) {
 // Cartão de cada investimento
 // ---------------------------------------------------------------------------
 
-// Diálogos de um cartão: "Guardei"/"Resgatei" (novo ou edição pelo histórico) e "Acertar com o app".
+// Diálogos de um cartão: "Guardei"/"Resgatei" (novo ou edição pelo histórico), "Acertar com o app" e "Mudar taxa".
 // O alvo do movimento fica guardado ao fechar, para o diálogo não sumir no meio da animação.
 function useCardDialogs(investment: InvestmentView) {
   const [movementTarget, setMovementTarget] = useState<MovementDialogTarget | null>(null);
   const [isMovementOpen, setMovementOpen] = useState(false);
   const [isReconcileOpen, setReconcileOpen] = useState(false);
+  const [isRateOpen, setRateOpen] = useState(false);
 
   const openMovement = (kind: MovementKindInput, movement: InvestmentMovementView | null = null) => {
     setMovementTarget({ investment, kind, movement });
@@ -272,6 +250,8 @@ function useCardDialogs(investment: InvestmentView) {
     setMovementOpen,
     isReconcileOpen,
     setReconcileOpen,
+    isRateOpen,
+    setRateOpen,
     openMovement,
     editMovement,
   };
@@ -281,11 +261,13 @@ function InvestmentCard({
   investment,
   monthLabel,
   today,
+  cdiDailyPercent,
   onEdit,
 }: {
   investment: InvestmentView;
   monthLabel: string;
   today: IsoDate;
+  cdiDailyPercent: number | null;
   onEdit: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -330,6 +312,10 @@ function InvestmentCard({
             <DropdownMenuItem onSelect={() => dialogs.setReconcileOpen(true)}>
               <ScaleIcon className="size-4" />
               <span>Acertar com o app</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => dialogs.setRateOpen(true)}>
+              <PercentIcon className="size-4" />
+              <span>Mudar taxa</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onEdit}>
@@ -387,7 +373,10 @@ function InvestmentCard({
 
       {investment.notes && <p className="mt-3 text-xs whitespace-pre-line text-muted-foreground">{investment.notes}</p>}
 
-      <InvestmentHistory movements={investment.movements} today={today} onEditMovement={dialogs.editMovement} />
+      <div className="mt-4 border-t border-border pt-2">
+        <InvestmentHistory movements={investment.movements} today={today} onEditMovement={dialogs.editMovement} />
+        <InvestmentRateHistory investmentId={investment.id} rates={investment.rates} currentRate={summary.currentRate} />
+      </div>
 
       <InvestmentMovementDialog
         open={dialogs.isMovementOpen}
@@ -399,6 +388,13 @@ function InvestmentCard({
         open={dialogs.isReconcileOpen}
         onOpenChange={dialogs.setReconcileOpen}
         investment={investment}
+      />
+      <InvestmentRateDialog
+        open={dialogs.isRateOpen}
+        onOpenChange={dialogs.setRateOpen}
+        investment={investment}
+        cdiDailyPercent={cdiDailyPercent}
+        today={today}
       />
     </article>
   );

@@ -106,17 +106,21 @@ export function movementsWithout(state: InvestmentState, movementId: string | nu
   return state.movements.filter((movement) => movement.id !== movementId);
 }
 
-function overdrawnDateOf(state: InvestmentState, movements: InvestmentMovement[]): IsoDate | null {
-  return firstOverdrawnDate(movements, state.rates, state.cdiByDate, state.today);
+function overdrawnDateOf(state: InvestmentState, movements: InvestmentMovement[], rates: RateEntry[]): IsoDate | null {
+  return firstOverdrawnDate(movements, rates, state.cdiByDate, state.today);
 }
 
-// Primeiro dia em que `planned` deixa o saldo negativo, ou null. Se o histórico atual já estava negativo
-// (ex.: taxa mudada depois de um "Resgatar tudo"), só barra quando a mudança antecipa esse dia,
-// para o investimento não ficar travado.
-export function newOverdrawnDate(state: InvestmentState, planned: InvestmentMovement[]): IsoDate | null {
-  const date = overdrawnDateOf(state, planned);
+// Primeiro dia em que `planned` (com as taxas `plannedRates`) deixa o saldo negativo, ou null. Se o histórico
+// atual já estava negativo (ex.: taxa mudada depois de um "Resgatar tudo"), só barra quando a mudança
+// antecipa esse dia, para o investimento não ficar travado.
+export function newOverdrawnDate(
+  state: InvestmentState,
+  planned: InvestmentMovement[],
+  plannedRates: RateEntry[] = state.rates,
+): IsoDate | null {
+  const date = overdrawnDateOf(state, planned, plannedRates);
   if (date === null) return null;
-  const current = overdrawnDateOf(state, state.movements);
+  const current = overdrawnDateOf(state, state.movements, state.rates);
   return current === null || date < current ? date : null;
 }
 

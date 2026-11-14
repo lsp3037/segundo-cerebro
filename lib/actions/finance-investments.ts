@@ -15,11 +15,13 @@ import {
 import { addDays, todayIso } from "@/lib/dates";
 import { serializeRateChanges, type InvestmentMovement, type MovementKind, type RateEntry } from "@/lib/finance/investments";
 import type {
+  DeleteInvestmentRateInput,
   InvestmentRateInput,
   ReconcileInvestmentInput,
   ReconcileInvestmentResult,
   SaveInvestmentInput,
   SaveInvestmentMovementInput,
+  SaveInvestmentRateInput,
 } from "@/lib/finance/investments-data";
 import { formatCentsToBrl } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +30,9 @@ import { type ActionResult, fail, ok } from "./result";
 // Arquivo "use server": só exporta funções assíncronas (schemas e constantes ficam internos).
 
 const MAX_PERCENT = 1000;
+const MAX_ANNUAL_PERCENT = 100;
+// Mudança de taxa agendada: no máximo cerca de 1 ano à frente.
+const MAX_RATE_DAYS_AHEAD = 366;
 const MAX_TIERS = 10;
 // R$ 1 bilhão: teto de sanidade para valores digitados.
 const MAX_AMOUNT_CENTS = 100_000_000_000;
@@ -69,7 +74,13 @@ const rateSchema = z.discriminatedUnion(
   "mode",
   [
     z.object({ mode: z.literal("cdi"), tiers: tiersSchema }),
-    z.object({ mode: z.literal("annual"), annualPercent: percentSchema }),
+    z.object({
+      mode: z.literal("annual"),
+      annualPercent: z
+        .number({ error: "Informe a taxa ao ano." })
+        .min(0, "A taxa não pode ser negativa.")
+        .max(MAX_ANNUAL_PERCENT, `A taxa ao ano vai até ${MAX_ANNUAL_PERCENT}%.`),
+    }),
   ],
   { error: "Escolha o tipo de taxa." },
 );
@@ -112,6 +123,17 @@ const reconcileSchema = z.object({
     .int("Valor inválido.")
     .min(0, "O valor não pode ser negativo.")
     .max(MAX_AMOUNT_CENTS, "Valor alto demais."),
+});
+
+const saveRateSchema = z.object({
+  investmentId: uuidSchema,
+  from: isoDateSchema,
+  rate: rateSchema,
+});
+
+const deleteRateSchema = z.object({
+  investmentId: uuidSchema,
+  from: isoDateSchema,
 });
 
 function toRateEntry(rate: InvestmentRateInput, from: string): RateEntry {
@@ -411,4 +433,89 @@ export async function reconcileInvestment(input: ReconcileInvestmentInput): Prom
   if (!inserted.ok) return inserted;
   revalidatePath("/", "layout");
   return ok({ adjustmentId: inserted.data, adjustmentCents });
+}
+
+// ---------------------------------------------------------------------------
+// Mudar taxa / histórico de taxas
+// ---------------------------------------------------------------------------
+
+// Entrada de taxa como o formulário envia (e como o "Desfazer" devolve para `saveInvestmentRate`).
+type RateChangeInput = Omit<SaveInvestmentRateInput, "investmentId">;
+
+function toRateChangeInput(entry: RateEntry): RateChangeInput {
+  const rate: InvestmentRateInput =
+    entry.mode === "cdi" ? { mode: "cdi", tiers: entry.tiers } : { mode: "annual", annualPercent: entry.annualPercent };
+  return { from: entry.from, rate };
+}
+
+// Mudar a taxa no passado refaz o rendimento desde então; se um resgate gravado passar a ser maior
+// que o saldo, a mudança é barrada (mesma regra dos movimentos).
+function rateOverdraftError(state: InvestmentState, rates: RateEntry[], prefix: string): string | null {
+  const date = newOverdrawnDate(state, state.movements, rates);
+  return date ? `${prefix}, o saldo ficaria negativo em ${formatDayMonth(date, state.today)}. Ajuste o resgate antes.` : null;
+}
+
+async function writeRates(userId: string, investmentId: string, rates: RateEntry[]): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_investments")
+    .update({ rate_changes: serializeRateChanges(rates), updated_at: new Date().toISOString() })
+    .eq("id", investmentId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("writeRates error:", error);
+    return fail("Não foi possível salvar a taxa.");
+  }
+  return data ? ok() : fail("Investimento não encontrado.");
+}
+
+// "Mudar taxa": vale de `from` em diante (passado ou até ~1 ano à frente). A mesma data substitui a entrada.
+export async function saveInvestmentRate(input: SaveInvestmentRateInput): Promise<ActionResult<null>> {
+  const user = await getCurrentUser();
+  const parsed = saveRateSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const d = parsed.data;
+  if (d.from > addDays(todayIso(), MAX_RATE_DAYS_AHEAD)) return fail("A data pode ser no máximo daqui a um ano.");
+
+  const loaded = await loadInvestmentState(user.id, d.investmentId);
+  if (!loaded.ok) return loaded;
+  const state = loaded.data;
+  const rates = [...state.rates.filter((rate) => rate.from !== d.from), toRateEntry(d.rate, d.from)].sort((a, b) =>
+    a.from.localeCompare(b.from),
+  );
+  const blocker = rateOverdraftError(state, rates, "Com essa taxa");
+  if (blocker) return fail(blocker);
+
+  const result = await writeRates(user.id, d.investmentId, rates);
+  if (!result.ok) return result;
+  revalidatePath("/", "layout");
+  return ok(null);
+}
+
+// Remove uma entrada do histórico de taxas (nunca a única). Devolve a entrada removida no formato de
+// `saveInvestmentRate` para o "Desfazer": saveInvestmentRate({ investmentId, ...removed }).
+export async function deleteInvestmentRate(input: DeleteInvestmentRateInput): Promise<ActionResult<{ removed: RateChangeInput }>> {
+  const user = await getCurrentUser();
+  const parsed = deleteRateSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const d = parsed.data;
+
+  const loaded = await loadInvestmentState(user.id, d.investmentId);
+  if (!loaded.ok) return loaded;
+  const state = loaded.data;
+  // Na mesma data vale a última entrada (como em `parseRateChanges`).
+  const removed = state.rates.filter((rate) => rate.from === d.from).at(-1);
+  if (!removed) return fail("Essa taxa não foi encontrada.");
+  const rates = state.rates.filter((rate) => rate.from !== d.from);
+  if (rates.length === 0) return fail("O investimento precisa ter pelo menos uma taxa.");
+  const blocker = rateOverdraftError(state, rates, "Sem essa taxa");
+  if (blocker) return fail(blocker);
+
+  const result = await writeRates(user.id, d.investmentId, rates);
+  if (!result.ok) return result;
+  revalidatePath("/", "layout");
+  return ok({ removed: toRateChangeInput(removed) });
 }

@@ -43,7 +43,7 @@ export function InvestmentHistory({ movements, today, onEditMovement }: Investme
   if (movements.length === 0) return null;
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-4 border-t border-border pt-2">
+    <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
         <Button variant="ghost" size="sm" className="-ml-2 h-8 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground">
           {open ? "Esconder histórico" : `Ver histórico (${movements.length})`}

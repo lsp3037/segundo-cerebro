@@ -84,6 +84,19 @@ export type ReconcileInvestmentInput = {
   appValueCents: number; // >= 0
 };
 
+// "Mudar taxa": nova taxa a partir de uma data. A mesma data substitui a entrada existente.
+export type SaveInvestmentRateInput = {
+  investmentId: string;
+  from: IsoDate; // pode ser passada ou futura
+  rate: InvestmentRateInput;
+};
+
+// Remover uma entrada do histórico de taxas (nunca a única). `from` identifica a entrada.
+export type DeleteInvestmentRateInput = {
+  investmentId: string;
+  from: IsoDate;
+};
+
 // Resultado do acerto: id do ajuste criado (null quando já estava igual) e a diferença aplicada.
 export type ReconcileInvestmentResult = {
   adjustmentId: string | null;
