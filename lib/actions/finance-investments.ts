@@ -4,9 +4,24 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
+import {
+  formatDayMonth,
+  loadInvestmentState,
+  movementsWithout,
+  newOverdrawnDate,
+  valueOn,
+  type InvestmentState,
+} from "@/lib/data/finance-investment-state";
 import { addDays, todayIso } from "@/lib/dates";
-import { serializeRateChanges, type RateEntry } from "@/lib/finance/investments";
-import type { InvestmentRateInput, SaveInvestmentInput } from "@/lib/finance/investments-data";
+import { serializeRateChanges, type InvestmentMovement, type MovementKind, type RateEntry } from "@/lib/finance/investments";
+import type {
+  InvestmentRateInput,
+  ReconcileInvestmentInput,
+  ReconcileInvestmentResult,
+  SaveInvestmentInput,
+  SaveInvestmentMovementInput,
+} from "@/lib/finance/investments-data";
+import { formatCentsToBrl } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { type ActionResult, fail, ok } from "./result";
 
@@ -14,6 +29,11 @@ import { type ActionResult, fail, ok } from "./result";
 
 const MAX_PERCENT = 1000;
 const MAX_TIERS = 10;
+// R$ 1 bilhão: teto de sanidade para valores digitados.
+const MAX_AMOUNT_CENTS = 100_000_000_000;
+const RECONCILE_NOTE = "Acerto com o app";
+
+const MOVEMENT_NOUN: Record<MovementKind, string> = { deposit: "aporte", withdrawal: "resgate", adjustment: "ajuste" };
 
 const uuidSchema = z.string().uuid("ID inválido.");
 
@@ -69,6 +89,30 @@ const saveInvestmentSchema = z.object({
 });
 
 type ParsedInvestment = z.infer<typeof saveInvestmentSchema>;
+
+const saveMovementSchema = z.object({
+  id: uuidSchema.optional(),
+  investmentId: uuidSchema,
+  kind: z.enum(["deposit", "withdrawal"], { error: "Escolha se você guardou ou resgatou." }),
+  amountCents: z
+    .number({ error: "Informe o valor." })
+    .int("Valor inválido.")
+    .positive("O valor deve ser maior que zero.")
+    .max(MAX_AMOUNT_CENTS, "Valor alto demais."),
+  date: isoDateSchema,
+  note: z.string().trim().max(500, "Use até 500 caracteres na observação.").nullable().optional(),
+});
+
+type ParsedMovement = z.infer<typeof saveMovementSchema>;
+
+const reconcileSchema = z.object({
+  investmentId: uuidSchema,
+  appValueCents: z
+    .number({ error: "Informe o valor que aparece no app." })
+    .int("Valor inválido.")
+    .min(0, "O valor não pode ser negativo.")
+    .max(MAX_AMOUNT_CENTS, "Valor alto demais."),
+});
 
 function toRateEntry(rate: InvestmentRateInput, from: string): RateEntry {
   return rate.mode === "cdi" ? { from, mode: "cdi", tiers: rate.tiers } : { from, mode: "annual", annualPercent: rate.annualPercent };
@@ -172,4 +216,199 @@ export async function deleteInvestment(investmentId: string): Promise<ActionResu
 
   revalidatePath("/", "layout");
   return ok();
+}
+
+// ---------------------------------------------------------------------------
+// Guardei / Resgatei
+// ---------------------------------------------------------------------------
+
+// Na edição, o movimento precisa ser deste investimento, estar ativo e não ser um ajuste.
+function editBlocker(state: InvestmentState, movementId: string): string | null {
+  const current = state.movements.find((movement) => movement.id === movementId);
+  if (!current) return "Movimento não encontrado.";
+  if (current.kind === "adjustment") return 'Ajustes não podem ser editados. Exclua o ajuste e use "Acertar com o app" de novo.';
+  return null;
+}
+
+// Mensagem quando a mudança deixaria o saldo negativo em alguma data; null se está tudo certo.
+function movementOverdraftError(state: InvestmentState, d: ParsedMovement): string | null {
+  const others = movementsWithout(state, d.id ?? null);
+  const change: InvestmentMovement = { date: d.date, kind: d.kind, amountCents: d.amountCents };
+  const date = newOverdrawnDate(state, [...others, change]);
+  if (date === null) return null;
+  const day = formatDayMonth(date, state.today);
+  if (d.kind === "withdrawal" && date === d.date) {
+    return `Você só tem ${formatCentsToBrl(Math.max(0, valueOn(state, others, date)))} em ${day}.`;
+  }
+  return `${d.id ? "Com essa mudança" : "Com esse resgate"}, o saldo ficaria negativo em ${day}.`;
+}
+
+async function insertMovement(userId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_investment_movements")
+    .insert({
+      user_id: userId,
+      investment_id: d.investmentId,
+      kind: d.kind,
+      date: d.date,
+      amount_cents: d.amountCents,
+      note: d.note || null,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("insertMovement error:", error);
+    return fail("Não foi possível registrar o movimento.");
+  }
+  return ok({ id: data.id });
+}
+
+async function updateMovement(userId: string, movementId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_investment_movements")
+    .update({
+      kind: d.kind,
+      date: d.date,
+      amount_cents: d.amountCents,
+      // Observação ausente mantém a atual.
+      ...(d.note !== undefined && { note: d.note || null }),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", movementId)
+    .eq("user_id", userId)
+    .eq("investment_id", d.investmentId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("updateMovement error:", error);
+    return fail("Não foi possível atualizar o movimento.");
+  }
+  if (!data) return fail("Movimento não encontrado.");
+  return ok({ id: data.id });
+}
+
+// "Guardei" / "Resgatei" (cria) ou edição de um aporte/resgate (com `id`). Recusa se o saldo ficar negativo.
+export async function saveInvestmentMovement(input: SaveInvestmentMovementInput): Promise<ActionResult<{ id: string }>> {
+  const user = await getCurrentUser();
+  const parsed = saveMovementSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const d = parsed.data;
+  if (d.date > todayIso()) return fail("A data não pode ser no futuro.");
+
+  const loaded = await loadInvestmentState(user.id, d.investmentId, [d.date]);
+  if (!loaded.ok) return loaded;
+  const blocker = (d.id ? editBlocker(loaded.data, d.id) : null) ?? movementOverdraftError(loaded.data, d);
+  if (blocker) return fail(blocker);
+
+  const result = d.id ? await updateMovement(user.id, d.id, d) : await insertMovement(user.id, d);
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+// Investimento de um movimento ativo do usuário.
+async function findMovementInvestmentId(userId: string, movementId: string): Promise<ActionResult<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_investment_movements")
+    .select("investment_id")
+    .eq("id", movementId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) {
+    console.error("findMovementInvestmentId error:", error);
+    return fail("Não foi possível excluir o movimento.");
+  }
+  return data ? ok(data.investment_id) : fail("Movimento não encontrado.");
+}
+
+function deletionOverdraftError(state: InvestmentState, movementId: string): string | null {
+  const movement = state.movements.find((item) => item.id === movementId);
+  if (!movement) return "Movimento não encontrado.";
+  const date = newOverdrawnDate(state, movementsWithout(state, movementId));
+  return date ? `Sem esse ${MOVEMENT_NOUN[movement.kind]}, o saldo ficaria negativo em ${formatDayMonth(date, state.today)}.` : null;
+}
+
+async function softDeleteMovement(userId: string, movementId: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("finance_investment_movements")
+    .update({ deleted_at: now, updated_at: now })
+    .eq("id", movementId)
+    .eq("user_id", userId)
+    .is("deleted_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error) {
+    console.error("softDeleteMovement error:", error);
+    return fail("Não foi possível excluir o movimento.");
+  }
+  return data ? ok() : fail("Movimento não encontrado.");
+}
+
+// Vai para a lixeira; o "Desfazer" usa `restoreFinanceItem("investment_movement", id)`.
+// Excluir o único movimento é permitido (o investimento fica zerado).
+export async function deleteInvestmentMovement(movementId: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!uuidSchema.safeParse(movementId).success) return fail("Movimento inválido.");
+
+  const investment = await findMovementInvestmentId(user.id, movementId);
+  if (!investment.ok) return investment;
+  const loaded = await loadInvestmentState(user.id, investment.data);
+  if (!loaded.ok) return loaded;
+  const blocker = deletionOverdraftError(loaded.data, movementId);
+  if (blocker) return fail(blocker);
+
+  const result = await softDeleteMovement(user.id, movementId);
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Acertar com o app
+// ---------------------------------------------------------------------------
+
+async function insertAdjustment(userId: string, investmentId: string, adjustment: InvestmentMovement): Promise<ActionResult<string>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("finance_investment_movements")
+    .insert({
+      user_id: userId,
+      investment_id: investmentId,
+      kind: "adjustment",
+      date: adjustment.date,
+      amount_cents: adjustment.amountCents,
+      note: RECONCILE_NOTE,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("insertAdjustment error:", error);
+    return fail("Não foi possível acertar o valor.");
+  }
+  return ok(data.id);
+}
+
+// Grava hoje um ajuste com a diferença entre o app do banco e a nossa estimativa (nada, se já bate).
+// Como o valor do app é >= 0, o saldo depois do ajuste não fica negativo.
+export async function reconcileInvestment(input: ReconcileInvestmentInput): Promise<ActionResult<ReconcileInvestmentResult>> {
+  const user = await getCurrentUser();
+  const parsed = reconcileSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0].message);
+
+  const loaded = await loadInvestmentState(user.id, parsed.data.investmentId);
+  if (!loaded.ok) return loaded;
+  const state = loaded.data;
+  const adjustmentCents = parsed.data.appValueCents - valueOn(state, state.movements, state.today);
+  if (adjustmentCents === 0) return ok({ adjustmentId: null, adjustmentCents: 0 });
+
+  const adjustment: InvestmentMovement = { date: state.today, kind: "adjustment", amountCents: adjustmentCents };
+  const inserted = await insertAdjustment(user.id, parsed.data.investmentId, adjustment);
+  if (!inserted.ok) return inserted;
+  revalidatePath("/", "layout");
+  return ok({ adjustmentId: inserted.data, adjustmentCents });
 }

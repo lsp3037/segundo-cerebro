@@ -1,8 +1,8 @@
 import "server-only";
 
 import { getCurrentUser } from "@/lib/auth";
-import { addDays, todayIso, type IsoDate } from "@/lib/dates";
-import { isBusinessDay, isWeekend, previousBusinessDay } from "@/lib/finance/business-days";
+import { todayIso, type IsoDate } from "@/lib/dates";
+import { isBusinessDay, isWeekend } from "@/lib/finance/business-days";
 import {
   parseRateChanges,
   simulateInvestment,
@@ -18,11 +18,7 @@ import type {
 } from "@/lib/finance/investments-data";
 import { createClient } from "@/lib/supabase/server";
 import { getCdiSeries } from "./finance-cdi";
-
-// Sem movimentos, ainda busca uns dias de CDI para mostrar a taxa atual.
-const CDI_LOOKBACK_WITHOUT_MOVEMENTS_DAYS = 10;
-
-const MOVEMENT_KINDS: readonly string[] = ["deposit", "withdrawal", "adjustment"] satisfies MovementKind[];
+import { cdiStartDate, isMovementKind } from "./finance-investment-state";
 
 type InvestmentRow = {
   id: string;
@@ -70,7 +66,7 @@ async function readMovements(supabase: SupabaseClient, userId: string, investmen
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data
-    .filter((row) => MOVEMENT_KINDS.includes(row.kind))
+    .filter((row) => isMovementKind(row.kind))
     .map((row) => ({
       id: row.id,
       investmentId: row.investment_id,
@@ -80,15 +76,6 @@ async function readMovements(supabase: SupabaseClient, userId: string, investmen
       note: row.note,
       createdAt: row.created_at,
     }));
-}
-
-// Pelo menos um dia útil antes do movimento mais antigo (e nunca menos que os últimos dias, para o CDI atual).
-function cdiStartDate(movements: MovementRow[], today: IsoDate): IsoDate {
-  const recent = addDays(today, -CDI_LOOKBACK_WITHOUT_MOVEMENTS_DAYS);
-  const oldest = movements.reduce<IsoDate | null>((min, row) => (min === null || row.date < min ? row.date : min), null);
-  if (oldest === null) return recent;
-  const beforeOldest = previousBusinessDay(oldest);
-  return beforeOldest < recent ? beforeOldest : recent;
 }
 
 function sumTotals(investments: InvestmentView[]): InvestmentsTotals {
@@ -125,7 +112,7 @@ async function loadInvestmentsData(userId: string, member: string | null, month:
     userId,
     investmentRows.map((row) => row.id),
   );
-  const { cdiByDate, info } = await getCdiSeries(cdiStartDate(movementRows, today));
+  const { cdiByDate, info } = await getCdiSeries(cdiStartDate(movementRows.map((row) => row.date), today));
 
   const investments = investmentRows.map((row): InvestmentView => {
     const ownMovements = movementRows.filter((movement) => movement.investmentId === row.id);

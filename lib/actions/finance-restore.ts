@@ -5,6 +5,13 @@ import { z } from "zod";
 
 import { getCurrentUser } from "@/lib/auth";
 import { ensureMonthBills } from "@/lib/data/finance-family";
+import {
+  formatDayMonth,
+  isMovementKind,
+  loadInvestmentState,
+  movementsWithout,
+  newOverdrawnDate,
+} from "@/lib/data/finance-investment-state";
 import { todayIso } from "@/lib/dates";
 import { monthKey } from "@/lib/finance/household";
 import { createClient } from "@/lib/supabase/server";
@@ -57,7 +64,6 @@ const restoreSchema = z.object({
   id: uuidSchema,
 });
 
-// TODO(investimentos, etapa 4): restaurar um movimento deve recusar se deixar o saldo negativo (firstOverdrawnDate).
 const TABLE_BY_KIND = {
   transaction: "transactions",
   notebook: "notebooks",
@@ -70,10 +76,36 @@ const TABLE_BY_KIND = {
 
 export type RestorableFinanceKind = z.infer<typeof restoreSchema>["kind"];
 
+// Restaurar um movimento de investimento não pode deixar o saldo negativo em nenhuma data.
+// Devolve a mensagem de erro, ou null se pode restaurar.
+async function investmentMovementRestoreError(userId: string, movementId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data: row, error } = await supabase
+    .from("finance_investment_movements")
+    .select("investment_id, kind, date, amount_cents")
+    .eq("id", movementId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) console.error("investmentMovementRestoreError error:", error);
+  if (!row || !isMovementKind(row.kind)) return "Não foi possível desfazer.";
+
+  const loaded = await loadInvestmentState(userId, row.investment_id, [row.date]);
+  if (!loaded.ok) return loaded.error;
+  const state = loaded.data;
+  const restored = { date: row.date, kind: row.kind, amountCents: row.amount_cents };
+  const date = newOverdrawnDate(state, [...movementsWithout(state, movementId), restored]);
+  return date ? `Não dá para desfazer: o saldo ficaria negativo em ${formatDayMonth(date, state.today)}.` : null;
+}
+
 export async function restoreFinanceItem(kind: RestorableFinanceKind, itemId: string): Promise<ActionResult> {
   const user = await getCurrentUser();
   const parsed = restoreSchema.safeParse({ kind, id: itemId });
   if (!parsed.success) return fail("Item inválido.");
+
+  if (parsed.data.kind === "investment_movement") {
+    const blocker = await investmentMovementRestoreError(user.id, parsed.data.id);
+    if (blocker) return fail(blocker);
+  }
 
   const supabase = await createClient();
   const { error } =

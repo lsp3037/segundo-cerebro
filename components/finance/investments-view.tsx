@@ -1,24 +1,47 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontalIcon, PencilIcon, PiggyBankIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import {
+  ArrowDownToLineIcon,
+  ArrowUpFromLineIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PiggyBankIcon,
+  PlusIcon,
+  ScaleIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { deleteInvestment } from "@/lib/actions/finance-investments";
 import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { IsoDate } from "@/lib/dates";
 import type { NonBusinessReason, RateEntry } from "@/lib/finance/investments";
-import type { CdiInfo, InvestmentView, InvestmentsData } from "@/lib/finance/investments-data";
+import type {
+  CdiInfo,
+  InvestmentMovementView,
+  InvestmentView,
+  InvestmentsData,
+} from "@/lib/finance/investments-data";
 import { formatCentsToBrl } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { monthNameLong } from "./getting-started";
+import { signedBrl } from "./investment-format";
+import { InvestmentHistory } from "./investment-history";
+import {
+  InvestmentMovementDialog,
+  type MovementDialogTarget,
+  type MovementKindInput,
+} from "./investment-movement-dialog";
+import { InvestmentReconcileDialog } from "./investment-reconcile-dialog";
 import { toastWithUndo } from "./pay-toggle";
 import { AnimatedBrl } from "./transitions";
 
@@ -71,10 +94,6 @@ function formatDayMonth(iso: IsoDate): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
 
-function signedBrl(cents: number): string {
-  return cents > 0 ? `+${formatCentsToBrl(cents)}` : formatCentsToBrl(cents);
-}
-
 // ---------------------------------------------------------------------------
 // Tela
 // ---------------------------------------------------------------------------
@@ -109,6 +128,7 @@ export function InvestmentsView({ data, month, memberFilter, onNewInvestment, on
                 key={investment.id}
                 investment={investment}
                 monthLabel={monthLabel}
+                today={data.today}
                 onEdit={() => onEditInvestment(investment)}
               />
             ))}
@@ -134,8 +154,16 @@ function InvestmentsTop({ data, monthLabel }: { data: InvestmentsData; monthLabe
           <AnimatedBrl cents={totals.valueCents} resetKey={data.today} />
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Você colocou <span className="tabular-nums text-foreground">{formatCentsToBrl(netDepositedCents)}</span> no total
-          {totals.withdrawnCents > 0 && <> (já descontado o que resgatou)</>}.
+          {totals.withdrawnCents > 0 ? (
+            <>
+              Você colocou <span className="tabular-nums text-foreground">{formatCentsToBrl(totals.depositedCents)}</span> e
+              resgatou <span className="tabular-nums text-foreground">{formatCentsToBrl(totals.withdrawnCents)}</span>.
+            </>
+          ) : (
+            <>
+              Você colocou <span className="tabular-nums text-foreground">{formatCentsToBrl(netDepositedCents)}</span> no total.
+            </>
+          )}
         </p>
       </div>
 
@@ -221,16 +249,47 @@ function CdiLine({ cdi }: { cdi: CdiInfo }) {
 // Cartão de cada investimento
 // ---------------------------------------------------------------------------
 
+// Diálogos de um cartão: "Guardei"/"Resgatei" (novo ou edição pelo histórico) e "Acertar com o app".
+// O alvo do movimento fica guardado ao fechar, para o diálogo não sumir no meio da animação.
+function useCardDialogs(investment: InvestmentView) {
+  const [movementTarget, setMovementTarget] = useState<MovementDialogTarget | null>(null);
+  const [isMovementOpen, setMovementOpen] = useState(false);
+  const [isReconcileOpen, setReconcileOpen] = useState(false);
+
+  const openMovement = (kind: MovementKindInput, movement: InvestmentMovementView | null = null) => {
+    setMovementTarget({ investment, kind, movement });
+    setMovementOpen(true);
+  };
+
+  const editMovement = (movement: InvestmentMovementView) => {
+    if (movement.kind === "adjustment") return;
+    openMovement(movement.kind, movement);
+  };
+
+  return {
+    movementTarget,
+    isMovementOpen,
+    setMovementOpen,
+    isReconcileOpen,
+    setReconcileOpen,
+    openMovement,
+    editMovement,
+  };
+}
+
 function InvestmentCard({
   investment,
   monthLabel,
+  today,
   onEdit,
 }: {
   investment: InvestmentView;
   monthLabel: string;
+  today: IsoDate;
   onEdit: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const dialogs = useCardDialogs(investment);
   const { summary } = investment;
   const rate = summary.currentRate ?? investment.rates[investment.rates.length - 1] ?? null;
 
@@ -267,7 +326,12 @@ function InvestmentCard({
               <MoreHorizontalIcon className="size-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={() => dialogs.setReconcileOpen(true)}>
+              <ScaleIcon className="size-4" />
+              <span>Acertar com o app</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={onEdit}>
               <PencilIcon className="size-4" />
               <span>Editar</span>
@@ -298,7 +362,44 @@ function InvestmentCard({
         <CardFact label="Rendimento total">{signedBrl(summary.yieldTotalCents)}</CardFact>
       </dl>
 
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => dialogs.openMovement("deposit")}
+          disabled={isPending}
+          className="h-8 gap-1.5 text-xs active:scale-[0.98]"
+        >
+          <ArrowDownToLineIcon className="size-3.5" aria-hidden="true" />
+          Guardei
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => dialogs.openMovement("withdrawal")}
+          disabled={isPending}
+          className="h-8 gap-1.5 text-xs active:scale-[0.98]"
+        >
+          <ArrowUpFromLineIcon className="size-3.5" aria-hidden="true" />
+          Resgatei
+        </Button>
+      </div>
+
       {investment.notes && <p className="mt-3 text-xs whitespace-pre-line text-muted-foreground">{investment.notes}</p>}
+
+      <InvestmentHistory movements={investment.movements} today={today} onEditMovement={dialogs.editMovement} />
+
+      <InvestmentMovementDialog
+        open={dialogs.isMovementOpen}
+        onOpenChange={dialogs.setMovementOpen}
+        target={dialogs.movementTarget}
+        today={today}
+      />
+      <InvestmentReconcileDialog
+        open={dialogs.isReconcileOpen}
+        onOpenChange={dialogs.setReconcileOpen}
+        investment={investment}
+      />
     </article>
   );
 }

@@ -66,3 +66,26 @@ export type SaveInvestmentInput = {
   // Na criação é obrigatória; na edição é ignorada (mudança de taxa é a etapa 5).
   rate?: InvestmentRateInput;
 };
+
+// "Guardei" (deposit) ou "Resgatei" (withdrawal). Com id, edita o movimento.
+// Ajustes não são editados por aqui: só excluídos (e criados pelo "Acertar com o app").
+export type SaveInvestmentMovementInput = {
+  id?: string;
+  investmentId: string;
+  kind: "deposit" | "withdrawal";
+  amountCents: number; // sempre > 0
+  date: IsoDate; // até hoje (Cuiabá)
+  note?: string | null;
+};
+
+// "Acertar com o app": o valor que o app do banco mostra hoje.
+export type ReconcileInvestmentInput = {
+  investmentId: string;
+  appValueCents: number; // >= 0
+};
+
+// Resultado do acerto: id do ajuste criado (null quando já estava igual) e a diferença aplicada.
+export type ReconcileInvestmentResult = {
+  adjustmentId: string | null;
+  adjustmentCents: number;
+};
