@@ -1,6 +1,6 @@
 # Plano: aba Investimentos (Finanças › Pessoal)
 
-Status: **revisão 2, aguardando aprovação do Luan** (nada foi alterado no código).
+Status: **implementado (etapas 1–6), falta só a conferência real com o app do Mercado Pago.**
 Elaborado em 2026-11-13 com `explorer-agent` (mapa do código) e `project-planner` (plano). A revisão 2 incorpora as respostas do Luan e o print das movimentações do Cofrinho.
 
 ## 0. O que mudou na revisão 2

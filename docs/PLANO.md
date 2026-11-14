@@ -89,14 +89,19 @@ Rotinas = eventos recorrentes com `kind = rotina`.
 |---|---|
 | `finance_categories` | `ledger` (pessoal/trustcare), `kind` (entrada/saída), `name`, `color`, `parent_id` |
 | `payment_methods` | `name` (Pix, crédito Nubank, dinheiro…), `type` |
-| `finance_accounts` | `name`, `kind` (checking/savings/cash/credit_card), `ledger`, `balance_cents`, `credit_limit_cents`, `closing_day`, `due_day`, `color`, `is_active` |
+| `finance_accounts` | `name`, `type` (checking/savings/cash/credit_card), `owner_label`, `opening_balance_cents`, `credit_limit_cents`, `due_day`, `active`, `sort_order` |
 | `finance_recurring_bills` | `name`, `ledger`, `kind`, `amount_cents`, `percentage_of_income` (ex.: `10%` Dízimo), `due_day`, `category_id`, `account_id`, `member_label` (Casa/Luan/Rayzza), `active` |
 | `finance_budgets` | `category_id`, `ledger`, `month` (YYYY-MM), `limit_cents`, `member_label` |
 | `finance_rules` | `pattern`, `ledger`, `kind`, `category_id`, `account_id`, `member_label` (regras aprendidas pelo importador OFX) |
 | `transactions` | `ledger`, `kind`, `amount_cents`, `date`, `status` (paid/pending), `due_date`, `paid_at`, `category_id`, `payment_method_id`, `account_id`, `member_label`, `recurring_bill_id`, `installment_group_id`, `installment_index`, `installment_total`, `bank_fitid`, `description`, `notes`, `notebook_id` (opcional) |
 | `notebooks` | `brand`, `model`, `specs`, `status` (comprado/em reparo/à venda/vendido), `asking_price_cents`, `buyer_name`, `buyer_contact`, `warranty_days`, `sold_at`, `machine_fee_cents`, `notes` |
+| `finance_investments` | Investimentos do Pessoal (ex.: Cofrinho): `name`, `owner_label`, `rate_changes jsonb` (histórico de taxas com data de início: faixas de "% do CDI" ou taxa fixa ao ano), `notes`, `sort_order` |
+| `finance_investment_movements` | `investment_id`, `kind` (deposit/withdrawal/adjustment), `date`, `amount_cents` (aporte e resgate > 0; ajuste com sinal, ≠ 0), `note` |
+| `finance_cdi_daily` | Cópia do CDI diário do Banco Central (série 12): `date`, `daily_percent numeric(12,8)`, `fetched_at`. Chave `(user_id, date)`, sem `id` nem lixeira. |
 
 **Lucro por notebook:** a compra, as peças, eventuais custos pós-venda (garantia) e a venda (descontando taxa de maquininha) são lançamentos ligados ao notebook em `transactions` / `notebooks`. O lucro real e o de vitrine são calculados diretamente a partir dos mesmos dados, sem redigitação.
+
+**Investimentos:** o rendimento não é gravado. Ele é recalculado dia a dia a partir dos movimentos, das taxas e do CDI guardado (ver seção 16).
 
 ### 2.6 Revisão e busca (Fases 5 e 6)
 
@@ -339,3 +344,37 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **"Conta" com um só sentido:** conta = boleto. Banco vira "banco" (aba, títulos, avisos, janela de lançamento e importação de extrato). Em Orçamento, meta/teto viraram "limite".
 - **Resumo com uma resposta:** frase "Novembro deve fechar com R$ X de sobra" (ou "no vermelho"/"empatado"), linha do que falta pagar e contas agrupadas por urgência; pagas recolhidas. Saiu a faixa de 3 números que repetia os totais.
 - **Leitura:** nenhum texto abaixo de 12 px em `components/finance` e sem rótulos em maiúsculas. Análises sem siglas ("Da renda, sobrou", "Contas fixas levam", "Gasto por dia", "Este mês / Mês passado / Média de 3 meses / Mudou" com setas). Gráfico de 6 meses vira uma frase com menos de 2 meses lançados. Selo Pessoal/Trust Care na lista só aparece quando ela mistura os dois.
+
+## 16. Investimentos (Finanças › Pessoal, 2026-11-13)
+
+> Plano detalhado em [`investimentos-financas.md`](../investimentos-financas.md). Aba **Investimentos** entre "Bancos e cartões" e "Análises", só no Pessoal. Migration `20261113180000_finance_investments.sql` (tabelas na seção 2.5).
+
+**Regra de cálculo** (`lib/finance/investments.ts`, puro)
+- **Taxa por faixas de "% do CDI"**, sobre a taxa **diária**: cada faixa rende a sua parte do saldo × percentual × CDI do dia. Padrão do Cofrinho do Mercado Pago (`COFRINHO_DEFAULT_TIERS`): 120% do CDI até R$ 10.000,00 e 100% no que passar. Ex.: R$ 15.000 = R$ 10.000 a 120% + R$ 5.000 a 100%. Também aceita **taxa fixa ao ano** (`(1 + a)^(1/252) − 1` por dia útil).
+- **Só dias úteis.** Dia útil = o Banco Central publicou CDI para ele. Para os dias ainda não publicados (hoje), vale segunda a sexta menos feriados nacionais (`lib/finance/business-days.ts`, com Páscoa calculada e Consciência Negra desde 2024).
+- **Crédito como o Mercado Pago:** em cada dia útil entra o rendimento calculado com o CDI do dia útil **anterior** (o crédito de segunda usa o CDI de sexta). Se esse CDI ainda não saiu, usa o último publicado.
+- **Simulação dia a dia** do primeiro movimento até hoje (Cuiabá): primeiro o rendimento do dia, depois os movimentos (aportes, ajustes, resgates). Por isso um aporte começa a render no **próximo dia útil**. Saldo em centavos sem arredondar; arredonda só na tela.
+- **Taxa vigente:** a última entrada de `rate_changes` com início até o dia. "Mudar taxa" vale da data em diante; a mesma data substitui a entrada anterior (data até 1 ano à frente).
+- Valores **brutos** (antes do imposto), como o app do banco mostra.
+- Conferido em 13 e 14/11/2026: R$ 8.730,00 rende **R$ 5,32** por dia útil (igual ao print do Mercado Pago); aporte de R$ 1.000,00 em 06/11 → **R$ 3,05** até 13/11.
+
+**CDI automático** (`lib/data/finance-cdi.ts`)
+- Série 12 do Banco Central (`api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados`), buscada ao abrir a aba quando a cópia guardada em `finance_cdi_daily` está incompleta ou atrasada. Sem rotina agendada (sem cron).
+- Tempo limite de 5 s; depois de uma falha, espera 5 min antes de tentar de novo. Em falha, usa o último CDI guardado e a tela avisa "Não consegui atualizar o CDI; usando o de [data]".
+
+**Decisões**
+- **Aporte e resgate não criam lançamentos nem mexem no saldo dos bancos.** O rendimento como entrada inflaria a base do Dízimo, e "Investimentos & Reserva" contaria em dobro. A tela avisa.
+- **"Acertar com o app"** grava hoje um ajuste (`adjustment`) com a diferença entre o valor do app do banco e a estimativa.
+- **Bloqueio de saldo negativo:** resgate, edição, exclusão e restauração de movimento, e mudança ou remoção de taxa, são barrados se deixarem o saldo negativo em alguma data (a mensagem diz o dia, ex.: "Você só tem R$ X em 13/11"). Movimento com data futura é rejeitado.
+- **"Desfazer"** por 10 s ao remover investimento, movimento ou taxa (`restoreFinanceItem` com os tipos `investment` e `investment_movement`; a taxa removida é gravada de novo).
+- Filtro de pessoa pelo "Responsável" (`owner_label`). Não aparece em Trust Care nem no Consolidado e não soma no Resumo.
+
+**Arquivos principais**
+- Regras: `lib/finance/investments.ts`, `lib/finance/business-days.ts`; tipos compartilhados: `lib/finance/investments-data.ts`.
+- Leitura: `lib/data/finance-cdi.ts`, `lib/data/finance-investments.ts` (`getInvestmentsData`, nunca quebra a página: em erro devolve `error: true`), `lib/data/finance-investment-state.ts` (estado de um investimento para as checagens de saldo).
+- Ações: `lib/actions/finance-investments.ts` (`saveInvestment`, `deleteInvestment`, `saveInvestmentMovement`, `deleteInvestmentMovement`, `reconcileInvestment`, `saveInvestmentRate`, `deleteInvestmentRate`) e `lib/actions/finance-restore.ts`.
+- Tela: `components/finance/investments-view.tsx` e `components/finance/investment-*.tsx` (cadastro, Guardei/Resgatei, Acertar com o app, Mudar taxa, históricos). A aba é carregada em `app/(app)/financas/page.tsx` e em `app/(app)/p/[folderId]/page.tsx`.
+
+**Privacidade:** a pergunta ao Banco Central é um GET público só com datas; nenhum dado do Luan sai do app. Nada dos investimentos vai para a IA (Finanças tem `ai_enabled = false`).
+
+**Fora da v1:** imposto exato (tabela regressiva e IOF); outros tipos (CDB, Tesouro, ações, fundos); ligar aportes e resgates aos saldos dos bancos; gráfico e projeção; patrimônio no Resumo; avisos no sino; investimentos em Trust Care ou Consolidado.

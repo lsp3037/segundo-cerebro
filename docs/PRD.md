@@ -132,6 +132,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 - **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + taxa de maquininha + custos pós-venda/garantia), com preço de vitrine e alerta para estoque parado (>30 dias).
 - **Importação OFX e Privacidade:** leitor local de extratos `.ofx` sem envio para IA, detecção de duplicidades via `FITID` e aprendizado automático de regras de categorização (`finance_rules`). Área nasce travada para IA (`ai_enabled = false`).
 - **Integração com `/hoje`:** card lateral **Contas da Semana** alertando vencimentos atrasados ou nos próximos 7 dias.
+- **Investimentos (só Pessoal, 2026-11-13):** aba entre "Bancos e cartões" e "Análises". O Luan cadastra o Cofrinho do Mercado Pago com quanto tem lá e desde quando; a taxa já vem pronta (120% do CDI até R$ 10.000, 100% acima) e o app busca o CDI sozinho no Banco Central. Mostra o valor de hoje, quanto rendeu hoje, no mês e no total, e o próximo crédito. Rende só em dias úteis, com valores antes do imposto. Botões "Guardei", "Resgatei", "Acertar com o app" (quando o número do banco ficar diferente) e "Mudar taxa", com histórico e "Desfazer". Guardar e resgatar aqui não mexe nos lançamentos nem no saldo dos bancos.
 
 ### 7.13 Revisão Semanal ✅ Fase 5
 - Checklist guiado de domingo (`/revisao`):
@@ -186,6 +187,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-12 | Evolução do módulo Finanças para o modelo pessoal/familiar ("Minhas Finanças"): contas e 4 cartões, contas fixas + dízimo automático de 10%, orçamentos por categoria e visão por membro (`Casa`, `Luan`, `Rayzza`). |
 | 2026-11-12 | Reorganização visual de Finanças em hierarquia única de 56px, reconciliação de filtros no servidor, gráficos ancorados no mês selecionado e responsividade móvel em 2 linhas. |
 | 2026-11-12 | Menu lateral desktop retrátil (`w-64` ↔ `w-14`) com trilho apenas de ícones + tooltips e troca dos pontos coloridos por ícones minimalistas outline nas áreas. |
+| 2026-11-13 | Investimentos só no Pessoal. Taxa por faixas de "% do CDI" sobre a taxa diária (padrão do Cofrinho: 120% até R$ 10.000, 100% acima) ou taxa fixa ao ano. CDI buscado sozinho no Banco Central (só datas saem do app; nada vai para a IA). Rende só em dias úteis, crédito com o CDI do dia útil anterior, aporte rende a partir do próximo dia útil, valores brutos. Aporte e resgate não viram lançamentos nem mexem no saldo dos bancos, para não inflar o Dízimo nem contar em dobro. |
 
 ## 10. Pendências e riscos
 
@@ -196,3 +198,6 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | Tabela `order_status_transitions` sem RLS no Supabase "Trust Care" | Risco de segurança, **em outro projeto** | No projeto do Gerenciador de O.S. |
 | Plano gratuito do Gemini: limites e modelos que mudam | Risco operacional | Modelo reserva já configurado. Acompanhar. |
 | A administração da SES pode bloquear apps externos no futuro | Risco | Plano B: compartilhar a agenda da SES com o Gmail |
+| Investimentos: conferir com o app do Mercado Pago o crédito do dia e o dia em que um aporte novo começa a render | Conferência pendente | Luan, com o Cofrinho real (ver OPERACAO.md) |
+| Investimentos: imposto exato (tabela regressiva e IOF), outros tipos (CDB, Tesouro, ações), ligação com os saldos dos bancos, gráfico e projeção, patrimônio no Resumo, avisos no sino | Fora da v1 | Decidir com o Luan quando houver necessidade |
+| Investimentos dependem da API pública do Banco Central | Risco operacional | Cópia local do CDI; em falha o app usa o último valor e avisa |

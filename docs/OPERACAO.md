@@ -85,6 +85,17 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [ ] No painel: filtros, `Hoje` numa tarefa atrasada, `Pagar` numa conta, `Concluir` numa tarefa com horário e o `Desfazer` de cada um.
 - [ ] `Marcar todas como lidas`, recarregar a página e ver que continuam lidas (fica em `profiles.settings.notifications_read`, vale no PC e no celular).
 
+### Investimentos (Finanças › Pessoal › Investimentos)
+- [x] Migration `20261113180000_finance_investments.sql` executada no SQL Editor (investimentos, movimentos e CDI, com RLS).
+- [x] A linha "CDI de hoje" mostra a taxa ao ano e a data do Banco Central.
+- [x] Cadastrar "[teste] Cofrinho" com R$ 8.730,00: "Próximo crédito" dá cerca de R$ 5,32.
+- [x] "[teste] Aporte" de R$ 1.000,00 com data de 06/11/2026: em 13/11 o rendimento total é R$ 3,05 (rende a partir do dia útil seguinte; sábado, domingo e feriado não rendem).
+- [x] "Resgatei" mais do que tem é recusado; "Resgatar tudo" preenche o valor de hoje; excluir um aporte que deixaria o saldo negativo é recusado.
+- [x] "Acertar com o app" com um valor diferente cria um "Ajuste" no histórico.
+- [x] "Mudar taxa" com data: antes dela a taxa não muda; na mesma data substitui a anterior. Testar um saldo acima de R$ 10.000 (o que passa rende 100%).
+- [x] "Desfazer" ao remover investimento, movimento e taxa. Trocar para Trust Care (a aba some), filtro de pessoa, `/p/[folderId]` e celular `390×844`.
+- [ ] **Conferência real:** cadastrar o Cofrinho com o saldo do dia, comparar o crédito do próximo dia útil com o app do Mercado Pago e confirmar em que dia um aporte novo começa a render. Se não bater, usar "Acertar com o app" e anotar a diferença.
+
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
 ## 4. Problemas comuns
@@ -100,6 +111,8 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 | A agenda parou de atualizar sozinha | O aviso do Google venceu ou o `pg_cron` falhou | Configurações › Google Agenda mostra o erro. A rotina de 15 min renova os avisos. Se a rotina falhar com 401, confira se o `CRON_SECRET` é igual na Vercel e no Vault. |
 | Card de O.S. com "Resumo desligado" ou "Chave recusada" | Falta ou expirou a `OS_API_KEY` | Crie uma chave nova no Gerenciador (só "Consultar Ordens de Serviço") e atualize no PC e na Vercel. |
 | Card de O.S. com "Muitas consultas seguidas" | Limite de 30 consultas por minuto do Gerenciador | Espere um minuto. O app guarda o resumo por 5 minutos. |
+| Rendimento diferente do app do banco | O banco arredonda cada crédito, mudou as faixas ou o saldo inicial foi digitado diferente | Use **Acertar com o app** (grava a diferença como ajuste). Se o banco mudou a taxa, use **Mudar taxa** com a data em que mudou. |
+| "Não consegui atualizar o CDI" ou "CDI desatualizado" | O Banco Central está fora do ar ou ainda não publicou o CDI do dia | Nada a fazer: o app usa o último CDI guardado e tenta de novo depois (no mínimo 5 min após uma falha). |
 | A conta da SES deixou de conectar | A administração do Google da SES bloqueou apps externos | Plano B: compartilhar a agenda da SES com o Gmail pessoal. |
 
 ## 5. Pendências
@@ -110,6 +123,7 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 | API do Agente de Marketing | Ainda é versão de teste. Combinar rotas, formato e chave na Fase 6. |
 | RLS no Gerenciador de O.S. | A tabela `order_status_transitions` do Supabase "Trust Care" está sem RLS: com a chave pública daquele app, dá para alterar as regras de status. Corrigir **no projeto do Gerenciador**, ligando o RLS e criando uma regra de leitura (ligar sem a regra bloqueia o próprio Gerenciador). |
 | Variável sobrando na Vercel | `NEXT_PUBLIC_SUPABASE` (sem uso) pode ser apagada. |
+| Investimentos: conferência real | Comparar o crédito do próximo dia útil e o primeiro rendimento de um aporte novo com o app do Mercado Pago (ver seção 3). |
 | Fases 1 a 5 | Concluídas e em produção (Vercel). |
 | Fase 6 (Próxima) | Telegram, busca semântica com IA, integração real do Agente de Marketing e PWA. |
 
