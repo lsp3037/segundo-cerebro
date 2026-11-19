@@ -2,19 +2,20 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { PlusIcon, SearchIcon } from "lucide-react";
+import { PlusIcon, SearchIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { trashTransaction } from "@/lib/actions/finance";
 import { restoreFinanceItem } from "@/lib/actions/finance-restore";
 import type { FinanceCategory, PaymentMethod, Transaction } from "@/lib/data/finance";
 import type { AccountWithBalance } from "@/lib/data/finance-family";
-import { todayIso } from "@/lib/dates";
+import { formatMonthName, todayIso, type IsoDate } from "@/lib/dates";
 import { buildTxGroups, monthTotals, statusCounts } from "@/lib/finance/transaction-groups";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MonthRuler, rulerDay } from "./month-ruler";
 import type { NewTransactionPrefill } from "./quick-entry";
 import { QuickEntryRow } from "./quick-entry-row";
 import { QuickEntrySheet } from "./quick-entry-sheet";
@@ -26,6 +27,8 @@ type StatusFilter = "all" | "pending" | "paid";
 
 interface TransactionsTableProps {
   transactions: Transaction[];
+  // Mês visto (AAAA-MM), usado pela régua do mês.
+  month: string;
   categories: FinanceCategory[];
   // Lançamentos de meses anteriores que continuam em aberto (entram no grupo "Atrasado").
   overdueEarlier: Transaction[];
@@ -101,6 +104,7 @@ const STATUS_LABEL: Record<StatusFilter, string> = {
 
 export function TransactionsTable({
   transactions,
+  month,
   categories,
   overdueEarlier,
   initialStatusFilter = "all",
@@ -147,7 +151,10 @@ export function TransactionsTable({
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatusFilter);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [dayFilter, setDayFilter] = useState<IsoDate | null>(null);
   const today = todayIso();
+  // Um dia escolhido só vale dentro do mês em que foi escolhido.
+  const activeDay = dayFilter && dayFilter.startsWith(month) ? dayFilter : null;
   // O selo Pessoal / Trust Care só ajuda quando a lista mistura os dois.
   const mixedLedgers = new Set(transactions.map((t) => t.ledger)).size > 1;
 
@@ -165,7 +172,10 @@ export function TransactionsTable({
     return { month: transactions.filter(matches), earlier: overdueEarlier.filter(matches) };
   }, [transactions, overdueEarlier, kindFilter, categoryFilter, search]);
 
-  const counts = statusCounts({ transactions: matching.month, overdueEarlier: matching.earlier, isPaid });
+  const byDay = (t: Transaction) => !activeDay || rulerDay(t, isPaid(t)) === activeDay;
+  const scoped = { month: matching.month.filter(byDay), earlier: matching.earlier.filter(byDay) };
+
+  const counts = statusCounts({ transactions: scoped.month, overdueEarlier: scoped.earlier, isPaid });
   const totals = monthTotals({ transactions, isPaid });
 
   const byStatus = (t: Transaction) => {
@@ -173,14 +183,14 @@ export function TransactionsTable({
     return statusFilter === "paid" ? isPaid(t) : !isPaid(t);
   };
   const groups = buildTxGroups({
-    transactions: matching.month.filter(byStatus),
-    overdueEarlier: matching.earlier.filter(byStatus),
+    transactions: scoped.month.filter(byStatus),
+    overdueEarlier: scoped.earlier.filter(byStatus),
     today,
     isPaid,
   });
   const visibleGroups = [...groups.todo, ...groups.done].filter((g) => g.items.length > 0);
 
-  const filtersActive = search.trim() !== "" || kindFilter !== "all" || categoryFilter !== "all" || statusFilter !== "all";
+  const filtersActive = search.trim() !== "" || kindFilter !== "all" || categoryFilter !== "all" || statusFilter !== "all" || activeDay !== null;
   const hasAnyData = transactions.length > 0 || overdueEarlier.length > 0;
 
   const clearFilters = () => {
@@ -188,10 +198,23 @@ export function TransactionsTable({
     setKindFilter("all");
     setCategoryFilter("all");
     setStatusFilter("all");
+    setDayFilter(null);
   };
+
+  const pickDay = (iso: IsoDate) => {
+    if (iso === activeDay) {
+      setDayFilter(null);
+      return;
+    }
+    setDayFilter(iso);
+    setStatusFilter("all");
+  };
+
+  const dayLabel = activeDay ? `Dia ${Number(activeDay.slice(8, 10))} de ${formatMonthName(activeDay)}` : "";
 
   const emptyFilterLabel = () => {
     const parts: string[] = [];
+    if (activeDay) parts.push(dayLabel);
     if (statusFilter !== "all") parts.push(STATUS_LABEL[statusFilter]);
     if (kindFilter !== "all") parts.push(kindFilter === "income" ? "Entradas" : "Saídas");
     const category = categories.find((c) => c.id === categoryFilter);
@@ -217,6 +240,10 @@ export function TransactionsTable({
     <>
     <div ref={containerRef} className={cn("@container", wide === false && "pb-24")}>
       <TransactionTotals totals={totals} kindFilter={kindFilter} onToggleKind={toggleKind} />
+
+      {wide && transactions.length > 0 && (
+        <MonthRuler transactions={transactions} month={month} today={today} isPaid={isPaid} selectedDay={activeDay} onPickDay={pickDay} />
+      )}
 
       <div className="mb-3.5 flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
         <div className="relative w-full md:max-w-[360px] md:flex-1">
@@ -255,6 +282,17 @@ export function TransactionsTable({
               { id: "expense", label: "Saídas" },
             ]}
           />
+          {activeDay && (
+            <button
+              type="button"
+              onClick={() => setDayFilter(null)}
+              aria-label={`Remover filtro: ${dayLabel.toLowerCase()}`}
+              className="inline-flex h-[34px] shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-foreground/40 bg-card px-3.5 text-[13px] text-foreground transition-colors hover:border-foreground md:h-[38px]"
+            >
+              {dayLabel}
+              <XIcon className="size-3.5" aria-hidden="true" />
+            </button>
+          )}
           <div className="shrink-0 md:ml-auto">
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger

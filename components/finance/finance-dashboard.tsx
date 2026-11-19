@@ -673,6 +673,7 @@ export function FinanceDashboard({
         {activeTab === "fluxo" && (
           <TransactionsTable
             key={fluxoStatusFilter}
+            month={currentMonth}
             transactions={
               activeMember
                 ? initialTransactions.filter((t) => t.member_label === activeMember)
