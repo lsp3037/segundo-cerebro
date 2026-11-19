@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { estimateDailyYield, RateFields, useRateFields } from "./investment-rate-fields";
+import { estimateDailyYield, RateFields, TAX_PREVIEW_SUFFIX, useRateFields } from "./investment-rate-fields";
 
 interface InvestmentRateDialogProps {
   open: boolean;
@@ -127,5 +127,6 @@ function ratePreview(valueCents: number, rate: InvestmentRateInput | null, cdiDa
   if (valueCents <= 0) return "Hoje não há valor guardado, então ainda não rende.";
   const daily = estimateDailyYield(valueCents, rate, cdiDailyPercent);
   if (daily === null) return "A prévia aparece quando o CDI do Banco Central estiver disponível.";
-  return `Com o valor de hoje, rende cerca de ${formatCentsToBrl(Math.round(daily))} por dia útil.`;
+  const suffix = rate.tax === "regressive" ? TAX_PREVIEW_SUFFIX : "";
+  return `Com o valor de hoje, rende cerca de ${formatCentsToBrl(Math.round(daily))} por dia útil${suffix}.`;
 }

@@ -8,6 +8,7 @@ import {
   tieredDailyYield,
   type RateEntry,
   type RateTier,
+  type TaxMode,
 } from "@/lib/finance/investments";
 import type { InvestmentRateInput } from "@/lib/finance/investments-data";
 import { centsToInput, inputToCents } from "@/lib/money";
@@ -25,7 +26,12 @@ export type RateFieldValues = {
   capStr: string;
   highPercentStr: string;
   annualStr: string;
+  withTax: boolean;
 };
+
+// Imposto de renda da tabela regressiva: em depósitos novos vale o primeiro degrau (22,5%).
+const NEW_DEPOSIT_TAX_FACTOR = 0.775;
+export const TAX_PREVIEW_SUFFIX = ", depois do imposto (22,5% nos primeiros 180 dias)";
 
 export type RateResult = { ok: true; value: InvestmentRateInput } | { ok: false; error: string };
 
@@ -49,9 +55,13 @@ function initialRateFieldValues(rate: RateEntry | null): RateFieldValues {
     capStr: centsToInput(DEFAULT_LOW_TIER.upToCents),
     highPercentStr: formatPercentInput(DEFAULT_HIGH_TIER.ofCdiPercent),
     annualStr: "",
+    withTax: true,
   };
   if (!rate) return defaults;
-  if (rate.mode === "annual") return { ...defaults, mode: "annual", annualStr: formatPercentInput(rate.annualPercent) };
+  const withTax = rate.tax === "regressive";
+  if (rate.mode === "annual") {
+    return { ...defaults, mode: "annual", annualStr: formatPercentInput(rate.annualPercent), withTax };
+  }
 
   const first = rate.tiers[0];
   const last = rate.tiers[rate.tiers.length - 1];
@@ -61,14 +71,16 @@ function initialRateFieldValues(rate: RateEntry | null): RateFieldValues {
     lowPercentStr: formatPercentInput(first.ofCdiPercent),
     capStr: first.upToCents === null ? defaults.capStr : centsToInput(first.upToCents),
     highPercentStr: formatPercentInput(last.ofCdiPercent),
+    withTax,
   };
 }
 
 export function buildRate(fields: RateFieldValues): RateResult {
+  const tax: TaxMode = fields.withTax ? "regressive" : "none";
   if (fields.mode === "annual") {
     const annualPercent = parsePercent(fields.annualStr);
     if (!(annualPercent > 0)) return { ok: false, error: "Informe a taxa ao ano (maior que zero)." };
-    return { ok: true, value: { mode: "annual", annualPercent } };
+    return { ok: true, value: { mode: "annual", tax, annualPercent } };
   }
   const low = parsePercent(fields.lowPercentStr);
   const high = parsePercent(fields.highPercentStr);
@@ -79,7 +91,7 @@ export function buildRate(fields: RateFieldValues): RateResult {
     { upToCents: capCents, ofCdiPercent: low },
     { upToCents: null, ofCdiPercent: high },
   ];
-  return { ok: true, value: { mode: "cdi", tiers } };
+  return { ok: true, value: { mode: "cdi", tax, tiers } };
 }
 
 // Estado dos campos de taxa + a taxa já montada (ou o erro do primeiro campo inválido).
@@ -92,19 +104,21 @@ export function useRateFields(initial: RateEntry | null = null) {
 // Entrada do histórico → formato aceito pelas actions (usado no "Desfazer" da remoção).
 export function rateEntryToInput(entry: RateEntry): InvestmentRateInput {
   return entry.mode === "annual"
-    ? { mode: "annual", annualPercent: entry.annualPercent }
-    : { mode: "cdi", tiers: entry.tiers };
+    ? { mode: "annual", tax: entry.tax, annualPercent: entry.annualPercent }
+    : { mode: "cdi", tax: entry.tax, tiers: entry.tiers };
 }
 
 // Rendimento estimado de um dia útil, em centavos (sem arredondar), ou null sem CDI disponível.
+// Com imposto, é uma aproximação: desconta 22,5% (depósito novo).
 export function estimateDailyYield(
   amountCents: number,
   rate: InvestmentRateInput,
   cdiDailyPercent: number | null,
 ): number | null {
-  if (rate.mode === "annual") return amountCents * fixedDailyFactor(rate.annualPercent);
+  const taxFactor = rate.tax === "regressive" ? NEW_DEPOSIT_TAX_FACTOR : 1;
+  if (rate.mode === "annual") return amountCents * fixedDailyFactor(rate.annualPercent) * taxFactor;
   if (cdiDailyPercent === null) return null;
-  return tieredDailyYield(amountCents, rate.tiers, cdiDailyPercent / 100);
+  return tieredDailyYield(amountCents, rate.tiers, cdiDailyPercent / 100) * taxFactor;
 }
 
 interface RateFieldsProps {
@@ -166,6 +180,22 @@ export function RateFields({ values, onChange }: RateFieldsProps) {
           placeholder="Ex: 10,5"
         />
       )}
+
+      <div className="flex items-start gap-2">
+        <input
+          id={`${idPrefix}-tax`}
+          type="checkbox"
+          checked={values.withTax}
+          onChange={(e) => onChange({ withTax: e.target.checked })}
+          className="mt-0.5 size-4 shrink-0 accent-primary"
+        />
+        <div className="min-w-0">
+          <Label htmlFor={`${idPrefix}-tax`} className="text-xs">Descontar imposto de renda (como o Cofrinho)</Label>
+          <p className="mt-1 text-xs text-muted-foreground">
+            O Mercado Pago já mostra o rendimento depois do imposto: 22,5% nos primeiros 180 dias de cada depósito, 20% até 360 dias, 17,5% até 720 e 15% depois. Marque se o valor do seu app é líquido.
+          </p>
+        </div>
+      </div>
     </fieldset>
   );
 }

@@ -355,8 +355,9 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - **Crédito como o Mercado Pago:** em cada dia útil entra o rendimento calculado com o CDI do dia útil **anterior** (o crédito de segunda usa o CDI de sexta). Se esse CDI ainda não saiu, usa o último publicado.
 - **Simulação dia a dia** do primeiro movimento até hoje (Cuiabá): primeiro o rendimento do dia, depois os movimentos (aportes, ajustes, resgates). Por isso um aporte começa a render no **próximo dia útil**. Saldo em centavos sem arredondar; arredonda só na tela.
 - **Taxa vigente:** a última entrada de `rate_changes` com início até o dia. "Mudar taxa" vale da data em diante; a mesma data substitui a entrada anterior (data até 1 ano à frente).
-- Valores **brutos** (antes do imposto), como o app do banco mostra.
-- Conferido em 13 e 14/11/2026: R$ 8.730,00 rende **R$ 5,32** por dia útil (igual ao print do Mercado Pago); aporte de R$ 1.000,00 em 06/11 → **R$ 3,05** até 13/11.
+- **Imposto de renda (opção "Descontar imposto de renda", `tax: "regressive"` na entrada de taxa):** o Mercado Pago credita o rendimento **líquido**. Cada depósito é um **lote** com dois saldos: `gross` (base que rende, cresce pelo bruto) e `net` (valor mostrado, cresce pelo bruto × (1 − IR)). IR pela idade do lote em dias corridos: 22,5% até 180, 20% até 360, 17,5% até 720, 15% depois. Resgate e ajuste negativo consomem do lote mais antigo (PEPS); ajuste positivo vira lote novo. Sem a opção (`tax: "none"`), tudo é bruto, como antes. O cadastro novo já vem com a opção marcada (padrão do Cofrinho).
+- **Calibragem (2026-11-19, dados reais do Luan):** depósitos 25/01 R$ 59,46, 29/01 R$ 106,91 e 13/04 R$ 10.000,00. Os 14 créditos reais conferidos (23 a 29/06, 07 a 11/08 e 06 a 13/11: R$ 5,07 a R$ 5,33) batem com o modelo em ±R$ 0,03; a razão líquido/bruto foi 0,773 (22,5%) em junho e agosto e 0,798 (20%) em novembro, depois que o depósito de 13/04 passou de 180 dias (10/10). O saldo simulado em 18/11 ficou R$ 139,74 abaixo dos R$ 11.088,46 do Mercado Pago (causa não identificada; "Acertar com o app" cobre).
+- Sem a opção de imposto, o primeiro teste (R$ 8.730 → R$ 5,32) parecia bater, mas era coincidência: o saldo real era maior e o crédito vinha com desconto.
 
 **CDI automático** (`lib/data/finance-cdi.ts`)
 - Série 12 do Banco Central (`api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados`), buscada ao abrir a aba quando a cópia guardada em `finance_cdi_daily` está incompleta ou atrasada. Sem rotina agendada (sem cron).
@@ -377,4 +378,4 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 
 **Privacidade:** a pergunta ao Banco Central é um GET público só com datas; nenhum dado do Luan sai do app. Nada dos investimentos vai para a IA (Finanças tem `ai_enabled = false`).
 
-**Fora da v1:** imposto exato (tabela regressiva e IOF); outros tipos (CDB, Tesouro, ações, fundos); ligar aportes e resgates aos saldos dos bancos; gráfico e projeção; patrimônio no Resumo; avisos no sino; investimentos em Trust Care ou Consolidado.
+**Fora da v1:** IOF e come-cotas; outros tipos (CDB, Tesouro, ações, fundos); ligar aportes e resgates aos saldos dos bancos; gráfico e projeção; patrimônio no Resumo; avisos no sino; investimentos em Trust Care ou Consolidado.

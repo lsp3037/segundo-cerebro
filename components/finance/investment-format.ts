@@ -33,9 +33,14 @@ export function formatPercent(value: number, fractionDigits?: number): string {
   });
 }
 
-// "120% do CDI até R$ 10.000, 100% acima" ou "10,00% ao ano".
+// "120% do CDI até R$ 10.000, 100% acima, depois do imposto" ou "10,00% ao ano".
 export function describeRate(rate: RateEntry | null): string {
   if (!rate) return "Taxa não informada";
+  const taxSuffix = rate.tax === "regressive" ? ", depois do imposto" : "";
+  return `${describeRateBase(rate)}${taxSuffix}`;
+}
+
+function describeRateBase(rate: RateEntry): string {
   if (rate.mode === "annual") return `${formatPercent(rate.annualPercent, 2)}% ao ano`;
   if (rate.tiers.length === 1) return `${formatPercent(rate.tiers[0].ofCdiPercent)}% do CDI`;
   return rate.tiers

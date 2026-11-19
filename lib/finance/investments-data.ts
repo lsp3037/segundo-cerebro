@@ -1,7 +1,7 @@
 // Formato dos dados da aba Investimentos, compartilhado entre o loader (servidor)
 // e a tela (cliente). Só tipos: sem "use client" e sem "server-only".
 import type { IsoDate } from "@/lib/dates";
-import type { InvestmentSummary, MovementKind, NonBusinessReason, RateEntry, RateTier } from "@/lib/finance/investments";
+import type { InvestmentSummary, MovementKind, NonBusinessReason, RateEntry, RateTier, TaxMode } from "@/lib/finance/investments";
 
 export type InvestmentMovementView = {
   id: string;
@@ -52,9 +52,10 @@ export type InvestmentsData = {
 };
 
 // Taxa enviada pelo formulário ao criar/editar (a data "from" é decidida pela action).
+// `tax` ausente = "none" (valores brutos).
 export type InvestmentRateInput =
-  | { mode: "cdi"; tiers: RateTier[] }
-  | { mode: "annual"; annualPercent: number };
+  | { mode: "cdi"; tax?: TaxMode; tiers: RateTier[] }
+  | { mode: "annual"; tax?: TaxMode; annualPercent: number };
 
 export type SaveInvestmentInput = {
   id?: string;

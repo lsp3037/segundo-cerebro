@@ -90,7 +90,6 @@ export function InvestmentsView({ data, month, memberFilter, onNewInvestment, on
       <section className="space-y-3" aria-labelledby="investments-list-title">
         <div>
           <h3 id="investments-list-title" className="text-sm font-medium text-foreground">Seus investimentos</h3>
-          <p className="text-xs text-muted-foreground">Valores antes do imposto, como no app do banco.</p>
         </div>
 
         {isEmpty ? (
@@ -295,6 +294,9 @@ function InvestmentCard({
             {investment.ownerLabel ? `Responsável: ${investment.ownerLabel}` : "Sem responsável"}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">{describeRate(rate)}</p>
+          {summary.currentRate?.tax !== "regressive" && (
+            <p className="mt-0.5 text-xs text-muted-foreground">Valores antes do imposto</p>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

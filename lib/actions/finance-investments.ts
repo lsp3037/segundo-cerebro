@@ -70,12 +70,15 @@ const tiersSchema = z
     "Os tetos das faixas devem crescer, e só a última fica sem teto.",
   );
 
+const taxSchema = z.enum(["none", "regressive"], { error: "Escolha se desconta imposto de renda." }).default("none");
+
 const rateSchema = z.discriminatedUnion(
   "mode",
   [
-    z.object({ mode: z.literal("cdi"), tiers: tiersSchema }),
+    z.object({ mode: z.literal("cdi"), tax: taxSchema, tiers: tiersSchema }),
     z.object({
       mode: z.literal("annual"),
+      tax: taxSchema,
       annualPercent: z
         .number({ error: "Informe a taxa ao ano." })
         .min(0, "A taxa não pode ser negativa.")
@@ -137,7 +140,10 @@ const deleteRateSchema = z.object({
 });
 
 function toRateEntry(rate: InvestmentRateInput, from: string): RateEntry {
-  return rate.mode === "cdi" ? { from, mode: "cdi", tiers: rate.tiers } : { from, mode: "annual", annualPercent: rate.annualPercent };
+  const tax = rate.tax ?? "none";
+  return rate.mode === "cdi"
+    ? { from, mode: "cdi", tax, tiers: rate.tiers }
+    : { from, mode: "annual", tax, annualPercent: rate.annualPercent };
 }
 
 function investmentFields(d: ParsedInvestment) {
@@ -444,7 +450,9 @@ type RateChangeInput = Omit<SaveInvestmentRateInput, "investmentId">;
 
 function toRateChangeInput(entry: RateEntry): RateChangeInput {
   const rate: InvestmentRateInput =
-    entry.mode === "cdi" ? { mode: "cdi", tiers: entry.tiers } : { mode: "annual", annualPercent: entry.annualPercent };
+    entry.mode === "cdi"
+      ? { mode: "cdi", tax: entry.tax, tiers: entry.tiers }
+      : { mode: "annual", tax: entry.tax, annualPercent: entry.annualPercent };
   return { from: entry.from, rate };
 }
 

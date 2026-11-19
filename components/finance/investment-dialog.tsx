@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { estimateDailyYield, RateFields, useRateFields, type RateResult } from "./investment-rate-fields";
+import { estimateDailyYield, RateFields, TAX_PREVIEW_SUFFIX, useRateFields, type RateResult } from "./investment-rate-fields";
 
 const NO_OWNER = "none";
 const DEFAULT_NAME = "Cofrinho";
@@ -272,5 +272,6 @@ function previewMessage(amountCents: number, rate: InvestmentRateInput | null, c
     return "A prévia aparece quando o CDI do Banco Central estiver disponível.";
   }
   const daily = estimateDailyYield(amountCents, rate, cdiDailyPercent) ?? 0;
-  return `Rende cerca de ${formatCentsToBrl(Math.round(daily))} por dia útil.`;
+  const suffix = rate.tax === "regressive" ? TAX_PREVIEW_SUFFIX : "";
+  return `Rende cerca de ${formatCentsToBrl(Math.round(daily))} por dia útil${suffix}.`;
 }

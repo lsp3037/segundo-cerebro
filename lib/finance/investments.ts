@@ -2,14 +2,19 @@
 // rendimento só em dias úteis e simulação do saldo dia a dia. Valores brutos, em centavos.
 // Fica fora de arquivos "use client"/"server-only" porque tela e servidor usam.
 
-import { addDays, type IsoDate } from "@/lib/dates";
+import { addDays, daysBetween, type IsoDate } from "@/lib/dates";
 import { isBusinessDay, isWeekend, previousBusinessDay } from "@/lib/finance/business-days";
 
 export type RateTier = { upToCents: number | null; ofCdiPercent: number };
 
+// Imposto de renda sobre o rendimento: "none" = valores brutos; "regressive" = tabela regressiva
+// da renda fixa (22,5% até 180 dias do depósito, 20% até 360, 17,5% até 720, 15% depois), como o
+// Cofrinho do Mercado Pago, que já credita o rendimento líquido.
+export type TaxMode = "none" | "regressive";
+
 export type RateEntry =
-  | { from: IsoDate; mode: "cdi"; tiers: RateTier[] }
-  | { from: IsoDate; mode: "annual"; annualPercent: number };
+  | { from: IsoDate; mode: "cdi"; tax: TaxMode; tiers: RateTier[] }
+  | { from: IsoDate; mode: "annual"; tax: TaxMode; annualPercent: number };
 
 export type MovementKind = "deposit" | "withdrawal" | "adjustment";
 
@@ -18,9 +23,10 @@ export type InvestmentMovement = { date: IsoDate; kind: MovementKind; amountCent
 
 // Formato gravado em `finance_investments.rate_changes`.
 export type RawRateTier = { up_to_cents: number | null; of_cdi_percent: number };
+// `tax` ausente = "none" (investimentos criados antes da opção de imposto).
 export type RawRateEntry =
-  | { from: string; mode: "cdi"; tiers: RawRateTier[] }
-  | { from: string; mode: "annual"; annual_percent: number };
+  | { from: string; mode: "cdi"; tax?: "regressive"; tiers: RawRateTier[] }
+  | { from: string; mode: "annual"; tax?: "regressive"; annual_percent: number };
 
 export type NonBusinessReason = "weekend" | "holiday";
 
@@ -98,14 +104,15 @@ function parseTiers(raw: unknown): RateTier[] | null {
 
 function parseRateEntry(raw: unknown): RateEntry | null {
   if (!isRecord(raw) || typeof raw.from !== "string" || !ISO_DATE_RE.test(raw.from)) return null;
+  const tax: TaxMode = raw.tax === "regressive" ? "regressive" : "none";
   if (raw.mode === "annual") {
     return isNonNegativeNumber(raw.annual_percent)
-      ? { from: raw.from, mode: "annual", annualPercent: raw.annual_percent }
+      ? { from: raw.from, mode: "annual", tax, annualPercent: raw.annual_percent }
       : null;
   }
   if (raw.mode !== "cdi") return null;
   const tiers = parseTiers(raw.tiers);
-  return tiers ? { from: raw.from, mode: "cdi", tiers } : null;
+  return tiers ? { from: raw.from, mode: "cdi", tax, tiers } : null;
 }
 
 // Entradas válidas, da mais antiga para a mais nova (na mesma data, vale a que vem depois).
@@ -120,15 +127,18 @@ export function parseRateChanges(raw: unknown): RateEntry[] {
 export function serializeRateChanges(entries: RateEntry[]): RawRateEntry[] {
   return [...entries]
     .sort((a, b) => a.from.localeCompare(b.from))
-    .map((entry) =>
-      entry.mode === "annual"
-        ? { from: entry.from, mode: "annual", annual_percent: entry.annualPercent }
+    .map((entry): RawRateEntry => {
+      // "none" não é gravado: o JSON de antes da opção de imposto continua idêntico.
+      const tax = entry.tax === "regressive" ? ({ tax: "regressive" } as const) : {};
+      return entry.mode === "annual"
+        ? { from: entry.from, mode: "annual", ...tax, annual_percent: entry.annualPercent }
         : {
             from: entry.from,
             mode: "cdi",
+            ...tax,
             tiers: entry.tiers.map((tier) => ({ up_to_cents: tier.upToCents, of_cdi_percent: tier.ofCdiPercent })),
-          },
-    );
+          };
+    });
 }
 
 // Taxa que vale num dia: a última com início até ele, ou a primeira se o dia for anterior a todas.
@@ -222,10 +232,81 @@ function dailyYield(balanceCents: number, rate: RateEntry | null, calendar: CdiC
 // Simulação dia a dia
 // ---------------------------------------------------------------------------
 
-type DayStep = { date: IsoDate; yieldCents: number; balanceCents: number };
+// Um lote = um depósito (ou ajuste positivo) com o saldo que ele já acumulou. O imposto regressivo
+// depende da idade de cada lote, por isso o saldo é guardado por lote.
+// `gross` (principal + rendimento bruto) é a base que rende; `net` (principal + rendimento líquido) é o
+// que o usuário vê, como no Mercado Pago. Sem imposto os dois crescem iguais.
+type Lot = { date: IsoDate; gross: number; net: number };
+
+type LotYield = { gross: number; net: number };
+
+type DayStep = { date: IsoDate; yieldCents: number; balanceCents: number; lots: Lot[] };
+
+// IR regressivo pelos dias corridos desde o depósito.
+const REGRESSIVE_TAX_BRACKETS: { maxDays: number; rate: number }[] = [
+  { maxDays: 180, rate: 0.225 },
+  { maxDays: 360, rate: 0.2 },
+  { maxDays: 720, rate: 0.175 },
+];
+const REGRESSIVE_TAX_LAST_RATE = 0.15;
+
+export function regressiveTaxRate(ageDays: number): number {
+  return REGRESSIVE_TAX_BRACKETS.find((bracket) => ageDays <= bracket.maxDays)?.rate ?? REGRESSIVE_TAX_LAST_RATE;
+}
 
 function signedAmount(movement: InvestmentMovement): number {
   return movement.kind === "withdrawal" ? -movement.amountCents : movement.amountCents;
+}
+
+const netTotalOf = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.net, 0);
+const grossTotalOf = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.gross, 0);
+
+// Rendimento do dia de cada lote: o bruto total (faixas ou taxa fixa sobre a base bruta de todos os lotes)
+// é dividido proporcionalmente à base de cada lote; o líquido desconta o IR da idade do lote (se regressiva).
+function lotYields(lots: Lot[], rate: RateEntry | null, calendar: CdiCalendar, day: IsoDate): LotYield[] {
+  const base = grossTotalOf(lots);
+  const totalGross = dailyYield(base, rate, calendar, day);
+  if (totalGross === 0) return lots.map(() => ({ gross: 0, net: 0 }));
+  const share = totalGross / base;
+  const regressive = rate?.tax === "regressive";
+  return lots.map((lot) => {
+    const gross = lot.gross * share;
+    return { gross, net: regressive ? gross * (1 - regressiveTaxRate(daysBetween(lot.date, day))) : gross };
+  });
+}
+
+const netYieldOf = (yields: LotYield[]) => yields.reduce((sum, value) => sum + value.net, 0);
+
+function addLot(lots: Lot[], date: IsoDate, amount: number) {
+  const last = lots.at(-1);
+  if (last && last.date === date) {
+    last.gross += amount;
+    last.net += amount;
+  } else lots.push({ date, gross: amount, net: amount });
+}
+
+// Resgate (e ajuste negativo) consome do lote mais antigo para o mais novo, em valor líquido; a mesma
+// fração sai da base bruta. Se faltar saldo, a sobra vira um lote negativo, que o teste de saldo negativo detecta.
+function consumeOldestFirst(lots: Lot[], date: IsoDate, amount: number) {
+  let remaining = amount;
+  while (remaining > 0 && lots.length > 0 && lots[0].net > 0) {
+    const lot = lots[0];
+    if (lot.net <= remaining) {
+      remaining -= lot.net;
+      lots.shift();
+    } else {
+      lot.gross -= lot.gross * (remaining / lot.net);
+      lot.net -= remaining;
+      remaining = 0;
+    }
+  }
+  if (remaining > 0) addLot(lots, date, -remaining);
+}
+
+function applyMovement(lots: Lot[], movement: InvestmentMovement) {
+  const amount = signedAmount(movement);
+  if (amount >= 0) addLot(lots, movement.date, amount);
+  else consumeOldestFirst(lots, movement.date, -amount);
 }
 
 function sortMovements(movements: InvestmentMovement[], asOf: IsoDate): InvestmentMovement[] {
@@ -244,13 +325,20 @@ function* walkDays(
 ): Generator<DayStep> {
   const sorted = sortMovements(movements, asOf);
   if (sorted.length === 0) return;
-  let balance = 0;
+  const lots: Lot[] = [];
   let next = 0;
   for (let date = sorted[0].date; date <= asOf; date = addDays(date, 1)) {
-    const yieldCents = calendar.isCreditDay(date) ? dailyYield(balance, rateOn(rates, date), calendar, date) : 0;
-    balance += yieldCents;
-    while (next < sorted.length && sorted[next].date === date) balance += signedAmount(sorted[next++]);
-    yield { date, yieldCents, balanceCents: balance };
+    let yieldCents = 0;
+    if (calendar.isCreditDay(date)) {
+      const yields = lotYields(lots, rateOn(rates, date), calendar, date);
+      yields.forEach((value, index) => {
+        lots[index].gross += value.gross;
+        lots[index].net += value.net;
+      });
+      yieldCents = netYieldOf(yields);
+    }
+    while (next < sorted.length && sorted[next].date === date) applyMovement(lots, sorted[next++]);
+    yield { date, yieldCents, balanceCents: netTotalOf(lots), lots };
   }
 }
 
@@ -284,11 +372,13 @@ export function simulateInvestment({ movements, rates, cdiByDate, asOf, month }:
   const calendar = buildCdiCalendar(cdiByDate);
   const totals = sumMovements(movements, asOf, month);
   let balance = 0;
+  let lots: Lot[] = [];
   let yieldTotal = 0;
   let yieldMonth = 0;
   let yieldToday = 0;
   for (const step of walkDays(movements, rates, calendar, asOf)) {
     balance = step.balanceCents;
+    lots = step.lots;
     yieldTotal += step.yieldCents;
     if (step.date.slice(0, 7) === month) yieldMonth += step.yieldCents;
     if (step.date === asOf) yieldToday = step.yieldCents;
@@ -306,7 +396,7 @@ export function simulateInvestment({ movements, rates, cdiByDate, asOf, month }:
     todayReason: todayIsBusinessDay ? null : isWeekend(asOf) ? "weekend" : "holiday",
     yieldMonthCents: roundCents(yieldMonth + totals.monthAdjustments),
     yieldTotalCents: roundCents(yieldTotal + totals.adjustments),
-    nextCreditCents: roundCents(dailyYield(balance, rateOn(rates, creditDay), calendar, creditDay)),
+    nextCreditCents: roundCents(netYieldOf(lotYields(lots, rateOn(rates, creditDay), calendar, creditDay))),
     currentRate: rateOn(rates, asOf),
     cdiLastDate: calendar.lastDate,
   };
