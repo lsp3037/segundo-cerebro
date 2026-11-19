@@ -1,18 +1,23 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { PlusIcon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { trashTransaction } from "@/lib/actions/finance";
 import { restoreFinanceItem } from "@/lib/actions/finance-restore";
-import type { FinanceCategory, Transaction } from "@/lib/data/finance";
+import type { FinanceCategory, PaymentMethod, Transaction } from "@/lib/data/finance";
+import type { AccountWithBalance } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { buildTxGroups, monthTotals, statusCounts } from "@/lib/finance/transaction-groups";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { NewTransactionPrefill } from "./quick-entry";
+import { QuickEntryRow } from "./quick-entry-row";
+import { QuickEntrySheet } from "./quick-entry-sheet";
 import { TransactionGroupsList } from "./transaction-groups-list";
 import { TransactionTotals, type KindFilter } from "./transaction-totals";
 import { toastWithUndo, usePayToggle } from "./pay-toggle";
@@ -25,9 +30,19 @@ interface TransactionsTableProps {
   // Lançamentos de meses anteriores que continuam em aberto (entram no grupo "Atrasado").
   overdueEarlier: Transaction[];
   initialStatusFilter?: StatusFilter;
+  paymentMethods: PaymentMethod[];
+  accounts: AccountWithBalance[];
+  currentLedger: string;
+  // Pessoa escolhida no filtro da tela (só no Pessoal).
+  memberFilter: string | null;
   onEditTransaction: (tx: Transaction) => void;
-  onNewTransaction: () => void;
+  onNewTransaction: (prefill?: NewTransactionPrefill) => void;
+  // Avisa a tela quando a folha do celular abre/fecha (desliga os atalhos ← →).
+  onSheetOpenChange: (open: boolean) => void;
 }
+
+// Largura do bloco a partir da qual a lista mostra o "Lançar rápido" em linha (tailwind @4xl).
+const WIDE_LAYOUT_MIN_PX = 896;
 
 interface ChoiceOption<T extends string> {
   id: T;
@@ -89,10 +104,44 @@ export function TransactionsTable({
   categories,
   overdueEarlier,
   initialStatusFilter = "all",
+  paymentMethods,
+  accounts,
+  currentLedger,
+  memberFilter,
   onEditTransaction,
   onNewTransaction,
+  onSheetOpenChange,
 }: TransactionsTableProps) {
   const [, startTransition] = useTransition();
+  const containerRef = useRef<HTMLDivElement>(null);
+  // null até medir: evita mostrar o botão do celular por um instante no computador.
+  const [wide, setWide] = useState<boolean | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const isWide = entry.contentRect.width >= WIDE_LAYOUT_MIN_PX;
+      setWide(isWide);
+      // Ao virar layout largo (girar o aparelho, por exemplo) a folha some: fecha também o aviso.
+      if (isWide) {
+        setSheetOpen(false);
+        onSheetOpenChange(false);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onSheetOpenChange]);
+
+  const changeSheetOpen = (open: boolean) => {
+    setSheetOpen(open);
+    onSheetOpenChange(open);
+  };
+
+  // Se a lista sair da tela com a folha aberta, os atalhos do mês voltam.
+  useEffect(() => () => onSheetOpenChange(false), [onSheetOpenChange]);
+
   const { isPaid, toggle } = usePayToggle();
   const [search, setSearch] = useState("");
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
@@ -165,7 +214,8 @@ export function TransactionsTable({
   const toggleKind = (kind: "income" | "expense") => setKindFilter((current) => (current === kind ? "all" : kind));
 
   return (
-    <div className="@container">
+    <>
+    <div ref={containerRef} className={cn("@container", wide === false && "pb-24")}>
       <TransactionTotals totals={totals} kindFilter={kindFilter} onToggleKind={toggleKind} />
 
       <div className="mb-3.5 flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
@@ -228,6 +278,17 @@ export function TransactionsTable({
         </div>
       </div>
 
+      {wide && (
+        <QuickEntryRow
+          categories={categories}
+          paymentMethods={paymentMethods}
+          accounts={accounts}
+          currentLedger={currentLedger}
+          memberFilter={memberFilter}
+          today={today}
+        />
+      )}
+
       {!hasAnyData ? (
         <div className="flex flex-col items-center justify-center rounded-lg bg-card p-12 text-center">
           <SearchIcon className="size-6 text-muted-foreground" aria-hidden="true" />
@@ -235,7 +296,7 @@ export function TransactionsTable({
           <p className="mt-1 max-w-sm text-[13px] text-muted-foreground">
             Quando você lançar uma entrada ou uma saída, ela aparece aqui.
           </p>
-          <Button type="button" variant="outline" size="sm" onClick={onNewTransaction} className="mt-4 gap-1.5 text-[13px]">
+          <Button type="button" variant="outline" size="sm" onClick={() => onNewTransaction()} className="mt-4 gap-1.5 text-[13px]">
             <PlusIcon className="size-3.5" />
             Novo lançamento
           </Button>
@@ -262,5 +323,34 @@ export function TransactionsTable({
         />
       )}
     </div>
+
+    {wide === false && (
+      <>
+        {!sheetOpen &&
+          createPortal(
+            <button
+              type="button"
+              onClick={() => changeSheetOpen(true)}
+              className="fixed right-[18px] bottom-[22px] z-40 inline-flex h-[54px] cursor-pointer items-center gap-2 rounded-full bg-foreground pr-5 pl-4 text-[15px] font-semibold text-background shadow-[0_8px_24px_rgba(0,0,0,0.5)] transition-transform active:scale-95 motion-reduce:transition-none"
+            >
+              <PlusIcon className="size-5" aria-hidden="true" />
+              Lançar
+            </button>,
+            document.body,
+          )}
+        <QuickEntrySheet
+          open={sheetOpen}
+          onOpenChange={changeSheetOpen}
+          categories={categories}
+          paymentMethods={paymentMethods}
+          accounts={accounts}
+          currentLedger={currentLedger}
+          memberFilter={memberFilter}
+          today={today}
+          onMoreOptions={onNewTransaction}
+        />
+      </>
+    )}
+    </>
   );
 }

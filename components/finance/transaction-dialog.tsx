@@ -24,31 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-
-const LAST_CHOICES_KEY = "segundo-cerebro:finance-last-choices";
-
-interface LastChoices {
-  memberLabel?: string;
-  accountId?: string;
-  paymentMethodId?: string;
-}
-
-function readLastChoices(): LastChoices | null {
-  try {
-    const raw = window.localStorage.getItem(LAST_CHOICES_KEY);
-    return raw ? (JSON.parse(raw) as LastChoices) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveLastChoices(choices: LastChoices) {
-  try {
-    window.localStorage.setItem(LAST_CHOICES_KEY, JSON.stringify(choices));
-  } catch {
-    // Sem armazenamento local (aba anônima, por exemplo): só não lembra a escolha.
-  }
-}
+import { readLastChoices, saveLastChoices, type LastChoices } from "./last-choices";
 
 interface TransactionDialogProps {
   open: boolean;
@@ -61,6 +37,7 @@ interface TransactionDialogProps {
   defaultNotebookId?: string | null;
   defaultDescription?: string | null;
   defaultKind?: "income" | "expense";
+  defaultAmountCents?: number | null;
   transactionToEdit?: Tables<"transactions"> | null;
   onSuccess?: () => void;
 }
@@ -86,6 +63,7 @@ function TransactionDialogForm({
   defaultNotebookId,
   defaultDescription,
   defaultKind,
+  defaultAmountCents,
   transactionToEdit,
   onSuccess,
 }: TransactionDialogProps) {
@@ -101,7 +79,7 @@ function TransactionDialogForm({
     () => (transactionToEdit?.status as "paid" | "pending") ?? "paid",
   );
   const [amountStr, setAmountStr] = useState(() =>
-    transactionToEdit ? centsToInput(transactionToEdit.amount_cents) : "",
+    transactionToEdit ? centsToInput(transactionToEdit.amount_cents) : centsToInput(defaultAmountCents),
   );
   const [description, setDescription] = useState(
     () => transactionToEdit?.description ?? defaultDescription ?? "",

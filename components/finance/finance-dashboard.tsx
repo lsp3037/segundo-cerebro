@@ -57,6 +57,7 @@ import { RecurringBillsDialog } from "./recurring-bills-dialog";
 import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
+import type { NewTransactionPrefill } from "./quick-entry";
 import { TransactionsTable } from "./transactions-table";
 import { AnimatedBrl, FinanceMonthSkeleton, MonthSlotLabel, SlidingTabs } from "./transitions";
 
@@ -126,6 +127,9 @@ export function FinanceDashboard({
   const [txDefaultKind, setTxDefaultKind] = useState<"income" | "expense">("expense");
   const [txDefaultNotebookId, setTxDefaultNotebookId] = useState<string | null>(null);
   const [txDefaultDescription, setTxDefaultDescription] = useState<string | null>(null);
+  const [txDefaultAmountCents, setTxDefaultAmountCents] = useState<number | null>(null);
+  // Folha "Novo lançamento" do celular (lista de lançamentos).
+  const [quickSheetOpen, setQuickSheetOpen] = useState(false);
 
   const [nbDialogOpen, setNbDialogOpen] = useState(false);
   const [nbToEdit, setNbToEdit] = useState<Notebook | null>(null);
@@ -225,13 +229,16 @@ export function FinanceDashboard({
       ofxDialogOpen ||
       catDialogOpen ||
       recurringDialogOpen ||
-      invDialogOpen;
+      invDialogOpen ||
+      quickSheetOpen;
     if (anyDialogOpen) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable) return;
+      // Linha "Lançar rápido" e suas listas abertas (as listas ficam fora da linha, no corpo da página).
+      if (target?.closest("[data-no-month-shortcuts], [role='listbox']")) return;
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -251,6 +258,7 @@ export function FinanceDashboard({
     catDialogOpen,
     recurringDialogOpen,
     invDialogOpen,
+    quickSheetOpen,
     handlePrevMonth,
     handleNextMonth,
   ]);
@@ -285,6 +293,13 @@ export function FinanceDashboard({
     setTxDefaultLedger(prefLedger || (currentLedger === "trustcare" ? "trustcare" : "pessoal"));
     setTxDefaultKind(prefKind);
     setTxDialogOpen(true);
+  };
+
+  // "Mais opções" da folha do celular: abre o formulário completo com o que já foi digitado.
+  const handleOpenFromQuickSheet = (prefill?: NewTransactionPrefill) => {
+    handleOpenNewTransaction(undefined, prefill?.kind ?? "expense");
+    setTxDefaultDescription(prefill?.description || null);
+    setTxDefaultAmountCents(prefill?.amountCents || null);
   };
 
   const handleEditTransaction = (tx: Tables<"transactions">) => {
@@ -670,8 +685,13 @@ export function FinanceDashboard({
             }
             categories={categories}
             initialStatusFilter={fluxoStatusFilter}
+            paymentMethods={paymentMethods}
+            accounts={householdData.accounts}
+            currentLedger={currentLedger}
+            memberFilter={activeMember}
             onEditTransaction={handleEditTransaction}
-            onNewTransaction={() => handleOpenNewTransaction()}
+            onNewTransaction={handleOpenFromQuickSheet}
+            onSheetOpenChange={setQuickSheetOpen}
           />
         )}
 
@@ -697,6 +717,7 @@ export function FinanceDashboard({
           if (!open) {
             setTxDefaultNotebookId(null);
             setTxDefaultDescription(null);
+            setTxDefaultAmountCents(null);
           }
         }}
         categories={categories}
@@ -707,6 +728,7 @@ export function FinanceDashboard({
         defaultKind={txDefaultKind}
         defaultNotebookId={txDefaultNotebookId}
         defaultDescription={txDefaultDescription}
+        defaultAmountCents={txDefaultAmountCents}
         transactionToEdit={txToEdit}
       />
 
