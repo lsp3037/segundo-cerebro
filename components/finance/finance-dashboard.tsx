@@ -63,6 +63,7 @@ import { AnimatedBrl, FinanceMonthSkeleton, MonthSlotLabel, SlidingTabs } from "
 interface FinanceDashboardProps {
   initialSummary: FinanceSummary;
   initialTransactions: Transaction[];
+  overdueEarlier: Transaction[];
   initialNotebooks: Notebook[];
   householdData: HouseholdData;
   investmentsData: InvestmentsData | null;
@@ -78,6 +79,7 @@ interface FinanceDashboardProps {
 export function FinanceDashboard({
   initialSummary,
   initialTransactions,
+  overdueEarlier,
   initialNotebooks,
   householdData,
   investmentsData,
@@ -134,7 +136,7 @@ export function FinanceDashboard({
   const [recurringDialogOpen, setRecurringDialogOpen] = useState(false);
   const [invDialogOpen, setInvDialogOpen] = useState(false);
   const [invToEdit, setInvToEdit] = useState<InvestmentView | null>(null);
-  const [fluxoStatusFilter, setFluxoStatusFilter] = useState<"all" | "pending" | "paid">("all");
+  const [fluxoStatusFilter, setFluxoStatusFilter] = useState<"all" | "pending" | "paid">("pending");
 
   // Mês atual real em Cuiabá
   const realCurrentMonth = todayIso().slice(0, 7);
@@ -456,7 +458,7 @@ export function FinanceDashboard({
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  if (tab.id === "fluxo") setFluxoStatusFilter("all");
+                  if (tab.id === "fluxo") setFluxoStatusFilter("pending");
                   updateParams({ tab: tab.id });
                 }}
                 className={`flex h-10 cursor-pointer items-center gap-1.5 border-b-2 text-xs whitespace-nowrap transition-colors ${
@@ -660,6 +662,11 @@ export function FinanceDashboard({
               activeMember
                 ? initialTransactions.filter((t) => t.member_label === activeMember)
                 : initialTransactions
+            }
+            overdueEarlier={
+              activeMember
+                ? overdueEarlier.filter((t) => t.member_label === activeMember)
+                : overdueEarlier
             }
             categories={categories}
             initialStatusFilter={fluxoStatusFilter}

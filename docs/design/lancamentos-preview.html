@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lançamentos: projeto visual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --card: #141416;
+    --raise: #1b1b1e;
+    --line: #26262a;
+    --ink: #f4f4f5;
+    --ink-2: #b4b4ba;
+    --ink-3: #85858c;
+    --in: #34d399;
+    --out: #fb7185;
+    --wait: #fbbf24;
+    --in-bg: rgba(52,211,153,.12);
+    --out-bg: rgba(251,113,133,.11);
+    --wait-bg: rgba(251,191,36,.10);
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  html { background: #050506; }
+  body { margin: 0; font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ===== Prancha ===== */
+  .board { max-width: 1500px; margin: 0 auto; padding: 40px 32px 80px; }
+  .board h1 { font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 8px; font-weight: 600; }
+  .board .lede { color: var(--ink-2); max-width: 70ch; margin: 0 0 36px; font-size: 16px; }
+  .board h2 { font-size: 18px; font-weight: 600; margin: 56px 0 6px; letter-spacing: -0.01em; }
+  .board .sub { color: var(--ink-2); margin: 0 0 20px; max-width: 72ch; }
+  .changes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 32px; margin: 0 0 8px; }
+  .changes p { margin: 0; color: var(--ink-2); }
+  .changes b { display: block; color: var(--ink); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+  .stage { background: #000; border-radius: 14px; padding: 28px; overflow: hidden; }
+  .scale-note { color: var(--ink-3); font-size: 12.5px; margin-top: 10px; }
+
+  /* ===== A tela (desktop) ===== */
+  .screen { background: var(--bg); width: 1280px; border-radius: 12px; padding: 20px 28px 36px; transform-origin: top left; }
+  .tabs { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); height: 46px; margin: 0 -28px 22px; padding: 0 28px; }
+  .tabs nav { display: flex; gap: 22px; color: var(--ink-3); font-size: 13.5px; }
+  .tabs nav .on { color: var(--ink); font-weight: 500; position: relative; }
+  .tabs nav .on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -15px; height: 2px; background: var(--ink); }
+  .who { display: flex; align-items: center; gap: 8px; color: var(--ink-3); font-size: 13px; }
+  .seg { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 2px; }
+  .seg button { all: unset; cursor: pointer; padding: 5px 11px; border-radius: 6px; font-size: 13px; color: var(--ink-3); white-space: nowrap; }
+  .seg button.on { background: var(--raise); color: var(--ink); font-weight: 500; }
+  .seg button:hover:not(.on) { color: var(--ink); }
+  .seg .n { margin-left: 6px; color: var(--ink-3); font-weight: 400; }
+  .seg button.on .n { color: var(--ink-2); }
+
+  /* Totais do mês: tipografia, sem cartões */
+  .totals { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; padding: 4px 0 26px; }
+  .tot .label { color: var(--ink-3); font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .tot .big { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; margin: 4px 0 10px; }
+  .tot .big small { font-size: 17px; font-weight: 500; color: var(--ink-3); margin-right: 3px; letter-spacing: 0; }
+  .bar { height: 5px; background: var(--raise); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 3px; }
+  .tot .split { display: flex; justify-content: space-between; color: var(--ink-2); font-size: 13px; margin-top: 8px; }
+  .tot.in .big { color: var(--in); } .tot.in .bar i { background: var(--in); }
+  .tot.out .big { color: var(--out); } .tot.out .bar i { background: var(--out); }
+  .tot.net .big { color: var(--ink); }
+  .tot .hint { color: var(--ink-2); font-size: 13px; margin-top: 8px; }
+
+  /* Linha do mês */
+  .month { margin: 0 0 24px; }
+  .month .head { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 13px; margin-bottom: 8px; }
+  .track { position: relative; height: 34px; }
+  .track .base { position: absolute; left: 0; right: 0; top: 16px; height: 2px; background: var(--line); border-radius: 1px; }
+  .track .done { position: absolute; left: 0; top: 16px; height: 2px; background: var(--ink-3); border-radius: 1px; width: 61.3%; }
+  .track .today { position: absolute; top: 7px; width: 2px; height: 20px; background: var(--ink); left: 61.3%; border-radius: 1px; }
+  .track .today-l { position: absolute; top: -12px; left: calc(61.3% - 14px); font-size: 12px; color: var(--ink); font-weight: 500; white-space: nowrap; }
+  .track .d { position: absolute; top: 11px; width: 12px; height: 12px; border-radius: 50%; transform: translateX(-6px); }
+  .d.in { background: var(--in); } .d.out { background: var(--out); } .d.late { background: var(--out); box-shadow: 0 0 0 3px rgba(251,113,133,.22); }
+  .d.ok { background: var(--ink-3); width: 8px; height: 8px; top: 13px; transform: translateX(-4px); }
+  .ticks { display: flex; justify-content: space-between; color: var(--ink-3); font-size: 12px; margin-top: 2px; }
+
+  /* Barra de ferramentas */
+  .bartools { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .search { position: relative; flex: 1; max-width: 360px; }
+  .search input { width: 100%; height: 38px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; color: var(--ink); padding: 0 12px 0 36px; font: inherit; }
+  .search input::placeholder { color: var(--ink-3); }
+  .search svg { position: absolute; left: 11px; top: 11px; width: 16px; height: 16px; stroke: var(--ink-3); fill: none; stroke-width: 2; }
+  .spacer { flex: 1; }
+  .select { height: 38px; display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 0 12px; color: var(--ink-2); font-size: 13px; }
+
+  /* Lançar rápido */
+  .quick { display: grid; grid-template-columns: 28px 1fr 160px 190px 120px 92px; gap: 10px; align-items: center; background: var(--card); border: 1px dashed #34343a; border-radius: var(--radius); padding: 8px 10px; margin-bottom: 22px; }
+  .quick .plus { width: 24px; height: 24px; display: grid; place-items: center; color: var(--ink-3); font-size: 18px; }
+  .quick input, .quick .f { height: 36px; background: transparent; border: 0; color: var(--ink); font: inherit; padding: 0 10px; border-radius: 7px; }
+  .quick .f { display: flex; align-items: center; color: var(--ink-2); background: var(--raise); gap: 6px; }
+  .quick input::placeholder { color: var(--ink-3); }
+  .quick .f.val { justify-content: flex-end; color: var(--ink-3); }
+  .btn { height: 36px; border-radius: 8px; border: 0; background: var(--ink); color: #0a0a0b; font: inherit; font-weight: 600; padding: 0 14px; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--line); font-weight: 500; }
+  .btn.sm { height: 30px; font-size: 13px; padding: 0 12px; }
+
+  /* Grupos e linhas */
+  .group { margin-bottom: 28px; }
+  .ghead { display: flex; align-items: baseline; gap: 12px; padding: 0 12px 8px; }
+  .ghead h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .ghead .cnt { color: var(--ink-3); font-size: 13px; }
+  .ghead .sum { margin-left: auto; color: var(--ink-2); font-size: 13px; }
+  .ghead .sum b { font-weight: 500; }
+  .ghead.late h3 { color: var(--out); }
+  .rows { background: var(--card); border-radius: var(--radius); overflow: hidden; }
+  .row { display: grid; grid-template-columns: 36px minmax(240px, 1.6fr) minmax(150px, 1fr) 96px 150px 140px 36px; align-items: center; min-height: 58px; padding: 0 12px; gap: 12px; position: relative; transition: background .12s; }
+  .row + .row::before { content: ""; position: absolute; left: 60px; right: 12px; top: 0; height: 1px; background: var(--line); }
+  .row:hover { background: var(--raise); }
+  .row:hover::before, .row:hover + .row::before { opacity: 0; }
+  .row.late { background: linear-gradient(90deg, rgba(251,113,133,.09), rgba(251,113,133,0) 55%); }
+  .chk { width: 22px; height: 22px; border-radius: 50%; border: 1.75px solid #4a4a52; display: grid; place-items: center; cursor: pointer; }
+  .chk:hover { border-color: var(--ink-2); }
+  .chk.done { background: var(--in); border-color: var(--in); }
+  .chk.done.out-done { background: #5b5b63; border-color: #5b5b63; }
+  .chk svg { width: 12px; height: 12px; stroke: #07130d; stroke-width: 3; fill: none; }
+  .chk:not(.done) svg { display: none; }
+  .desc .t { font-weight: 500; font-size: 14.5px; }
+  .desc .m { font-size: 13px; margin-top: 1px; }
+  .m.late { color: var(--out); } .m.soon { color: var(--wait); } .m.mute { color: var(--ink-3); } .m.in { color: var(--in); }
+  .row.paid .desc .t { color: var(--ink-2); }
+  .cat { display: flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 13.5px; }
+  .ci { width: 17px; height: 17px; flex: none; }
+  .quick .f .ci { width: 16px; height: 16px; }
+  .cat i { width: 8px; height: 8px; border-radius: 50%; }
+  .who-c { color: var(--ink-2); font-size: 13.5px; }
+  .acc { color: var(--ink-3); font-size: 13.5px; }
+  .amt { text-align: right; font-size: 15.5px; font-weight: 600; }
+  .amt.in { color: var(--in); } .amt.out { color: var(--out); }
+  .row.paid .amt.out { color: #d9a3ad; }
+  .more { width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center; color: var(--ink-3); opacity: 0; }
+  .row:hover .more { opacity: 1; }
+  .more:hover { background: var(--line); color: var(--ink); }
+  .hover-act { position: absolute; right: 56px; top: 50%; transform: translateY(-50%); display: none; gap: 6px; }
+  .row:hover .hover-act { display: flex; }
+
+  /* ===== Celular ===== */
+  .phones { display: flex; gap: 40px; align-items: flex-start; flex-wrap: wrap; }
+  .phone { width: 390px; background: var(--bg); border-radius: 36px; border: 1px solid #2a2a2e; overflow: hidden; position: relative; padding-bottom: 96px; }
+  .phone .sbar { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; color: var(--ink-2); font-size: 13px; }
+  .phone .pad { padding: 0 16px; }
+  .phone .h4 { margin: 8px 0 12px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .p-net .l { color: var(--ink-3); font-size: 13px; }
+  .p-net .v { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; }
+  .p-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0 6px; }
+  .p-two .l { color: var(--ink-3); font-size: 13px; }
+  .p-two .v { font-size: 19px; font-weight: 600; margin: 2px 0 6px; }
+  .p-two .in .v { color: var(--in); } .p-two .out .v { color: var(--out); }
+  .p-two .s { color: var(--ink-3); font-size: 12.5px; margin-top: 6px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px 12px; scrollbar-width: none; }
+  .chip { flex: none; height: 34px; padding: 0 14px; border-radius: 17px; background: var(--card); border: 1px solid var(--line); color: var(--ink-2); font-size: 13.5px; display: inline-flex; align-items: center; gap: 6px; }
+  .chip.on { background: var(--ink); color: #0a0a0b; border-color: var(--ink); font-weight: 600; }
+  .chip .n { opacity: .6; font-weight: 500; }
+  .phone .ghead { padding: 14px 16px 6px; position: sticky; top: 0; background: var(--bg); }
+  .phone .ghead h3 { font-size: 14px; }
+  .prow { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 11px 16px; position: relative; }
+  .prow + .prow::before { content: ""; position: absolute; left: 66px; right: 16px; top: 0; height: 1px; background: var(--line); }
+  .prow .t { font-weight: 500; font-size: 15px; }
+  .prow .m { font-size: 13px; color: var(--ink-3); margin-top: 1px; }
+  .prow .m b { font-weight: 500; }
+  .prow .amt { font-size: 15.5px; }
+  .prow.late { background: linear-gradient(90deg, rgba(251,113,133,.09), transparent 60%); }
+  .fab { position: absolute; right: 18px; bottom: 22px; height: 54px; border-radius: 27px; background: var(--ink); color: #0a0a0b; display: flex; align-items: center; gap: 8px; padding: 0 20px 0 16px; font-weight: 600; font-size: 15px; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--raise); border-radius: 22px 22px 0 0; padding: 14px 16px 20px; border-top: 1px solid #323238; }
+  .sheet .grab { width: 40px; height: 4px; border-radius: 2px; background: #4a4a52; margin: 0 auto 14px; }
+  .sheet .h5 { margin: 0 0 12px; font-size: 16px; font-weight: 600; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 10px; white-space: nowrap; height: 46px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; margin-bottom: 8px; color: var(--ink-2); }
+  .field b { color: var(--ink); font-weight: 500; }
+  .field.big { height: 64px; } .field.big b { font-size: 24px; font-weight: 600; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .phone.sheetopen { padding-bottom: 0; }
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.62); }
+  .phone .sheet { z-index: 2; }
+  .phone.sheetopen .fab { display: none; }
+
+  .legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 32px; margin-top: 22px; color: var(--ink-2); max-width: 900px; }
+  .legend b { color: var(--ink); font-weight: 600; }
+  .grow { flex: 1; min-width: 320px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="i-banknote" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol><symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol><symbol id="i-receipt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></symbol><symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol><symbol id="i-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></symbol><symbol id="i-handheart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 14h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16"/><path d="m7 20 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 15 6 6"/><path d="M19.5 8.5c.7-.7 1.5-1.6 1.5-2.7A2.73 2.73 0 0 0 16 4a2.78 2.78 0 0 0-5 1.8c0 1.2.8 2 1.5 2.8L16 12Z"/></symbol><symbol id="i-cap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol><symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></symbol><symbol id="i-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></symbol><symbol id="i-utensils" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></symbol></defs></svg>
+<div class="board">
+
+  <h1>Lançamentos, do jeito que você usa</h1>
+  <p class="lede">Hoje a tela é uma tabela de oito colunas. Aqui ela passa a responder, em ordem: quanto sobra no mês, o que falta resolver e o que já foi feito. Dá para lançar um gasto sem abrir uma janela. Mesmo tema escuro e as mesmas cores do app; os valores abaixo são de exemplo.</p>
+
+  <div class="changes">
+    <p><b>Totais do mês no topo</b>Entradas, saídas e quanto sobra, com o que já foi pago e o que ainda falta. Quem decide o que olhar é você: clicar num total filtra a lista.</p>
+    <p><b>Lista em grupos</b>Atrasado, esta semana, mais adiante e já feitos por dia. Cada grupo mostra o total dele. O que exige ação fica no começo, e o que já passou desce.</p>
+    <p><b>Lançar rápido</b>Uma linha no topo: descrição, valor, categoria e dia. Enter salva. O formulário completo continua no botão "Lançamento", para parcelas e observações.</p>
+    <p><b>Letra maior, ícones de categoria</b>Descrição em 14,5px (hoje 12px) e valor em 15,5px. Cada categoria ganha um ícone pequeno na cor dela, no lugar da bolinha. Sem caixinha em volta da pessoa, sem coluna vazia. Ações aparecem ao passar o mouse.</p>
+    <p><b>Linha do mês</b>Uma régua com hoje e os dias de vencimento. Mostra de relance se a semana está pesada.</p>
+    <p><b>No celular</b>Totais em duas linhas, filtros que deslizam, grupos que ficam presos no topo e um botão "Lançar" na altura do polegar, que abre uma folha de baixo para cima.</p>
+  </div>
+
+  <h2>Computador</h2>
+  <p class="sub">A tela inteira da aba Lançamentos. Os filtros de pessoa e as abas continuam onde estão hoje.</p>
+
+  <div class="stage" id="stage">
+  <div class="screen" id="screen">
+
+    <div class="tabs">
+      <nav><span>Resumo</span><span class="on">Lançamentos</span><span>Orçamento</span><span>Bancos e cartões</span><span>Investimentos</span><span>Análises</span></nav>
+      <div class="who">Pessoa: <div class="seg"><button class="on">Todos</button><button>Casa</button><button>Luan</button><button>Rayzza</button></div></div>
+    </div>
+
+    <div class="totals">
+      <div class="tot in">
+        <div class="label">Entradas de novembro</div>
+        <div class="big num"><small>R$</small>26.100,00</div>
+        <div class="bar"><i style="width:76.6%"></i></div>
+        <div class="split num"><span>Recebido R$ 20.000,00</span><span>Falta R$ 6.100,00</span></div>
+      </div>
+      <div class="tot out">
+        <div class="label">Saídas de novembro</div>
+        <div class="big num"><small>R$</small>6.335,45</div>
+        <div class="bar"><i style="width:51.8%"></i></div>
+        <div class="split num"><span>Pago R$ 3.283,00</span><span>Falta R$ 3.052,45</span></div>
+      </div>
+      <div class="tot net">
+        <div class="label">Sobra prevista</div>
+        <div class="big num"><small>R$</small>19.764,55</div>
+        <div class="hint num">Hoje, já na conta: R$ 16.717,00<br>Contas a pagar até o fim do mês: 4</div>
+      </div>
+    </div>
+
+    <div class="month">
+      <div class="head"><span>Novembro: hoje é dia 19</span><span><b style="color:var(--in)">●</b> recebe &nbsp; <b style="color:var(--out)">●</b> paga ou atrasa &nbsp; <b style="color:var(--ink-3)">●</b> já feito</span></div>
+      <div class="track">
+        <div class="base"></div><div class="done"></div>
+        <div class="today"></div><span class="today-l">hoje</span>
+        <!-- posições: dia/30 -->
+        <div class="d ok" style="left:36.7%"></div>
+        <div class="d ok" style="left:40%"></div>
+        <div class="d ok" style="left:56.7%"></div>
+        <div class="d ok" style="left:60%"></div>
+        <div class="d late" style="left:33.3%"></div>
+        <div class="d out" style="left:66.7%"></div>
+        <div class="d out" style="left:70%"></div>
+        <div class="d in" style="left:90%"></div>
+        <div class="d out" style="left:93.3%"></div>
+        <div class="d in" style="left:100%"></div>
+      </div>
+      <div class="ticks"><span>1</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span></div>
+    </div>
+
+    <div class="bartools">
+      <div class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input placeholder="Buscar por descrição, categoria ou pessoa">
+      </div>
+      <div class="seg" id="filter">
+        <button class="on" data-f="todo">Falta resolver<span class="n">5</span></button>
+        <button data-f="feito">Já feitos<span class="n">7</span></button>
+        <button data-f="all">Todos<span class="n">12</span></button>
+      </div>
+      <div class="seg"><button class="on">Entradas e saídas</button><button>Entradas</button><button>Saídas</button></div>
+      <div class="spacer"></div>
+      <div class="select">Todas as categorias <span style="color:var(--ink-3)">▾</span></div>
+    </div>
+
+    <div class="quick">
+      <div class="plus">+</div>
+      <input placeholder="Lançar rápido: o que foi? (ex.: Mercado)">
+      <div class="f val num">R$ 0,00</div>
+      <div class="f"><svg class="ci" viewBox="0 0 24 24" style="color:#fbbf24" aria-hidden="true"><use href="#i-utensils"/></svg>Alimentação <span style="margin-left:auto;color:var(--ink-3)">▾</span></div>
+      <div class="f">Hoje <span style="margin-left:auto;color:var(--ink-3)">▾</span></div>
+      <button class="btn">Salvar</button>
+    </div>
+
+    <div id="groups">
+
+      <section class="group g-todo">
+        <div class="ghead late"><h3>Atrasado</h3><span class="cnt">1 conta</span><span class="sum num">saem <b>R$ 129,90</b></span></div>
+        <div class="rows">
+          <div class="row late">
+            <div class="chk out-chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Internet Vivo Fibra</div><div class="m late">Venceu em 10/11, 9 dias de atraso</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#f97316" aria-hidden="true"><use href="#i-zap"/></svg>Contas de consumo</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt out num">− R$ 129,90</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Dar baixa</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group g-todo">
+        <div class="ghead"><h3>Esta semana</h3><span class="cnt">20 a 22 de novembro · 2 contas</span><span class="sum num">saem <b>R$ 1.092,40</b></span></div>
+        <div class="rows">
+          <div class="row">
+            <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Plano de saúde</div><div class="m soon">Vence amanhã, sexta (20/11)</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#22d3ee" aria-hidden="true"><use href="#i-pulse"/></svg>Saúde</div>
+            <div class="who-c">Rayzza</div>
+            <div class="acc">Cartão Nubank</div>
+            <div class="amt out num">− R$ 612,40</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Dar baixa</button></div>
+          </div>
+          <div class="row">
+            <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Mensalidade do curso</div><div class="m soon">Vence sábado (21/11)</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#6366f1" aria-hidden="true"><use href="#i-cap"/></svg>Bolsa &amp; Estudos</div>
+            <div class="who-c">Rayzza</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt out num">− R$ 480,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Dar baixa</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group g-todo">
+        <div class="ghead"><h3>Mais adiante</h3><span class="cnt">até 30 de novembro · 3 itens</span><span class="sum num">entram <b style="color:var(--in)">R$ 6.100,00</b> &nbsp; saem <b>R$ 1.830,15</b></span></div>
+        <div class="rows">
+          <div class="row">
+            <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Fatura do cartão Itaú</div><div class="m mute">Vence sábado, 28/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#a78bfa" aria-hidden="true"><use href="#i-card"/></svg>Cartões</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt out num">− R$ 1.830,15</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Dar baixa</button></div>
+          </div>
+          <div class="row">
+            <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Aluguel Sinop</div><div class="m mute">A receber em 27/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#34d399" aria-hidden="true"><use href="#i-house"/></svg>Aluguel</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt in num">+ R$ 2.100,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Marcar recebido</button></div>
+          </div>
+          <div class="row">
+            <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Salário Luan</div><div class="m mute">A receber em 30/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#34d399" aria-hidden="true"><use href="#i-banknote"/></svg>Salário</div>
+            <div class="who-c">Luan</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt in num">+ R$ 4.000,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn sm">Marcar recebido</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group g-feito">
+        <div class="ghead"><h3>Quinta, 19 de novembro</h3><span class="cnt">hoje · 2 itens</span><span class="sum num">saíram <b>R$ 2.780,00</b></span></div>
+        <div class="rows">
+          <div class="row paid">
+            <div class="chk done out-done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Dízimo</div><div class="m mute">Pago hoje</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#2dd4bf" aria-hidden="true"><use href="#i-handheart"/></svg>Dízimo &amp; Ofertas</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt out num">− R$ 2.600,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+          <div class="row paid">
+            <div class="chk done out-done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Conserto do micro-ondas</div><div class="m mute">Pago hoje</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#94a3b8" aria-hidden="true"><use href="#i-receipt"/></svg>Outras despesas</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Dinheiro</div>
+            <div class="amt out num">− R$ 180,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group g-feito">
+        <div class="ghead"><h3>Terça, 17 de novembro</h3><span class="cnt">2 itens</span><span class="sum num">entraram <b style="color:var(--in)">R$ 12.000,00</b> &nbsp; saíram <b>R$ 503,00</b></span></div>
+        <div class="rows">
+          <div class="row paid">
+            <div class="chk done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Salário HSH</div><div class="m in">Recebido em 17/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#34d399" aria-hidden="true"><use href="#i-banknote"/></svg>Salário</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt in num">+ R$ 12.000,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+          <div class="row paid">
+            <div class="chk done out-done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Energia</div><div class="m mute">Pago em 17/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#f97316" aria-hidden="true"><use href="#i-zap"/></svg>Contas de consumo</div>
+            <div class="who-c">Casa</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt out num">− R$ 503,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="group g-feito">
+        <div class="ghead"><h3>Antes, em novembro</h3><span class="cnt">2 itens</span><span class="sum num">entraram <b style="color:var(--in)">R$ 8.000,00</b></span></div>
+        <div class="rows">
+          <div class="row paid">
+            <div class="chk done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Bolsa Residência</div><div class="m in">Recebido em 13/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#8b5cf6" aria-hidden="true"><use href="#i-gift"/></svg>Benefícios &amp; Bonificações</div>
+            <div class="who-c">Luan</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt in num">+ R$ 4.000,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+          <div class="row paid">
+            <div class="chk done"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+            <div class="desc"><div class="t">Bolsa Residência Rayzza</div><div class="m in">Recebido em 12/11</div></div>
+            <div class="cat"><svg class="ci" viewBox="0 0 24 24" style="color:#6366f1" aria-hidden="true"><use href="#i-cap"/></svg>Bolsa &amp; Estudos</div>
+            <div class="who-c">Rayzza</div>
+            <div class="acc">Conta corrente</div>
+            <div class="amt in num">+ R$ 4.000,00</div>
+            <div class="more">⋯</div>
+            <div class="hover-act"><button class="btn ghost sm">Editar</button><button class="btn ghost sm">Desfazer baixa</button></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+  </div>
+  <div class="scale-note">Passe o mouse sobre uma linha para ver "Dar baixa" e "Editar". Os botões Falta resolver, Já feitos e Todos funcionam neste preview.</div>
+
+  <h2>Celular</h2>
+  <p class="sub">Duas telas: a lista e a folha de "Lançar". A bolinha continua sendo o jeito de dar baixa, agora com área de toque maior.</p>
+
+  <div class="phones">
+
+    <div class="phone">
+      <div class="sbar"><span>9:41</span><span>● ● ●</span></div>
+      <div class="pad">
+        <div class="h4">Lançamentos</div>
+        <div class="p-net"><div class="l">Sobra prevista em novembro</div><div class="v num">R$ 19.764,55</div></div>
+        <div class="p-two">
+          <div class="in"><div class="l">Entradas</div><div class="v num">R$ 26.100,00</div><div class="bar"><i style="width:76.6%;background:var(--in)"></i></div><div class="s num">Falta receber R$ 6.100,00</div></div>
+          <div class="out"><div class="l">Saídas</div><div class="v num">R$ 6.335,45</div><div class="bar"><i style="width:51.8%;background:var(--out)"></i></div><div class="s num">Falta pagar R$ 3.052,45</div></div>
+        </div>
+      </div>
+      <div class="chips"><span class="chip on">Falta resolver <span class="n">5</span></span><span class="chip">Já feitos <span class="n">7</span></span><span class="chip">Todos</span><span class="chip">Saídas</span><span class="chip">Categoria ▾</span></div>
+      <div class="ghead late"><h3>Atrasado</h3><span class="sum num">R$ 129,90</span></div>
+      <div class="prow late">
+        <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <div><div class="t">Internet Vivo Fibra</div><div class="m"><b style="color:var(--out)">Venceu 10/11</b> · Casa</div></div>
+        <div class="amt out num">− R$ 129,90</div>
+      </div>
+      <div class="ghead"><h3>Esta semana</h3><span class="sum num">R$ 1.092,40</span></div>
+      <div class="prow">
+        <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <div><div class="t">Plano de saúde</div><div class="m"><b style="color:var(--wait)">Vence amanhã</b> · Rayzza</div></div>
+        <div class="amt out num">− R$ 612,40</div>
+      </div>
+      <div class="prow">
+        <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <div><div class="t">Mensalidade do curso</div><div class="m"><b style="color:var(--wait)">Vence sábado</b> · Rayzza</div></div>
+        <div class="amt out num">− R$ 480,00</div>
+      </div>
+      <div class="ghead"><h3>Mais adiante</h3><span class="sum num">3 itens</span></div>
+      <div class="prow">
+        <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <div><div class="t">Fatura do cartão Itaú</div><div class="m">Vence 28/11 · Casa</div></div>
+        <div class="amt out num">− R$ 1.830,15</div>
+      </div>
+      <div class="prow">
+        <div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div>
+        <div><div class="t">Aluguel Sinop</div><div class="m">A receber 27/11 · Casa</div></div>
+        <div class="amt in num">+ R$ 2.100,00</div>
+      </div>
+      <div class="fab"><span style="font-size:22px;line-height:1">+</span> Lançar</div>
+    </div>
+
+    <div class="phone sheetopen" style="min-height: 860px;">
+      <div class="sbar"><span>9:41</span><span>● ● ●</span></div>
+      <div class="pad"><div class="h4">Lançamentos</div></div>
+      <div class="prow"><div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div><div><div class="t">Plano de saúde</div><div class="m">Vence amanhã · Rayzza</div></div><div class="amt out num">− R$ 612,40</div></div>
+      <div class="prow"><div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div><div><div class="t">Mensalidade do curso</div><div class="m">Vence sábado · Rayzza</div></div><div class="amt out num">− R$ 480,00</div></div>
+      <div class="prow"><div class="chk"><svg viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></svg></div><div><div class="t">Fatura do cartão Itaú</div><div class="m">Vence 28/11 · Casa</div></div><div class="amt out num">− R$ 1.830,15</div></div>
+      <div class="scrim"></div>
+      <div class="sheet" style="position:absolute;">
+        <div class="grab"></div>
+        <div class="h5">Novo lançamento</div>
+        <div class="seg" style="width:100%;margin-bottom:10px"><button class="on" style="flex:1;text-align:center">Saída</button><button style="flex:1;text-align:center">Entrada</button></div>
+        <div class="field big"><span>Valor</span><b class="num">R$ 230,00</b></div>
+        <div class="field"><span>O que foi</span><b>Mercado</b></div>
+        <div class="row2"><div class="field"><span>Categoria</span><b>Alimentação</b></div><div class="field"><span>Dia</span><b>Hoje</b></div></div>
+        <div class="row2"><div class="field"><span>Quem</span><b>Casa</b></div><div class="field"><span>Pago com</span><b>Cartão Nubank</b></div></div>
+        <div class="field"><span>Já foi pago</span><b style="color:var(--in)">Sim</b></div>
+        <div style="color:var(--ink-3);font-size:13px;margin:6px 2px 10px">Parcelas, repetição e observações ficam em "Mais opções".</div>
+        <div class="row2"><button class="btn ghost" style="height:48px">Mais opções</button><button class="btn" style="height:48px">Salvar</button></div>
+      </div>
+    </div>
+
+    <div class="grow">
+      <div class="legend" style="grid-template-columns:1fr;margin-top:0">
+        <div><b>O que fica igual</b><br>Bolinha para dar baixa, "Desfazer" por 10 segundos, filtro por pessoa, busca, formulário completo, importação de extrato e as mesmas cores de entrada, saída e atenção.</div>
+        <div><b>O que sai</b><br>A coluna "Pagamento" vazia, as caixinhas em volta de "Casa" e a tabela de 8 colunas no celular. Quem paga e a conta passam para a linha, em texto simples.</div>
+        <div><b>Regras de cor</b><br>Verde só para dinheiro que entra, rosa só para o que sai e atrasou, amarelo só para o que vence esta semana. O resto é cinza e branco.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Escala a tela de desktop para caber na prancha
+  (function () {
+    const stage = document.getElementById('stage');
+    const screen = document.getElementById('screen');
+    function fit() {
+      const avail = stage.clientWidth - 56;
+      const s = Math.min(1, avail / 1280);
+      screen.style.transform = 'scale(' + s + ')';
+      stage.style.height = (screen.offsetHeight * s + 56) + 'px';
+    }
+    window.addEventListener('resize', fit); fit();
+  })();
+  // Filtro de demonstração
+  document.querySelectorAll('#filter button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#filter button').forEach(function (x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      var f = b.dataset.f;
+      document.querySelectorAll('.g-todo').forEach(function (g) { g.style.display = (f === 'feito') ? 'none' : ''; });
+      document.querySelectorAll('.g-feito').forEach(function (g) { g.style.display = (f === 'todo') ? 'none' : ''; });
+      var s = document.getElementById('stage'), sc = document.getElementById('screen');
+      var k = parseFloat(sc.style.transform.replace(/[^0-9.]/g, '')) || 1;
+      s.style.height = (sc.offsetHeight * k + 56) + 'px';
+    });
+  });
+  // Bolinhas de demonstração
+  document.querySelectorAll('.chk').forEach(function (c) {
+    c.addEventListener('click', function () { c.classList.toggle('done'); });
+  });
+</script>
+</body>
+</html>

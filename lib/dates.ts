@@ -136,6 +136,27 @@ export function formatMonthYear(iso: IsoDate) {
   return monthYear.format(toUtc(iso));
 }
 
+const weekdayLong = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "UTC" });
+const dayOfMonthLong = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "UTC" });
+const monthLong = new Intl.DateTimeFormat("pt-BR", { month: "long", timeZone: "UTC" });
+
+// "quinta-feira"
+export function formatWeekdayLong(iso: IsoDate) {
+  return weekdayLong.format(toUtc(iso));
+}
+
+// "Quinta, 19 de novembro"
+export function formatDayTitle(iso: IsoDate) {
+  const weekdayName = formatWeekdayLong(iso).replace(/-feira$/, "");
+  const text = `${weekdayName}, ${dayOfMonthLong.format(toUtc(iso))}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// "novembro"
+export function formatMonthName(iso: IsoDate) {
+  return monthLong.format(toUtc(iso));
+}
+
 // Data e minuto do dia (0–1439) de um instante, no relógio de Cuiabá.
 export function wallParts(iso: string) {
   const d = new Date(new Date(iso).getTime() + TZ_OFFSET_MS);

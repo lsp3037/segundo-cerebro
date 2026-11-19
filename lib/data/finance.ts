@@ -351,6 +351,45 @@ export async function getTransactions(params?: {
     query = query.limit(1000);
   }
 
+  return withTransactionJoins(supabase, query);
+}
+
+// Pendentes que venceram antes de `beforeDate` (início do mês visto), de qualquer mês anterior.
+export async function getOverdueTransactions(params: {
+  ledger: "pessoal" | "trustcare" | "all";
+  member?: string | null;
+  beforeDate: string; // YYYY-MM-DD
+}): Promise<Transaction[]> {
+  const supabase = await createClient();
+
+  let query = supabase
+    .from("transactions")
+    .select("*")
+    .is("deleted_at", null)
+    .eq("status", "pending")
+    .or(
+      `due_date.lt.${params.beforeDate},and(due_date.is.null,date.lt.${params.beforeDate})`
+    )
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("date", { ascending: true })
+    .limit(200);
+
+  if (params.ledger !== "all") query = query.eq("ledger", params.ledger);
+  if (params.member && params.member.trim()) query = query.eq("member_label", params.member.trim());
+
+  return withTransactionJoins(supabase, query);
+}
+
+type TransactionsQuery = PromiseLike<{
+  data: Tables<"transactions">[] | null;
+  error: { message: string } | null;
+}>;
+
+// Anexa categoria, forma de pagamento, notebook e conta às linhas de `transactions`.
+async function withTransactionJoins(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  query: TransactionsQuery
+): Promise<Transaction[]> {
   const [txRes, catsRes, methodsRes, notebooksRes, accountsRes] = await Promise.all([
     query,
     supabase.from("finance_categories").select("id, name, color"),

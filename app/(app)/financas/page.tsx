@@ -8,12 +8,14 @@ import {
   getFinanceCategories,
   getFinanceSummary,
   getNotebooks,
+  getOverdueTransactions,
   getPaymentMethods,
   getTransactions,
+  type Transaction,
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getInvestmentsData } from "@/lib/data/finance-investments";
-import { todayIso } from "@/lib/dates";
+import { startOfMonth, todayIso } from "@/lib/dates";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[7];
@@ -47,9 +49,16 @@ export default async function Page(props: PageProps<"/financas">) {
   const effectiveMember = currentLedger === "pessoal" ? currentMember : null;
   const showInvestments = currentLedger === "pessoal" && searchParams.tab === "investimentos";
 
-  const [summary, transactions, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
+  // Atrasados de meses anteriores só entram na lista quando se olha o mês atual de verdade.
+  const today = todayIso();
+  const showOverdueEarlier = searchParams.tab === "fluxo" && currentMonth === today.slice(0, 7);
+
+  const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
     getFinanceSummary({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     getTransactions({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
+    showOverdueEarlier
+      ? getOverdueTransactions({ ledger: currentLedger, member: effectiveMember, beforeDate: startOfMonth(today) })
+      : Promise.resolve([] as Transaction[]),
     getNotebooks(),
     getFinanceCategories(),
     getPaymentMethods(),
@@ -61,6 +70,7 @@ export default async function Page(props: PageProps<"/financas">) {
     <FinanceDashboard
       initialSummary={summary}
       initialTransactions={transactions}
+      overdueEarlier={overdueEarlier}
       initialNotebooks={notebooks}
       householdData={householdData}
       investmentsData={investmentsData}

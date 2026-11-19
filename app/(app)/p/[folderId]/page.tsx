@@ -26,8 +26,10 @@ import {
   getFinanceCategories,
   getFinanceSummary,
   getNotebooks,
+  getOverdueTransactions,
   getPaymentMethods,
   getTransactions,
+  type Transaction,
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getInvestmentsData } from "@/lib/data/finance-investments";
@@ -38,7 +40,7 @@ import { getNotes } from "@/lib/data/notes";
 import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
 import { getContentIdeas, getContentPillars, getPublications, getReplyCases, getServiceFlows, getShortcuts } from "@/lib/data/trustcare";
-import { todayIso } from "@/lib/dates";
+import { startOfMonth, todayIso } from "@/lib/dates";
 import { getOsSummary } from "@/lib/integrations/os-manager";
 import { type Folder, type FolderModule, MODULES } from "@/lib/modules";
 
@@ -189,9 +191,15 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
 
       await ensureMonthBills(user.id, currentMonth);
 
-      const [summary, transactions, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
+      // Atrasados de meses anteriores só entram na lista quando se olha o mês atual de verdade.
+      const showOverdueEarlier = searchParams.tab === "fluxo" && currentMonth === today.slice(0, 7);
+
+      const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
         getFinanceSummary({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         getTransactions({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
+        showOverdueEarlier
+          ? getOverdueTransactions({ ledger: targetLedger, member: effectiveMember, beforeDate: startOfMonth(today) })
+          : Promise.resolve([] as Transaction[]),
         getNotebooks(),
         getFinanceCategories(),
         getPaymentMethods(),
@@ -203,6 +211,7 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
         <FinanceDashboard
           initialSummary={summary}
           initialTransactions={transactions}
+          overdueEarlier={overdueEarlier}
           initialNotebooks={notebooks}
           householdData={householdData}
           investmentsData={investmentsData}
