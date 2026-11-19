@@ -1,7 +1,6 @@
 // Contrato da lista de Lançamentos (grupos, totais, situação de cada linha).
 // Só tipos: sem "use client" e sem "server-only". A implementação fica em
 // `lib/finance/transaction-groups.ts` (funções puras) e é usada pela tela.
-import type { IsoDate } from "@/lib/dates";
 import type { Transaction } from "@/lib/data/finance";
 
 // "todo" = falta resolver (a pagar / a receber); "done" = já feito.
