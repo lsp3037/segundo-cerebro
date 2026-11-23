@@ -127,7 +127,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
   - `Bancos e cartões`: gestão de saldos reais, transferências entre contas e acompanhamento separado de faturas/limites de 4 cartões de crédito.
   - `Orçamentos`: tetos mensais por categoria com barras proporcionais reais (sem barras mínimas enganosas) e cards responsivos no celular.
   - `Análises`: quanto sobrou da renda, quanto as contas fixas levam, gasto por dia, gastos por categoria mês a mês (este mês, mês passado, média de 3 meses), tendência de 6 meses ancorada no mês selecionado e diagnóstico mensal sob demanda (local/determinístico quando `ai_enabled = false`, via `assertAreaAllowsAi`).
-  - `Lançamentos`: tabela no desktop, linhas compactas no celular, bolinha de pagar e "Desfazer" em baixas e exclusões.
+  - `Lançamentos` (redesenhado em 2026-11-19 a 23): totais do mês em texto (entradas e saídas com recebido/pago/falta, sobra prevista e "hoje, já na conta"); lista em grupos (Atrasado, Esta semana, Mais adiante, Sem vencimento e, nos já feitos, por dia e por mês) com subtotal; filtro que abre em "Falta resolver", com contagens; atrasados de meses anteriores no mês atual; **Lançar rápido** (linha no computador, Enter salva como pago, com "Desfazer"; folha de baixo para cima no celular); régua do mês no computador (clicar num dia filtra); ícone por categoria, automático pelo nome ou escolhido. Bolinha de pagar e "Desfazer" em baixas e exclusões.
 - **Contas Fixas & Dízimo Automático (10%):** carregamento guiado do modelo familiar com cálculo automático de 10% do dízimo sobre as entradas e geração em lote no mês.
 - **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + taxa de maquininha + custos pós-venda/garantia), com preço de vitrine e alerta para estoque parado (>30 dias).
 - **Importação OFX e Privacidade:** leitor local de extratos `.ofx` sem envio para IA, detecção de duplicidades via `FITID` e aprendizado automático de regras de categorização (`finance_rules`). Área nasce travada para IA (`ai_enabled = false`).
@@ -188,6 +188,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-12 | Reorganização visual de Finanças em hierarquia única de 56px, reconciliação de filtros no servidor, gráficos ancorados no mês selecionado e responsividade móvel em 2 linhas. |
 | 2026-11-12 | Menu lateral desktop retrátil (`w-64` ↔ `w-14`) com trilho apenas de ícones + tooltips e troca dos pontos coloridos por ícones minimalistas outline nas áreas. |
 | 2026-11-13 | Investimentos só no Pessoal. Taxa por faixas de "% do CDI" sobre a taxa diária (padrão do Cofrinho: 120% até R$ 10.000, 100% acima) ou taxa fixa ao ano. CDI buscado sozinho no Banco Central (só datas saem do app; nada vai para a IA). Rende só em dias úteis, crédito com o CDI do dia útil anterior, aporte rende a partir do próximo dia útil. Em 2026-11-19, com os créditos reais do Luan, confirmou-se que o Mercado Pago credita o rendimento líquido (imposto de renda regressivo por depósito); o app passou a descontar o imposto por padrão. Aporte e resgate não viram lançamentos nem mexem no saldo dos bancos, para não inflar o Dízimo nem contar em dobro. |
+| 2026-11-19 a 23 | Lançamentos redesenhado, aprovado pelo Luan com prévia visual: lista em grupos por situação (padrão "Falta resolver"), totais do mês em texto, "Lançar rápido" (linha no computador, folha no celular; sempre grava como pago), régua do mês só no computador e ícone por categoria (automático pelo nome ou escolhido). Atrasados de meses anteriores só aparecem no mês atual. Nada vai para a IA. |
 
 ## 10. Pendências e riscos
 
@@ -199,5 +200,6 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | Plano gratuito do Gemini: limites e modelos que mudam | Risco operacional | Modelo reserva já configurado. Acompanhar. |
 | A administração da SES pode bloquear apps externos no futuro | Risco | Plano B: compartilhar a agenda da SES com o Gmail |
 | Investimentos: conferir com o app do Mercado Pago o crédito do dia e o dia em que um aporte novo começa a render | Conferência pendente | Luan, com o Cofrinho real (ver OPERACAO.md) |
+| Lançamentos: ideias futuras (lançar rápido com "a pagar", colunas configuráveis, lançamento por voz ou texto livre) | Ideia, sem data | Luan, se sentir falta no uso |
 | Investimentos: IOF e come-cotas, outros tipos (CDB, Tesouro, ações), ligação com os saldos dos bancos, gráfico e projeção, patrimônio no Resumo, avisos no sino | Fora da v1 | Decidir com o Luan quando houver necessidade |
 | Investimentos dependem da API pública do Banco Central | Risco operacional | Cópia local do CDI; em falha o app usa o último valor e avisa |

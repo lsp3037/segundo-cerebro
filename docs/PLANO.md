@@ -87,7 +87,7 @@ Rotinas = eventos recorrentes com `kind = rotina`.
 
 | Tabela | Campos principais |
 |---|---|
-| `finance_categories` | `ledger` (pessoal/trustcare), `kind` (entrada/saída), `name`, `color`, `parent_id` |
+| `finance_categories` | `ledger` (pessoal/trustcare), `kind` (entrada/saída), `name`, `color`, `icon` (chave do ícone; nula = automático pelo nome, ver seção 17), `parent_id` |
 | `payment_methods` | `name` (Pix, crédito Nubank, dinheiro…), `type` |
 | `finance_accounts` | `name`, `type` (checking/savings/cash/credit_card), `owner_label`, `opening_balance_cents`, `credit_limit_cents`, `due_day`, `active`, `sort_order` |
 | `finance_recurring_bills` | `name`, `ledger`, `kind`, `amount_cents`, `percentage_of_income` (ex.: `10%` Dízimo), `due_day`, `category_id`, `account_id`, `member_label` (Casa/Luan/Rayzza), `active` |
@@ -302,7 +302,7 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 > Evolução do ledger `pessoal` calibrada com a planilha familiar de Luan & Rayzza.
 
 - **Modelo de Dados (`20261112120000_finance_family.sql`):** `finance_accounts` (contas correntes, reserva, dinheiro e 4 cartões de crédito com limite e dia de vencimento), `finance_recurring_bills` (contas/entradas fixas mensais + regra percentual automática de `10%` para o Dízimo), `finance_budgets` (tetos mensais por categoria) e extensão de `transactions` (`status` Pago/Pendente, `due_date`, `paid_at`, `account_id`, `member_label` Casa/Luan/Rayzza, `recurring_bill_id` e parcelamentos `installment_group_id` / `installment_index` / `installment_total`). Todas as tabelas novas com RLS (`private.apply_owner_policy`).
-- **5 Visões em `/financas`:** (1) `Visão Geral` (alertas de vencimento, resposta principal do mês + faixa dividida de KPIs, baixa rápida em 1 clique, entradas base e distribuição por pessoa), (2) `Contas & Cartões` (saldos reais, transferência entre contas e faturas dos cartões), (3) `Orçamentos` (planejado vs. realizado com barras proporcionais honestas e lista adaptada ao celular), (4) `Relatórios & KPIs` (Diagnóstico do mês sob demanda com trava de privacidade via `assertAreaAllowsAi` / análise local determinística, Taxa de Poupança, Comprometimento Fixo, Burn Rate, comparativo Mês Atual vs. Anterior vs. Média 3M, tendência 6 meses e distribuição por categoria) e (5) `Fluxo & Vencimentos` (tabela desktop + linhas compactas de 2 linhas no mobile e quitação direta).
+- **5 Visões em `/financas`:** (1) `Visão Geral` (alertas de vencimento, resposta principal do mês + faixa dividida de KPIs, baixa rápida em 1 clique, entradas base e distribuição por pessoa), (2) `Contas & Cartões` (saldos reais, transferência entre contas e faturas dos cartões), (3) `Orçamentos` (planejado vs. realizado com barras proporcionais honestas e lista adaptada ao celular), (4) `Relatórios & KPIs` (Diagnóstico do mês sob demanda com trava de privacidade via `assertAreaAllowsAi` / análise local determinística, Taxa de Poupança, Comprometimento Fixo, Burn Rate, comparativo Mês Atual vs. Anterior vs. Média 3M, tendência 6 meses e distribuição por categoria) e (5) `Fluxo & Vencimentos`, hoje a aba **Lançamentos** (tabela desktop + linhas compactas de 2 linhas no mobile e quitação direta). Em 2026-11-19 a 23 a aba foi redesenhada: totais do mês, lista em grupos por situação, "Lançar rápido", régua do mês e ícones por categoria (ver seção 17).
 - **Reorganização visual e hierarquia (`2026-11-12`):**
   - Shell único de 56px em `/financas` e `/p/[folderId]` (módulo `finance`), sem título duplicado de pasta e sem o botão flutuante global de captura no celular sobreposto à lista financeira.
   - Abas filtradas por ledger (`Pessoal`, `Trust Care`, `Consolidado`), menu único **Configurar ▾** e apenas 1 CTA primário invertido no topo (`+ Lançamento` ou `+ Notebook`).
@@ -379,3 +379,40 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 **Privacidade:** a pergunta ao Banco Central é um GET público só com datas; nenhum dado do Luan sai do app. Nada dos investimentos vai para a IA (Finanças tem `ai_enabled = false`).
 
 **Fora da v1:** IOF e come-cotas; outros tipos (CDB, Tesouro, ações, fundos); ligar aportes e resgates aos saldos dos bancos; gráfico e projeção; patrimônio no Resumo; avisos no sino; investimentos em Trust Care ou Consolidado.
+
+
+## 17. Lançamentos redesenhado (2026-11-19 a 23)
+
+> Especificação visual aprovada: [`design/lancamentos-preview.html`](design/lancamentos-preview.html). Feito em 5 etapas, cada uma publicada depois de testada no navegador: (1) lista em grupos, totais, filtros e ícones por nome; (2) lançar rápido e folha do celular; (3) régua do mês; (4) ícone escolhido por categoria; (5) esta documentação.
+
+**Totais do mês** (`transaction-totals.tsx`, regra em `monthTotals`): em tipografia, sem cartões. "Entradas" e "Saídas" mostram o total e, abaixo, recebido/pago e quanto falta; "Sobra prevista" = entradas − saídas do mês; "Hoje, já na conta" = só o que já foi recebido menos o que já foi pago. Os totais usam os lançamentos do mês visto, sem os atrasados de meses anteriores.
+
+**Grupos da lista** (`lib/finance/transaction-groups.ts`, puro, sem `"use client"`; tipos em `transaction-groups.types.ts`)
+- **Pendentes**, nesta ordem: **Atrasado** (vencimento anterior a hoje), **Esta semana** (vence até o fim da semana, que começa na segunda), **Mais adiante** e **Sem vencimento** (sem `due_date` e com data já passada). Cada grupo mostra subtotal e contagem ("2 contas", ou "3 itens" quando há entradas).
+- **Já feitos:** um grupo por dia nos últimos 7 dias (hoje e os 6 anteriores, pelo dia do pagamento) e um grupo por mês para o que é mais antigo ("Antes, em outubro").
+- Cada linha mostra a situação em texto (`txSituation`): "Venceu em 05/11, 3 dias de atraso", "Vence hoje", "Vence amanhã, quarta (19/11)", "Pago hoje", "Recebido em 12/11". Amarelo até 7 dias à frente, rosa quando atrasado.
+- **Filtros** (`transactions-table.tsx`): situação, tipo, categoria, busca e dia. O padrão da situação passou de "Todos" para **"Falta resolver"** (os outros: "Já feitos" e "Todos"). Os botões mostram a contagem (`statusCounts`).
+- **Atrasados de meses anteriores:** `getOverdueTransactions` (`lib/data/finance.ts`) busca pendentes com vencimento anterior ao início do mês (`beforeDate`), limite de 200. A página só chama quando o mês visto é o **mês atual real**; em outros meses a lista mostra só aquele mês.
+- **Computador e celular** por container query (`@container`, `@4xl`): lista com 896 px de largura ou mais usa colunas (`WIDE_LAYOUT_MIN_PX`); abaixo disso, linhas de 2 linhas.
+
+**Lançar rápido** (lógica compartilhada em `quick-entry.ts`; telas `quick-entry-row.tsx` e `quick-entry-sheet.tsx`; seletores `quick-category-select.tsx` e `quick-day-select.tsx`)
+- **Computador:** linha fixa no topo da lista. Enter salva como **pago**, limpa descrição e valor e mantém categoria, dia e tipo (para lançar vários em sequência). Aviso de 10 s com "Desfazer" (`trashTransaction` / `restoreFinanceItem`).
+- **Celular:** o botão "+ Lançar" abre uma folha de baixo para cima (valor em foco, categoria, dia, quem, pago com, "Já foi pago?"; ao marcar "ainda não", o campo vira "Vence em"). "Mais opções" leva ao formulário completo com o que já foi digitado (`QuickEntryDraft`). As últimas escolhas (pessoa, banco, forma) vêm de `last-choices`.
+
+**Régua do mês** (`month-ruler.tsx`, só no computador): um ponto por dia com lançamentos: verde, rosa, rosa com anel (atrasado) e cinza (já feito). Clicar filtra o dia e aparece o chip "Dia 19 de novembro ✕" para limpar.
+
+**Ícones de categoria** (`lib/finance/category-icons.ts`, `category-icon.tsx`, `category-icon-labels.ts`, `category-icon-picker.tsx`)
+- Coluna `finance_categories.icon` (migration `20261123120000_finance_category_icon.sql`, já executada). **Nula = automático:** `categoryIconKey` deduz o ícone pelo nome (regras em ordem; a primeira que casar vence). São 26 chaves Lucide curadas; o seletor no gerenciador de categorias tem a opção "Automático". O `categorySchema` (`lib/actions/finance.ts`) aceita só chaves da lista.
+- Os **gráficos continuam por cor** (`color`); o ícone vale na lista de Lançamentos, Orçamento e Importação.
+
+**Privacidade:** tudo é leitura e gravação no Supabase; nada desta aba vai para a IA (Finanças tem `ai_enabled = false`), então não foi preciso chamar `assertAreaAllowsAi`.
+
+**Lições**
+- A régua e os grupos de "já feitos" usam `paid_at.slice(0, 10)`: `paid_at` é do tipo `date` (texto de dia), sem conversão de fuso. Converter com `new Date` deslocaria o dia.
+- O atalho ← → de troca de mês é desligado com folha, linha rápida ou popover abertos (`anyDialogOpen` e o atributo `data-no-month-shortcuts`), para as setas não mudarem o mês durante a digitação.
+- Constantes usadas por servidor e cliente (lista de ícones, regras de grupos) ficam em módulos sem `"use client"`.
+
+**Ficou de fora (de propósito)**
+- O lançar rápido grava **sempre como "pago"**; conta a pagar continua pelo formulário completo ou pela folha do celular ("ainda não foi pago").
+- Atrasados antigos só aparecem no mês atual, com limite de 200.
+- Sem colunas configuráveis, sem lançamento por voz ou texto livre, sem ícones enviados pelo usuário (só a lista curada).

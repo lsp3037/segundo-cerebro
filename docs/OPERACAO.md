@@ -96,6 +96,16 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [x] "Desfazer" ao remover investimento, movimento e taxa. Trocar para Trust Care (a aba some), filtro de pessoa, `/p/[folderId]` e celular `390×844`.
 - [ ] **Conferência real:** cadastrar o Cofrinho com o saldo do dia, comparar o crédito do próximo dia útil com o app do Mercado Pago e confirmar em que dia um aporte novo começa a render. Se não bater, usar "Acertar com o app" e anotar a diferença.
 
+### Lançamentos redesenhado (Finanças › Lançamentos)
+- [x] Migration `20261123120000_finance_category_icon.sql` executada no SQL Editor (coluna `icon` em `finance_categories`).
+- [x] **Lançar rápido (computador):** na linha do topo, digitar "[teste] Café" e R$ 8,00 e apertar Enter: entra como pago, em "Já feitos", e categoria, dia e tipo continuam. Clicar em "Desfazer" (10 s) remove.
+- [ ] **Folha no celular (390×844):** "+ Lançar" abre de baixo para cima com o valor em foco; escolher categoria, dia e quem; marcar "Ainda não" troca por "Vence em"; "Mais opções" abre o formulário completo com o que foi digitado.
+- [x] **Ícone da categoria:** no gerenciador de categorias, escolher outro ícone (e "Automático" para voltar ao do nome) e ver na lista.
+- [x] **Régua do mês (só na tela larga):** clicar num ponto filtra o dia e mostra o chip "Dia 19 de novembro ✕"; o ✕ limpa. Cores: verde, rosa, rosa com anel (atrasado) e cinza (feito).
+- [ ] **Atrasados:** criar "[teste] Conta velha" pendente com vencimento no mês passado; ela aparece em "Atrasado" só no mês atual e some ao ver outro mês.
+- [x] O filtro abre em "Falta resolver" e os botões mostram as contagens.
+- [ ] As setas ← → trocam o mês, menos com folha, linha rápida ou popover abertos.
+
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
 ## 4. Problemas comuns
@@ -111,9 +121,13 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 | A agenda parou de atualizar sozinha | O aviso do Google venceu ou o `pg_cron` falhou | Configurações › Google Agenda mostra o erro. A rotina de 15 min renova os avisos. Se a rotina falhar com 401, confira se o `CRON_SECRET` é igual na Vercel e no Vault. |
 | Card de O.S. com "Resumo desligado" ou "Chave recusada" | Falta ou expirou a `OS_API_KEY` | Crie uma chave nova no Gerenciador (só "Consultar Ordens de Serviço") e atualize no PC e na Vercel. |
 | Card de O.S. com "Muitas consultas seguidas" | Limite de 30 consultas por minuto do Gerenciador | Espere um minuto. O app guarda o resumo por 5 minutos. |
-| Rendimento diferente do app do banco (cerca de 20% a mais no dia) | O banco mostra o rendimento depois do imposto de renda e a opção "Descontar imposto de renda" está desligada (use **Mudar taxa** e marque, a partir da data do primeiro depósito). Outra causa comum: o saldo de hoje foi lançado como depósito de uma data antiga; lance só o que foi depositado, com as datas reais |
+| Rendimento diferente do app do banco (cerca de 20% a mais no dia) | O banco mostra o rendimento depois do imposto de renda e a opção "Descontar imposto de renda" está desligada (use **Mudar taxa** e marque, a partir da data do primeiro depósito). Outra causa comum: o saldo de hoje foi lançado como depósito de uma data antiga; lance só o que foi depositado, com as datas reais | Corrija os lançamentos e ligue o desconto em **Mudar taxa**; se sobrar uma diferença pequena, use **Acertar com o app**. |
 | Rendimento diferente do app do banco (poucos reais) | O banco arredonda cada crédito, mudou as faixas ou o saldo inicial foi digitado diferente | Use **Acertar com o app** (grava a diferença como ajuste). Se o banco mudou a taxa, use **Mudar taxa** com a data em que mudou. |
 | "Não consegui atualizar o CDI" ou "CDI desatualizado" | O Banco Central está fora do ar ou ainda não publicou o CDI do dia | Nada a fazer: o app usa o último CDI guardado e tenta de novo depois (no mínimo 5 min após uma falha). |
+| Lançamento atrasado de mês passado não aparece | Atrasados de meses anteriores só entram quando o mês visto é o mês atual (limite de 200) | Volte para o mês atual e use o filtro "Falta resolver". |
+| A régua do mês não aparece | Ela só existe no computador, com a lista em 896 px de largura ou mais | Alargue a janela ou recolha o menu lateral. No celular, use os filtros. |
+| Ícone da categoria errado | Sem escolha, o app deduz o ícone pelo nome da categoria | No gerenciador de categorias, escolha outro ícone (ou "Automático" para voltar ao do nome). |
+| O lançar rápido gravou "pago" mas era uma conta a pagar | A linha rápida do computador sempre grava como pago | Use "+ Lançamento" (formulário completo) ou, no celular, a folha com "Já foi pago? Ainda não". |
 | A conta da SES deixou de conectar | A administração do Google da SES bloqueou apps externos | Plano B: compartilhar a agenda da SES com o Gmail pessoal. |
 
 ## 5. Pendências
