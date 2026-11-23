@@ -593,6 +593,7 @@ export type Database = {
           color: string | null
           created_at: string
           deleted_at: string | null
+          icon: string | null
           id: string
           kind: string
           ledger: string
@@ -606,6 +607,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           deleted_at?: string | null
+          icon?: string | null
           id?: string
           kind: string
           ledger: string
@@ -619,6 +621,7 @@ export type Database = {
           color?: string | null
           created_at?: string
           deleted_at?: string | null
+          icon?: string | null
           id?: string
           kind?: string
           ledger?: string

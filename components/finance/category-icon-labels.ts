@@ -1,0 +1,31 @@
+import type { CategoryIconKey } from "@/lib/finance/category-icons";
+
+// Nome amigável de cada ícone, usado como rótulo acessível e dica ao passar o mouse.
+export const CATEGORY_ICON_LABELS: Record<CategoryIconKey, string> = {
+  banknote: "Dinheiro (salário e renda)",
+  house: "Casa (moradia)",
+  receipt: "Recibo (contas e despesas)",
+  zap: "Raio (contas de consumo)",
+  gift: "Presente (benefícios)",
+  "hand-heart": "Mão com coração (doações)",
+  "graduation-cap": "Capelo (educação)",
+  "heart-pulse": "Coração (saúde)",
+  "credit-card": "Cartão (cartões e faturas)",
+  utensils: "Talheres (alimentação)",
+  car: "Carro (transporte)",
+  "shopping-bag": "Sacola (compras)",
+  film: "Filme (lazer e assinaturas)",
+  "piggy-bank": "Porquinho (reservas)",
+  "trending-up": "Gráfico subindo (investimentos)",
+  briefcase: "Maleta (serviços)",
+  laptop: "Notebook",
+  wrench: "Chave inglesa (ferramentas e manutenção)",
+  megaphone: "Megafone (marketing)",
+  percent: "Porcentagem (taxas e impostos)",
+  package: "Caixa (peças e insumos)",
+  baby: "Bebê (filhos)",
+  "paw-print": "Pata (animais)",
+  plane: "Avião (viagens)",
+  shield: "Escudo (seguros)",
+  "circle-ellipsis": "Reticências (outras)",
+};

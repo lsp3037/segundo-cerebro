@@ -25,6 +25,7 @@ export type HouseholdTransaction = Tables<"transactions"> & {
   billStatus: BillStatus;
   categoryName: string | null;
   categoryColor: string | null;
+  categoryIcon: string | null;
   accountName: string | null;
 };
 
@@ -37,6 +38,7 @@ export type BudgetRow = {
   categoryId: string;
   categoryName: string;
   color: string | null;
+  icon: string | null;
   budgetCents: number | null;
   spentCents: number;
 };
@@ -327,7 +329,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
       .gte("date", trendStart)
       .lte("date", end)
       .order("date", { ascending: true }),
-    supabase.from("finance_categories").select("id, name, color, kind, ledger").is("deleted_at", null),
+    supabase.from("finance_categories").select("id, name, color, icon, kind, ledger").is("deleted_at", null),
     supabase.from("finance_accounts").select("*").is("deleted_at", null).order("sort_order").order("created_at"),
     supabase.from("finance_budgets").select("*"),
     supabase.from("finance_recurring_bills").select("*").is("deleted_at", null).order("sort_order"),
@@ -356,6 +358,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
       billStatus: billStatus(t, today),
       categoryName: cat?.name ?? null,
       categoryColor: cat?.color ?? null,
+      categoryIcon: cat?.icon ?? null,
       accountName: t.account_id ? accountsMap.get(t.account_id)?.name ?? null : null,
     };
   };
@@ -433,6 +436,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
       categoryId: c.id,
       categoryName: c.name,
       color: c.color,
+      icon: c.icon,
       budgetCents: budgetMap.get(c.id) ?? null,
       spentCents: curByCat.get(c.id) ?? 0,
     }))
@@ -454,7 +458,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
   const buildBreakdown = (kind: "expense" | "income"): FinanceSummary["categoriesBreakdown"] => {
     const kindTxs = current.filter((t) => t.kind === kind);
     const kindTotal = kindTxs.reduce((acc, t) => acc + t.amount_cents, 0);
-    const grouped = new Map<string, { categoryId: string | null; categoryName: string; color: string | null; totalCents: number }>();
+    const grouped = new Map<string, { categoryId: string | null; categoryName: string; color: string | null; icon: string | null; totalCents: number }>();
     for (const t of kindTxs) {
       const cat = t.category_id ? catsMap.get(t.category_id) : null;
       const key = t.category_id ?? "none";
@@ -462,6 +466,7 @@ export async function getHouseholdData(params: { month: string; member?: string 
         categoryId: t.category_id,
         categoryName: cat?.name ?? "Sem categoria",
         color: cat?.color ?? null,
+        icon: cat?.icon ?? null,
         totalCents: 0,
       };
       cur.totalCents += t.amount_cents;

@@ -92,7 +92,7 @@ function TransactionRow({ tx, paid, today, first, mixedLedgers, showAccount, onE
       </button>
 
       <div className="hidden min-w-0 items-center gap-2 text-[13.5px] text-foreground/75 @4xl:flex">
-        <CategoryIcon name={tx.category?.name ?? ""} kind={income ? "income" : "expense"} color={tx.category?.color} />
+        <CategoryIcon name={tx.category?.name ?? ""} kind={income ? "income" : "expense"} icon={tx.category?.icon} color={tx.category?.color} />
         <span className="truncate">{tx.category?.name ?? "Sem categoria"}</span>
       </div>
 

@@ -23,6 +23,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CATEGORY_ICON_KEYS, type CategoryIconKey } from "@/lib/finance/category-icons";
+import { CategoryIcon } from "./category-icon";
+import { CategoryIconPicker } from "./category-icon-picker";
 import { toastWithUndo } from "./pay-toggle";
 import { LEDGER_LABELS, type LedgerType } from "./meta";
 
@@ -48,6 +51,10 @@ const PRESET_COLORS = [
   "#6b7280", // Gray
 ];
 
+function isCategoryIconKey(value: string | null | undefined): value is CategoryIconKey {
+  return !!value && (CATEGORY_ICON_KEYS as readonly string[]).includes(value);
+}
+
 export function CategoriesDialog({
   open,
   onOpenChange,
@@ -64,6 +71,7 @@ export function CategoriesDialog({
   const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState("#10b981");
+  const [icon, setIcon] = useState<CategoryIconKey | null>(null);
 
   const filteredCategories = useMemo(() => {
     const list = categories.filter(
@@ -85,12 +93,14 @@ export function CategoriesDialog({
     setEditingCategory(cat);
     setName(cat.name);
     setColor(cat.color || "#10b981");
+    setIcon(isCategoryIconKey(cat.icon) ? cat.icon : null);
   };
 
   const handleCancelForm = () => {
     setEditingCategory(null);
     setName("");
     setColor("#10b981");
+    setIcon(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,6 +115,7 @@ export function CategoriesDialog({
         const res = await updateFinanceCategory(editingCategory.id, {
           name: name.trim(),
           color,
+          icon,
         });
 
         if (res.ok) {
@@ -120,6 +131,7 @@ export function CategoriesDialog({
           kind: activeKind,
           name: name.trim(),
           color,
+          icon,
           sort_order: filteredCategories.length + 1,
         });
 
@@ -236,10 +248,7 @@ export function CategoriesDialog({
               className="group flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs transition-colors hover:bg-muted/40"
             >
               <div className="flex items-center gap-2">
-                <span
-                  className="size-2.5 rounded-full ring-1 ring-border"
-                  style={{ backgroundColor: c.color || "#94a3b8" }}
-                />
+                <CategoryIcon name={c.name} kind={activeKind} icon={c.icon} color={c.color} />
                 <span className="font-medium text-foreground">{c.name}</span>
               </div>
 
@@ -306,6 +315,11 @@ export function CategoriesDialog({
                 ))}
               </div>
             </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">Ícone</Label>
+            <CategoryIconPicker value={icon} onChange={setIcon} name={name} kind={activeKind} color={color} />
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-1">

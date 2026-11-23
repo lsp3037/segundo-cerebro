@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { ensureMonthBills } from "@/lib/data/finance-family";
 import { addMonths, todayIso } from "@/lib/dates";
+import { CATEGORY_ICON_KEYS } from "@/lib/finance/category-icons";
 import { monthKey, splitInstallments } from "@/lib/finance/household";
 import type { Tables, TablesInsert } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -518,6 +519,7 @@ const categorySchema = z.object({
   kind: z.enum(["income", "expense"]),
   name: z.string().trim().min(1, "Informe o nome da categoria.").max(80),
   color: z.string().nullable().optional(),
+  icon: z.enum(CATEGORY_ICON_KEYS, { error: "Ícone inválido." }).nullable().optional(),
   sort_order: z.number().int().optional(),
 });
 
@@ -537,6 +539,7 @@ export async function createFinanceCategory(input: CategoryInput): Promise<Actio
       kind: parsed.data.kind,
       name: parsed.data.name,
       color: parsed.data.color ?? null,
+      icon: parsed.data.icon ?? null,
       sort_order: parsed.data.sort_order ?? 0,
     })
     .select("*")

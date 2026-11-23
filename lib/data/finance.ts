@@ -6,7 +6,7 @@ import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
 export type Transaction = Tables<"transactions"> & {
-  category?: { name: string; color: string | null } | null;
+  category?: { id: string; name: string; color: string | null; icon: string | null } | null;
   payment_method?: { name: string; type: string | null } | null;
   notebook?: { model: string; brand: string | null } | null;
   account?: { name: string; type: string } | null;
@@ -53,6 +53,7 @@ export type FinanceSummary = {
     categoryId: string | null;
     categoryName: string;
     color: string | null;
+    icon: string | null;
     kind: "income" | "expense";
     totalCents: number;
     percentage: number;
@@ -392,7 +393,7 @@ async function withTransactionJoins(
 ): Promise<Transaction[]> {
   const [txRes, catsRes, methodsRes, notebooksRes, accountsRes] = await Promise.all([
     query,
-    supabase.from("finance_categories").select("id, name, color"),
+    supabase.from("finance_categories").select("id, name, color, icon"),
     supabase.from("payment_methods").select("id, name, type"),
     supabase.from("notebooks").select("id, model, brand"),
     supabase.from("finance_accounts").select("id, name, type").is("deleted_at", null),
@@ -487,7 +488,7 @@ export async function getFinanceSummary(params?: {
 
   const [txRes, catsRes] = await Promise.all([
     query,
-    supabase.from("finance_categories").select("id, name, color"),
+    supabase.from("finance_categories").select("id, name, color, icon"),
   ]);
 
   if (txRes.error) throw txRes.error;
@@ -512,7 +513,14 @@ export async function getFinanceSummary(params?: {
 
   const categoriesMap = new Map<
     string,
-    { categoryId: string | null; name: string; color: string | null; kind: "income" | "expense"; totalCents: number }
+    {
+      categoryId: string | null;
+      name: string;
+      color: string | null;
+      icon: string | null;
+      kind: "income" | "expense";
+      totalCents: number;
+    }
   >();
 
   for (const t of transactions) {
@@ -541,6 +549,7 @@ export async function getFinanceSummary(params?: {
       categoryId: t.category_id,
       name: catName,
       color: catColor,
+      icon: catObj?.icon ?? null,
       kind: t.kind as "income" | "expense",
       totalCents: 0,
     };
@@ -563,6 +572,7 @@ export async function getFinanceSummary(params?: {
         categoryId: c.categoryId,
         categoryName: c.name,
         color: c.color,
+        icon: c.icon,
         kind: c.kind,
         totalCents: c.totalCents,
         percentage: Number(percentage.toFixed(1)),

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CategoryIcon } from "./category-icon";
 import { FinanceKpiStrip } from "./finance-hierarchy";
 import { toastWithUndo } from "./pay-toggle";
 
@@ -136,7 +137,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                   <div key={row.categoryId} className="space-y-2 px-3.5 py-3 text-xs">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2 font-medium text-foreground">
-                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: row.color || "#94a3b8" }} />
+                        <CategoryIcon name={row.categoryName} kind="expense" icon={row.icon} color={row.color} />
                         <span className="truncate">{row.categoryName}</span>
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -207,7 +208,7 @@ export function BudgetsView({ budgets, categories }: BudgetsViewProps) {
                       <tr key={row.categoryId} className="hover:bg-muted/20">
                         <td className="py-3 pl-4 pr-3 font-medium text-foreground">
                           <div className="flex items-center gap-2">
-                            <span className="size-2 rounded-full" style={{ backgroundColor: row.color || "#94a3b8" }} />
+                            <CategoryIcon name={row.categoryName} kind="expense" icon={row.icon} color={row.color} />
                             <span>{row.categoryName}</span>
                           </div>
                         </td>

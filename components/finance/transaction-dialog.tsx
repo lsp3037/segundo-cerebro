@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { CategoryIcon } from "./category-icon";
 import { readLastChoices, saveLastChoices, type LastChoices } from "./last-choices";
 
 interface TransactionDialogProps {
@@ -355,7 +356,7 @@ function TransactionDialogForm({
                         : "border-border text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <span className="size-1.5 rounded-full" style={{ backgroundColor: c.color || "#94a3b8" }} />
+                    <CategoryIcon name={c.name} kind={kind} icon={c.icon} color={c.color} className="size-4" />
                     {c.name}
                   </button>
                 );
@@ -371,6 +372,7 @@ function TransactionDialogForm({
                   <SelectContent>
                     {otherCategories.map((c) => (
                       <SelectItem key={c.id} value={c.id} className="text-[13px]">
+                        <CategoryIcon name={c.name} kind={kind} icon={c.icon} color={c.color} className="size-4" />
                         {c.name}
                       </SelectItem>
                     ))}

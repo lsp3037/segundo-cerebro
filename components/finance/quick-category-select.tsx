@@ -27,7 +27,7 @@ export function QuickCategorySelect({ categories, kind, value, onChange, classNa
         </SelectItem>
         {categories.map((c) => (
           <SelectItem key={c.id} value={c.id} className="text-[13px]">
-            <CategoryIcon name={c.name} kind={kind} color={c.color} className="size-4" />
+            <CategoryIcon name={c.name} kind={kind} icon={c.icon} color={c.color} className="size-4" />
             {c.name}
           </SelectItem>
         ))}

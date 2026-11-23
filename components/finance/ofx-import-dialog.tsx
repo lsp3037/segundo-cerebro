@@ -26,6 +26,7 @@ import {
 } from "@/lib/actions/ofx-import";
 import type { FinanceCategory, PaymentMethod } from "@/lib/data/finance";
 import { formatCentsToBrl } from "@/lib/money";
+import { CategoryIcon } from "./category-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -633,9 +634,12 @@ export function OfxImportDialog({
                                   .map((c) => (
                                     <SelectItem key={c.id} value={c.id}>
                                       <div className="flex items-center gap-1.5">
-                                        <span
-                                          className="size-2 rounded-full"
-                                          style={{ backgroundColor: c.color || "#6b7280" }}
+                                        <CategoryIcon
+                                          name={c.name}
+                                          kind={item.kind}
+                                          icon={c.icon}
+                                          color={c.color}
+                                          className="size-4"
                                         />
                                         {c.name}
                                       </div>
