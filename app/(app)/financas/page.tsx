@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { FinanceDashboard } from "@/components/finance/finance-dashboard";
-import { getCurrentUser } from "@/lib/auth";
 import { getAreaFilter } from "@/lib/data/area-filter";
 import {
   ensureDefaultFinanceData,
@@ -16,6 +15,7 @@ import {
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getInvestmentsData } from "@/lib/data/finance-investments";
 import { startOfMonth, todayIso } from "@/lib/dates";
+import { getFinanceScope } from "@/lib/finance/scope";
 import { TABS } from "@/lib/modules";
 
 const tab = TABS[7];
@@ -23,8 +23,9 @@ const tab = TABS[7];
 export const metadata: Metadata = { title: tab.label };
 
 export default async function Page(props: PageProps<"/financas">) {
-  const user = await getCurrentUser();
-  await ensureDefaultFinanceData(user.id);
+  const scope = await getFinanceScope();
+  // Membro usa as categorias do dono: não cria nem limpa nada.
+  if (!scope.isMember) await ensureDefaultFinanceData(scope.ownerId);
 
   const searchParams = await props.searchParams;
   const area = await getAreaFilter(props.searchParams);
@@ -35,11 +36,13 @@ export default async function Page(props: PageProps<"/financas">) {
       ? searchParams.m
       : todayIso().slice(0, 7);
 
-  await ensureMonthBills(user.id, currentMonth);
+  await ensureMonthBills(scope.ownerId, currentMonth);
 
-  // Ledger padrão: Pessoal & Familiar (prioridade da casa)
+  // Ledger padrão: Pessoal & Familiar (prioridade da casa). Membro: sempre o Pessoal, ignora ?ledger=.
   let currentLedger: "all" | "pessoal" | "trustcare" = "pessoal";
-  if (searchParams.ledger === "all" || searchParams.ledger === "pessoal" || searchParams.ledger === "trustcare") {
+  if (scope.isMember) {
+    currentLedger = "pessoal";
+  } else if (searchParams.ledger === "all" || searchParams.ledger === "pessoal" || searchParams.ledger === "trustcare") {
     currentLedger = searchParams.ledger;
   } else if (area?.slug === "trustcare" || area?.slug === "profissional") {
     currentLedger = "trustcare";
@@ -59,7 +62,7 @@ export default async function Page(props: PageProps<"/financas">) {
     showOverdueEarlier
       ? getOverdueTransactions({ ledger: currentLedger, member: effectiveMember, beforeDate: startOfMonth(today) })
       : Promise.resolve([] as Transaction[]),
-    getNotebooks(),
+    scope.isMember ? [] : getNotebooks(),
     getFinanceCategories(),
     getPaymentMethods(),
     getHouseholdData({ month: currentMonth, member: effectiveMember }),

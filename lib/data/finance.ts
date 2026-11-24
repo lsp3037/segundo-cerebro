@@ -2,6 +2,7 @@ import "server-only";
 
 import { todayIso } from "@/lib/dates";
 import { shiftMonth } from "@/lib/finance/household";
+import { getFinanceScope, readableLedger } from "@/lib/finance/scope";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -129,14 +130,14 @@ const DEFAULT_PAYMENT_METHODS: Array<{
 ];
 
 // Limpa e unifica categorias duplicadas no banco de dados, remapeando transações para a categoria canônica
-export async function cleanupDuplicateCategories(userId: string): Promise<void> {
+export async function cleanupDuplicateCategories(ownerId: string): Promise<void> {
   try {
     const supabase = await createClient();
 
     const { data: allCats } = await supabase
       .from("finance_categories")
       .select("id, ledger, kind, name, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true });
 
@@ -163,7 +164,7 @@ export async function cleanupDuplicateCategories(userId: string): Promise<void> 
         .from("transactions")
         .update({ category_id: newId })
         .eq("category_id", oldId)
-        .eq("user_id", userId);
+        .eq("user_id", ownerId);
     }
 
     // Exclui fisicamente as categorias duplicadas
@@ -172,26 +173,28 @@ export async function cleanupDuplicateCategories(userId: string): Promise<void> 
         .from("finance_categories")
         .delete()
         .in("id", toDeleteIds)
-        .eq("user_id", userId);
+        .eq("user_id", ownerId);
     }
   } catch (err) {
     console.error("cleanupDuplicateCategories error:", err);
   }
 }
 
-// Garante que o usuário possua categorias e métodos de pagamento padrão (sem duplicar)
-export async function ensureDefaultFinanceData(userId: string): Promise<void> {
+// Garante que o usuário possua categorias e métodos de pagamento padrão (sem duplicar).
+// Só para o dono: o membro usa as categorias do dono e não cria nem apaga nenhuma.
+export async function ensureDefaultFinanceData(ownerId: string): Promise<void> {
+  if ((await getFinanceScope()).isMember) return;
   try {
     const supabase = await createClient();
 
     // 1. Limpa duplicidades existentes primeiro
-    await cleanupDuplicateCategories(userId);
+    await cleanupDuplicateCategories(ownerId);
 
     // 2. Busca todas as categorias existentes do usuário (ativas)
     const { data: existingCats } = await supabase
       .from("finance_categories")
       .select("id, name, ledger, kind")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .is("deleted_at", null);
 
     const existingList = existingCats ?? [];
@@ -208,7 +211,7 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
 
     if (missingDefaults.length > 0) {
       const toInsert = missingDefaults.map((c) => ({
-        user_id: userId,
+        user_id: ownerId,
         ledger: c.ledger,
         kind: c.kind,
         name: c.name,
@@ -222,11 +225,11 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
     const { data: existingMethods } = await supabase
       .from("payment_methods")
       .select("id, name")
-      .eq("user_id", userId);
+      .eq("user_id", ownerId);
 
     if (!existingMethods || existingMethods.length === 0) {
       const methodsToInsert = DEFAULT_PAYMENT_METHODS.map((m) => ({
-        user_id: userId,
+        user_id: ownerId,
         name: m.name,
         type: m.type,
         active: true,
@@ -238,7 +241,8 @@ export async function ensureDefaultFinanceData(userId: string): Promise<void> {
   }
 }
 
-export async function getFinanceCategories(ledger?: "pessoal" | "trustcare" | "all"): Promise<FinanceCategory[]> {
+export async function getFinanceCategories(requested?: "pessoal" | "trustcare" | "all"): Promise<FinanceCategory[]> {
+  const ledger = readableLedger(await getFinanceScope(), requested);
   const supabase = await createClient();
   let query = supabase
     .from("finance_categories")
@@ -282,7 +286,8 @@ export async function getPaymentMethods(): Promise<PaymentMethod[]> {
   return data ?? [];
 }
 
-export async function getFinanceRules(ledger?: "pessoal" | "trustcare" | "all"): Promise<FinanceRule[]> {
+export async function getFinanceRules(requested?: "pessoal" | "trustcare" | "all"): Promise<FinanceRule[]> {
+  const ledger = readableLedger(await getFinanceScope(), requested);
   const supabase = await createClient();
   let query = supabase.from("finance_rules").select("*").order("created_at", { ascending: false });
 
@@ -308,6 +313,7 @@ export async function getTransactions(params?: {
   query?: string;
   limit?: number;
 }): Promise<Transaction[]> {
+  const ledger = readableLedger(await getFinanceScope(), params?.ledger);
   const supabase = await createClient();
 
   let query = supabase
@@ -317,8 +323,8 @@ export async function getTransactions(params?: {
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (params?.ledger && params.ledger !== "all") {
-    query = query.eq("ledger", params.ledger);
+  if (ledger && ledger !== "all") {
+    query = query.eq("ledger", ledger);
   }
 
   if (params?.month) {
@@ -361,6 +367,7 @@ export async function getOverdueTransactions(params: {
   member?: string | null;
   beforeDate: string; // YYYY-MM-DD
 }): Promise<Transaction[]> {
+  const ledger = readableLedger(await getFinanceScope(), params.ledger);
   const supabase = await createClient();
 
   let query = supabase
@@ -375,7 +382,7 @@ export async function getOverdueTransactions(params: {
     .order("date", { ascending: true })
     .limit(200);
 
-  if (params.ledger !== "all") query = query.eq("ledger", params.ledger);
+  if (ledger !== "all") query = query.eq("ledger", ledger);
   if (params.member && params.member.trim()) query = query.eq("member_label", params.member.trim());
 
   return withTransactionJoins(supabase, query);
@@ -418,6 +425,8 @@ async function withTransactionJoins(
 export async function getNotebooks(params?: {
   status?: "bought" | "repair" | "for_sale" | "sold" | "all";
 }): Promise<Notebook[]> {
+  // Notebooks são da Trust Care: membro não vê (o banco também barra).
+  if ((await getFinanceScope()).isMember) return [];
   const supabase = await createClient();
 
   let query = supabase
@@ -464,6 +473,7 @@ export async function getFinanceSummary(params?: {
   month?: string; // YYYY-MM
   member?: string | null;
 }): Promise<FinanceSummary> {
+  const ledger = readableLedger(await getFinanceScope(), params?.ledger);
   const supabase = await createClient();
   const memberFilter = params?.member && params.member.trim() ? params.member.trim() : null;
 
@@ -473,8 +483,8 @@ export async function getFinanceSummary(params?: {
     .select("id, kind, amount_cents, date, ledger, category_id, status")
     .is("deleted_at", null);
 
-  if (params?.ledger && params.ledger !== "all") {
-    query = query.eq("ledger", params.ledger);
+  if (ledger && ledger !== "all") {
+    query = query.eq("ledger", ledger);
   }
 
   if (params?.month) {
@@ -594,8 +604,8 @@ export async function getFinanceSummary(params?: {
     .gte("date", oldestDate)
     .lte("date", newestDate);
 
-  if (params?.ledger && params.ledger !== "all") {
-    trendQuery = trendQuery.eq("ledger", params.ledger);
+  if (ledger && ledger !== "all") {
+    trendQuery = trendQuery.eq("ledger", ledger);
   }
 
   if (memberFilter) {

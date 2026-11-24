@@ -1,8 +1,8 @@
 import "server-only";
 
-import { getCurrentUser } from "@/lib/auth";
 import { todayIso, type IsoDate } from "@/lib/dates";
 import { isBusinessDay, isWeekend } from "@/lib/finance/business-days";
+import { getFinanceScope } from "@/lib/finance/scope";
 import {
   parseRateChanges,
   simulateInvestment,
@@ -42,11 +42,11 @@ const EMPTY_TOTALS: InvestmentsTotals = {
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-async function readInvestments(supabase: SupabaseClient, userId: string, member: string | null): Promise<InvestmentRow[]> {
+async function readInvestments(supabase: SupabaseClient, ownerId: string, member: string | null): Promise<InvestmentRow[]> {
   let query = supabase
     .from("finance_investments")
     .select("id, name, owner_label, notes, rate_changes")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null);
   if (member) query = query.eq("owner_label", member);
   const { data, error } = await query.order("sort_order", { ascending: true }).order("created_at", { ascending: true });
@@ -54,12 +54,12 @@ async function readInvestments(supabase: SupabaseClient, userId: string, member:
   return data;
 }
 
-async function readMovements(supabase: SupabaseClient, userId: string, investmentIds: string[]): Promise<MovementRow[]> {
+async function readMovements(supabase: SupabaseClient, ownerId: string, investmentIds: string[]): Promise<MovementRow[]> {
   if (investmentIds.length === 0) return [];
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .select("id, investment_id, date, kind, amount_cents, note, created_at")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .in("investment_id", investmentIds)
     .is("deleted_at", null)
     .order("date", { ascending: false })
@@ -104,12 +104,12 @@ function emptyData(today: IsoDate, cdi: CdiInfo): InvestmentsData {
   return { investments: [], totals: EMPTY_TOTALS, cdi, today, ...todayStatus(today, new Map()), error: true };
 }
 
-async function loadInvestmentsData(userId: string, member: string | null, month: string, today: IsoDate): Promise<InvestmentsData> {
+async function loadInvestmentsData(ownerId: string, member: string | null, month: string, today: IsoDate): Promise<InvestmentsData> {
   const supabase = await createClient();
-  const investmentRows = await readInvestments(supabase, userId, member);
+  const investmentRows = await readInvestments(supabase, ownerId, member);
   const movementRows = await readMovements(
     supabase,
-    userId,
+    ownerId,
     investmentRows.map((row) => row.id),
   );
   const { cdiByDate, info } = await getCdiSeries(cdiStartDate(movementRows.map((row) => row.date), today));
@@ -133,12 +133,12 @@ async function loadInvestmentsData(userId: string, member: string | null, month:
 }
 
 // Dados da aba Investimentos (Finanças › Pessoal). Nunca lança: em erro devolve `error: true` e listas vazias.
-// O usuário é lido fora do try: o `redirect` do login não pode ser engolido.
+// O escopo (e o usuário) é lido fora do try: o `redirect` do login não pode ser engolido.
 export async function getInvestmentsData(params: { member?: string | null; month: string }): Promise<InvestmentsData> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const today = todayIso();
   try {
-    return await loadInvestmentsData(user.id, params.member || null, params.month, today);
+    return await loadInvestmentsData(scope.ownerId, params.member || null, params.month, today);
   } catch (error) {
     console.error("getInvestmentsData error:", error);
     return emptyData(today, { lastDate: null, dailyPercent: null, annualPercent: null, stale: true });

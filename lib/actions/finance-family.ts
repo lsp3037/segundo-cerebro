@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { getFinanceScope } from "@/lib/finance/scope";
 import { ensureMonthBills } from "@/lib/data/finance-family";
 import { todayIso } from "@/lib/dates";
 import { HOUSEHOLD_TEMPLATE } from "@/lib/finance/household-template";
@@ -20,7 +20,7 @@ const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Mês inválido.");
 // ---------------------------------------------------------------------------
 
 export async function toggleTransactionPaid(transactionId: string): Promise<ActionResult<{ status: string }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
   const supabase = await createClient();
@@ -28,7 +28,7 @@ export async function toggleTransactionPaid(transactionId: string): Promise<Acti
     .from("transactions")
     .select("id, status")
     .eq("id", transactionId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .is("deleted_at", null)
     .maybeSingle();
 
@@ -45,7 +45,7 @@ export async function toggleTransactionPaid(transactionId: string): Promise<Acti
       updated_at: new Date().toISOString(),
     })
     .eq("id", transactionId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("toggleTransactionPaid error:", error);
@@ -73,7 +73,7 @@ const accountSchema = z.object({
 export type FinanceAccountInput = z.infer<typeof accountSchema>;
 
 export async function saveFinanceAccount(input: FinanceAccountInput): Promise<ActionResult<Tables<"finance_accounts">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = accountSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -95,7 +95,7 @@ export async function saveFinanceAccount(input: FinanceAccountInput): Promise<Ac
       .from("finance_accounts")
       .update(payload)
       .eq("id", d.id)
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .select("*")
       .single();
 
@@ -109,7 +109,7 @@ export async function saveFinanceAccount(input: FinanceAccountInput): Promise<Ac
 
   const { data, error } = await supabase
     .from("finance_accounts")
-    .insert({ ...payload, user_id: user.id })
+    .insert({ ...payload, user_id: scope.ownerId })
     .select("*")
     .single();
 
@@ -123,7 +123,7 @@ export async function saveFinanceAccount(input: FinanceAccountInput): Promise<Ac
 }
 
 export async function deleteFinanceAccount(accountId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(accountId).success) return fail("Conta inválida.");
 
   const supabase = await createClient();
@@ -131,7 +131,7 @@ export async function deleteFinanceAccount(accountId: string): Promise<ActionRes
     .from("finance_accounts")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", accountId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("deleteFinanceAccount error:", error);
@@ -149,7 +149,7 @@ const transferSchema = z.object({
 });
 
 export async function transferBetweenAccounts(input: z.infer<typeof transferSchema>): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = transferSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -161,7 +161,7 @@ export async function transferBetweenAccounts(input: z.infer<typeof transferSche
     .from("finance_accounts")
     .select("id, type, opening_balance_cents")
     .in("id", [fromAccountId, toAccountId])
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .is("deleted_at", null);
 
   if (fetchErr || !accounts || accounts.length !== 2) {
@@ -180,12 +180,12 @@ export async function transferBetweenAccounts(input: z.infer<typeof transferSche
       .from("finance_accounts")
       .update({ opening_balance_cents: fromAcc.opening_balance_cents - amount_cents, updated_at: now })
       .eq("id", fromAccountId)
-      .eq("user_id", user.id),
+      .eq("user_id", scope.ownerId),
     supabase
       .from("finance_accounts")
       .update({ opening_balance_cents: toAcc.opening_balance_cents + amount_cents, updated_at: now })
       .eq("id", toAccountId)
-      .eq("user_id", user.id),
+      .eq("user_id", scope.ownerId),
   ]);
 
   if (res1.error || res2.error) {
@@ -207,14 +207,14 @@ const budgetSchema = z.object({
 });
 
 export async function upsertBudget(input: z.infer<typeof budgetSchema>): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = budgetSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const supabase = await createClient();
   const { error } = await supabase.from("finance_budgets").upsert(
     {
-      user_id: user.id,
+      user_id: scope.ownerId,
       category_id: parsed.data.category_id,
       amount_cents: parsed.data.amount_cents,
       updated_at: new Date().toISOString(),
@@ -232,7 +232,7 @@ export async function upsertBudget(input: z.infer<typeof budgetSchema>): Promise
 }
 
 export async function deleteBudget(categoryId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(categoryId).success) return fail("Categoria inválida.");
 
   const supabase = await createClient();
@@ -240,7 +240,7 @@ export async function deleteBudget(categoryId: string): Promise<ActionResult> {
     .from("finance_budgets")
     .delete()
     .eq("category_id", categoryId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("deleteBudget error:", error);
@@ -273,7 +273,7 @@ const recurringBillSchema = z.object({
 export type RecurringBillInput = z.infer<typeof recurringBillSchema>;
 
 export async function saveRecurringBill(input: RecurringBillInput): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = recurringBillSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -302,14 +302,14 @@ export async function saveRecurringBill(input: RecurringBillInput): Promise<Acti
       .from("finance_recurring_bills")
       .update(payload)
       .eq("id", d.id)
-      .eq("user_id", user.id);
+      .eq("user_id", scope.ownerId);
 
     if (error) {
       console.error("updateRecurringBill error:", error);
       return fail("Não foi possível atualizar a conta fixa.");
     }
   } else {
-    const { error } = await supabase.from("finance_recurring_bills").insert({ ...payload, user_id: user.id });
+    const { error } = await supabase.from("finance_recurring_bills").insert({ ...payload, user_id: scope.ownerId });
     if (error) {
       console.error("createRecurringBill error:", error);
       return fail("Não foi possível salvar a conta fixa.");
@@ -317,7 +317,7 @@ export async function saveRecurringBill(input: RecurringBillInput): Promise<Acti
   }
 
   if (d.month) {
-    await ensureMonthBills(user.id, d.month);
+    await ensureMonthBills(scope.ownerId, d.month);
   }
 
   revalidatePath("/", "layout");
@@ -325,7 +325,7 @@ export async function saveRecurringBill(input: RecurringBillInput): Promise<Acti
 }
 
 export async function deleteRecurringBill(billId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(billId).success) return fail("Conta fixa inválida.");
 
   const supabase = await createClient();
@@ -333,7 +333,7 @@ export async function deleteRecurringBill(billId: string): Promise<ActionResult>
     .from("finance_recurring_bills")
     .update({ deleted_at: new Date().toISOString(), active: false })
     .eq("id", billId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("deleteRecurringBill error:", error);
@@ -346,15 +346,15 @@ export async function deleteRecurringBill(billId: string): Promise<ActionResult>
 
 // Carrega o modelo da planilha da casa (contas, os 4 cartões e as 19 linhas fixas/variáveis) sem duplicar
 export async function bootstrapHouseholdTemplate(month: string): Promise<ActionResult<{ createdCount: number }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!monthSchema.safeParse(month).success) return fail("Mês inválido.");
 
   const supabase = await createClient();
 
   const [catsRes, accRes, billsRes] = await Promise.all([
-    supabase.from("finance_categories").select("id, name, ledger, kind").eq("user_id", user.id).is("deleted_at", null),
-    supabase.from("finance_accounts").select("id, name").eq("user_id", user.id).is("deleted_at", null),
-    supabase.from("finance_recurring_bills").select("id, description").eq("user_id", user.id).is("deleted_at", null),
+    supabase.from("finance_categories").select("id, name, ledger, kind").eq("user_id", scope.ownerId).is("deleted_at", null),
+    supabase.from("finance_accounts").select("id, name").eq("user_id", scope.ownerId).is("deleted_at", null),
+    supabase.from("finance_recurring_bills").select("id, description").eq("user_id", scope.ownerId).is("deleted_at", null),
   ]);
 
   const catsMap = new Map(
@@ -387,7 +387,7 @@ export async function bootstrapHouseholdTemplate(month: string): Promise<ActionR
   if (missingAccounts.length > 0) {
     const { data: insertedAcc } = await supabase
       .from("finance_accounts")
-      .insert(missingAccounts.map((a, idx) => ({ ...a, user_id: user.id, sort_order: idx })))
+      .insert(missingAccounts.map((a, idx) => ({ ...a, user_id: scope.ownerId, sort_order: idx })))
       .select("id, name");
 
     for (const a of insertedAcc ?? []) {
@@ -399,7 +399,7 @@ export async function bootstrapHouseholdTemplate(month: string): Promise<ActionR
   const missingBills = HOUSEHOLD_TEMPLATE.filter((r) => !existingBillNames.has(r.description.toLowerCase()));
   if (missingBills.length > 0) {
     const rows = missingBills.map((r, idx) => ({
-      user_id: user.id,
+      user_id: scope.ownerId,
       kind: r.kind,
       description: r.description,
       amount_mode: r.percentBp ? "percent_of_income" : "fixed",
@@ -420,7 +420,7 @@ export async function bootstrapHouseholdTemplate(month: string): Promise<ActionR
     }
   }
 
-  await ensureMonthBills(user.id, month);
+  await ensureMonthBills(scope.ownerId, month);
   revalidatePath("/", "layout");
   return ok({ createdCount: missingBills.length });
 }
@@ -441,7 +441,7 @@ const bulkValuesSchema = z.object({
 });
 
 export async function saveRecurringValuesBatch(input: z.infer<typeof bulkValuesSchema>): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = bulkValuesSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -451,7 +451,7 @@ export async function saveRecurringValuesBatch(input: z.infer<typeof bulkValuesS
   const { data: current } = await supabase
     .from("finance_recurring_bills")
     .select("id, amount_cents, amount_changes")
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .in(
       "id",
       parsed.data.items.map((i) => i.id),
@@ -481,10 +481,10 @@ export async function saveRecurringValuesBatch(input: z.infer<typeof bulkValuesS
         );
       }
     }
-    await supabase.from("finance_recurring_bills").update(patch).eq("id", item.id).eq("user_id", user.id);
+    await supabase.from("finance_recurring_bills").update(patch).eq("id", item.id).eq("user_id", scope.ownerId);
   }
 
-  await ensureMonthBills(user.id, parsed.data.month, { syncPendingFixed: true });
+  await ensureMonthBills(scope.ownerId, parsed.data.month, { syncPendingFixed: true });
   revalidatePath("/", "layout");
   return ok();
 }
@@ -499,7 +499,7 @@ const scheduleSchema = z.object({
 });
 
 export async function updateRecurringSchedule(input: z.infer<typeof scheduleSchema>): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = scheduleSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
   const d = parsed.data;
@@ -517,26 +517,26 @@ export async function updateRecurringSchedule(input: z.infer<typeof scheduleSche
       updated_at: new Date().toISOString(),
     })
     .eq("id", d.id)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
   if (error) {
     console.error("updateRecurringSchedule error:", error);
     return fail("Não foi possível salvar o período.");
   }
 
-  await ensureMonthBills(user.id, d.month);
+  await ensureMonthBills(scope.ownerId, d.month);
   revalidatePath("/", "layout");
   return ok();
 }
 
 export async function syncMonthTithe(month: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!monthSchema.safeParse(month).success) return fail("Mês inválido.");
 
   const supabase = await createClient();
   const { data: existingPercent } = await supabase
     .from("finance_recurring_bills")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .eq("amount_mode", "percent_of_income")
     .is("deleted_at", null)
     .limit(1);
@@ -545,7 +545,7 @@ export async function syncMonthTithe(month: string): Promise<ActionResult> {
     const { data: titheCat } = await supabase
       .from("finance_categories")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .eq("ledger", "pessoal")
       .eq("kind", "expense")
       .ilike("name", "%dízimo%")
@@ -553,7 +553,7 @@ export async function syncMonthTithe(month: string): Promise<ActionResult> {
       .limit(1);
 
     const { error } = await supabase.from("finance_recurring_bills").insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       kind: "expense",
       description: "Dízimo",
       amount_mode: "percent_of_income",
@@ -570,7 +570,7 @@ export async function syncMonthTithe(month: string): Promise<ActionResult> {
     }
   }
 
-  const { titheTouched } = await ensureMonthBills(user.id, month, { allowPastTithe: true });
+  const { titheTouched } = await ensureMonthBills(scope.ownerId, month, { allowPastTithe: true });
   revalidatePath("/", "layout");
   if (!titheTouched) {
     return fail("Nenhuma diferença de Dízimo para gerar neste mês.");

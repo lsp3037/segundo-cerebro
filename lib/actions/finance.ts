@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { type FinanceScope, assertLedgerAllowed, getFinanceScope } from "@/lib/finance/scope";
 import { ensureMonthBills } from "@/lib/data/finance-family";
 import { addMonths, todayIso } from "@/lib/dates";
 import { CATEGORY_ICON_KEYS } from "@/lib/finance/category-icons";
@@ -40,10 +40,24 @@ const transactionSchema = z.object({
 
 export type TransactionInput = z.infer<typeof transactionSchema>;
 
+// Membro: só o livro Pessoal e nada ligado a notebooks (Trust Care).
+function transactionAccessError(
+  scope: FinanceScope,
+  d: { ledger?: TransactionInput["ledger"]; notebook_id?: string | null },
+): string | null {
+  if (d.ledger) {
+    const denied = assertLedgerAllowed(scope, d.ledger);
+    if (denied) return denied;
+  }
+  return d.notebook_id ? assertLedgerAllowed(scope, "trustcare") : null;
+}
+
 export async function createTransaction(input: TransactionInput): Promise<ActionResult<Tables<"transactions">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = transactionSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const denied = transactionAccessError(scope, parsed.data);
+  if (denied) return fail(denied);
 
   const supabase = await createClient();
   const d = parsed.data;
@@ -57,7 +71,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
     const rows: TablesInsert<"transactions">[] = parts.map((amount, idx) => {
       const firstPaid = idx === 0 && status === "paid";
       return {
-        user_id: user.id,
+        user_id: scope.ownerId,
         ledger: d.ledger,
         kind: d.kind,
         amount_cents: amount,
@@ -85,7 +99,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
     }
 
     if (d.ledger === "pessoal" && d.kind === "income") {
-      await ensureMonthBills(user.id, monthKey(d.date));
+      await ensureMonthBills(scope.ownerId, monthKey(d.date));
     }
 
     revalidatePath("/", "layout");
@@ -100,7 +114,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
     const { data: billRow, error: billErr } = await supabase
       .from("finance_recurring_bills")
       .insert({
-        user_id: user.id,
+        user_id: scope.ownerId,
         kind: d.kind,
         description: d.description,
         amount_mode: "fixed",
@@ -122,7 +136,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
   const { data, error } = await supabase
     .from("transactions")
     .insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       ledger: d.ledger,
       kind: d.kind,
       amount_cents: d.amount_cents,
@@ -152,7 +166,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
       const { data: existingPercent } = await supabase
         .from("finance_recurring_bills")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("user_id", scope.ownerId)
         .eq("amount_mode", "percent_of_income")
         .is("deleted_at", null)
         .limit(1);
@@ -161,7 +175,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
         const { data: titheCat } = await supabase
           .from("finance_categories")
           .select("id")
-          .eq("user_id", user.id)
+          .eq("user_id", scope.ownerId)
           .eq("ledger", "pessoal")
           .eq("kind", "expense")
           .ilike("name", "%dízimo%")
@@ -169,7 +183,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
           .limit(1);
 
         await supabase.from("finance_recurring_bills").insert({
-          user_id: user.id,
+          user_id: scope.ownerId,
           kind: "expense",
           description: "Dízimo",
           amount_mode: "percent_of_income",
@@ -182,7 +196,7 @@ export async function createTransaction(input: TransactionInput): Promise<Action
         });
       }
     }
-    await ensureMonthBills(user.id, monthKey(d.date));
+    await ensureMonthBills(scope.ownerId, monthKey(d.date));
   }
 
   revalidatePath("/", "layout");
@@ -193,7 +207,7 @@ export async function updateTransaction(
   transactionId: string,
   patch: Partial<TransactionInput>,
 ): Promise<ActionResult<Tables<"transactions">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!id.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
   const parsed = transactionSchema
@@ -201,6 +215,8 @@ export async function updateTransaction(
     .partial()
     .safeParse(patch);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const denied = transactionAccessError(scope, parsed.data);
+  if (denied) return fail(denied);
 
   const supabase = await createClient();
   const nextPatch = { ...parsed.data };
@@ -217,7 +233,7 @@ export async function updateTransaction(
       updated_at: new Date().toISOString(),
     })
     .eq("id", transactionId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .select("*")
     .single();
 
@@ -227,7 +243,7 @@ export async function updateTransaction(
   }
 
   if (data.ledger === "pessoal" && data.kind === "income") {
-    await ensureMonthBills(user.id, monthKey(data.date));
+    await ensureMonthBills(scope.ownerId, monthKey(data.date));
   }
 
   revalidatePath("/", "layout");
@@ -235,7 +251,7 @@ export async function updateTransaction(
 }
 
 export async function trashTransaction(transactionId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!id.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
   const supabase = await createClient();
@@ -243,7 +259,7 @@ export async function trashTransaction(transactionId: string): Promise<ActionRes
     .from("transactions")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", transactionId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .select("ledger, kind, date")
     .maybeSingle();
 
@@ -253,7 +269,7 @@ export async function trashTransaction(transactionId: string): Promise<ActionRes
   }
 
   if (data?.ledger === "pessoal" && data.kind === "income") {
-    await ensureMonthBills(user.id, monthKey(data.date));
+    await ensureMonthBills(scope.ownerId, monthKey(data.date));
   }
 
   revalidatePath("/", "layout");
@@ -288,7 +304,9 @@ export async function createNotebook(
     payment_method_id?: string | null;
   },
 ): Promise<ActionResult<Tables<"notebooks">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
+  const denied = assertLedgerAllowed(scope, "trustcare");
+  if (denied) return fail(denied);
   const parsed = notebookSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -297,7 +315,7 @@ export async function createNotebook(
   const { data: notebook, error } = await supabase
     .from("notebooks")
     .insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       model: parsed.data.model,
       brand: parsed.data.brand ?? null,
       specs: parsed.data.specs ?? null,
@@ -319,7 +337,7 @@ export async function createNotebook(
     const { data: stockCat } = await supabase
       .from("finance_categories")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .eq("ledger", "trustcare")
       .eq("kind", "expense")
       .ilike("name", "%estoque%")
@@ -327,7 +345,7 @@ export async function createNotebook(
       .maybeSingle();
 
     await supabase.from("transactions").insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       ledger: "trustcare",
       kind: "expense",
       amount_cents: initialPurchase.amount_cents,
@@ -347,7 +365,9 @@ export async function updateNotebook(
   notebookId: string,
   patch: Partial<NotebookInput>,
 ): Promise<ActionResult<Tables<"notebooks">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
+  const denied = assertLedgerAllowed(scope, "trustcare");
+  if (denied) return fail(denied);
   if (!id.safeParse(notebookId).success) return fail("Notebook inválido.");
 
   const parsed = notebookSchema.partial().safeParse(patch);
@@ -361,7 +381,7 @@ export async function updateNotebook(
       updated_at: new Date().toISOString(),
     })
     .eq("id", notebookId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .select("*")
     .single();
 
@@ -391,7 +411,9 @@ export type RecordSaleInput = z.infer<typeof recordSaleSchema>;
 export async function recordNotebookSale(
   input: RecordSaleInput,
 ): Promise<ActionResult<Tables<"notebooks">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
+  const denied = assertLedgerAllowed(scope, "trustcare");
+  if (denied) return fail(denied);
   const parsed = recordSaleSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
@@ -402,7 +424,7 @@ export async function recordNotebookSale(
     .from("notebooks")
     .select("*")
     .eq("id", parsed.data.notebook_id)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .is("deleted_at", null)
     .single();
 
@@ -421,7 +443,7 @@ export async function recordNotebookSale(
       updated_at: new Date().toISOString(),
     })
     .eq("id", nb.id)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .select("*")
     .single();
 
@@ -434,7 +456,7 @@ export async function recordNotebookSale(
   const { data: saleCat } = await supabase
     .from("finance_categories")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .eq("ledger", "trustcare")
     .eq("kind", "income")
     .ilike("name", "%notebook%")
@@ -448,7 +470,7 @@ export async function recordNotebookSale(
   const saleNotesCombined = [buyerDesc, warrantyDesc, parsed.data.notes].filter(Boolean).join(" | ");
 
   await supabase.from("transactions").insert({
-    user_id: user.id,
+    user_id: scope.ownerId,
     ledger: "trustcare",
     kind: "income",
     amount_cents: parsed.data.sale_amount_cents,
@@ -465,7 +487,7 @@ export async function recordNotebookSale(
     const { data: feeCat } = await supabase
       .from("finance_categories")
       .select("id")
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .eq("ledger", "trustcare")
       .eq("kind", "expense")
       .ilike("name", "%taxa%")
@@ -473,7 +495,7 @@ export async function recordNotebookSale(
       .maybeSingle();
 
     await supabase.from("transactions").insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       ledger: "trustcare",
       kind: "expense",
       amount_cents: parsed.data.machine_fee_cents,
@@ -491,7 +513,9 @@ export async function recordNotebookSale(
 }
 
 export async function trashNotebook(notebookId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
+  const denied = assertLedgerAllowed(scope, "trustcare");
+  if (denied) return fail(denied);
   if (!id.safeParse(notebookId).success) return fail("Notebook inválido.");
 
   const supabase = await createClient();
@@ -499,7 +523,7 @@ export async function trashNotebook(notebookId: string): Promise<ActionResult> {
     .from("notebooks")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", notebookId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("trashNotebook error:", error);
@@ -526,15 +550,17 @@ const categorySchema = z.object({
 export type CategoryInput = z.infer<typeof categorySchema>;
 
 export async function createFinanceCategory(input: CategoryInput): Promise<ActionResult<Tables<"finance_categories">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = categorySchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const denied = assertLedgerAllowed(scope, parsed.data.ledger);
+  if (denied) return fail(denied);
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_categories")
     .insert({
-      user_id: user.id,
+      user_id: scope.ownerId,
       ledger: parsed.data.ledger,
       kind: parsed.data.kind,
       name: parsed.data.name,
@@ -558,11 +584,13 @@ export async function updateFinanceCategory(
   categoryId: string,
   patch: Partial<CategoryInput>
 ): Promise<ActionResult<Tables<"finance_categories">>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!id.safeParse(categoryId).success) return fail("Categoria inválida.");
 
   const parsed = categorySchema.partial().safeParse(patch);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const denied = parsed.data.ledger ? assertLedgerAllowed(scope, parsed.data.ledger) : null;
+  if (denied) return fail(denied);
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -572,7 +600,7 @@ export async function updateFinanceCategory(
       updated_at: new Date().toISOString(),
     })
     .eq("id", categoryId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .select("*")
     .single();
 
@@ -586,7 +614,7 @@ export async function updateFinanceCategory(
 }
 
 export async function trashFinanceCategory(categoryId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!id.safeParse(categoryId).success) return fail("Categoria inválida.");
 
   const supabase = await createClient();
@@ -594,7 +622,7 @@ export async function trashFinanceCategory(categoryId: string): Promise<ActionRe
     .from("finance_categories")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", categoryId)
-    .eq("user_id", user.id);
+    .eq("user_id", scope.ownerId);
 
   if (error) {
     console.error("trashFinanceCategory error:", error);

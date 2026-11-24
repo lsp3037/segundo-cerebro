@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { getFinanceScope } from "@/lib/finance/scope";
 import {
   formatDayMonth,
   loadInvestmentState,
@@ -155,13 +155,13 @@ function investmentFields(d: ParsedInvestment) {
   };
 }
 
-async function updateInvestment(userId: string, id: string, d: ParsedInvestment): Promise<ActionResult<{ id: string }>> {
+async function updateInvestment(ownerId: string, id: string, d: ParsedInvestment): Promise<ActionResult<{ id: string }>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investments")
     .update({ ...investmentFields(d), updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null)
     .select("id")
     .maybeSingle();
@@ -174,7 +174,7 @@ async function updateInvestment(userId: string, id: string, d: ParsedInvestment)
 }
 
 // Cria o investimento e o primeiro aporte ("quanto tem lá hoje"). Se o aporte falhar, desfaz o investimento.
-async function createInvestment(userId: string, d: ParsedInvestment): Promise<ActionResult<{ id: string }>> {
+async function createInvestment(ownerId: string, d: ParsedInvestment): Promise<ActionResult<{ id: string }>> {
   if (!d.rate) return fail("Informe a taxa do investimento.");
   if (!d.initial) return fail("Informe quanto você tem lá hoje e desde quando.");
   if (d.initial.date > todayIso()) return fail("A data não pode ser no futuro.");
@@ -184,7 +184,7 @@ async function createInvestment(userId: string, d: ParsedInvestment): Promise<Ac
     .from("finance_investments")
     .insert({
       ...investmentFields(d),
-      user_id: userId,
+      user_id: ownerId,
       rate_changes: serializeRateChanges([toRateEntry(d.rate, d.initial.date)]),
     })
     .select("id")
@@ -195,7 +195,7 @@ async function createInvestment(userId: string, d: ParsedInvestment): Promise<Ac
   }
 
   const { error: movementError } = await supabase.from("finance_investment_movements").insert({
-    user_id: userId,
+    user_id: ownerId,
     investment_id: created.id,
     kind: "deposit",
     date: d.initial.date,
@@ -203,27 +203,27 @@ async function createInvestment(userId: string, d: ParsedInvestment): Promise<Ac
   });
   if (movementError) {
     console.error("createInvestment initial deposit error:", movementError);
-    await supabase.from("finance_investments").delete().eq("id", created.id).eq("user_id", userId);
+    await supabase.from("finance_investments").delete().eq("id", created.id).eq("user_id", ownerId);
     return fail("Não foi possível registrar o valor inicial do investimento.");
   }
   return ok({ id: created.id });
 }
 
 export async function saveInvestment(input: SaveInvestmentInput): Promise<ActionResult<{ id: string }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = saveInvestmentSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
   const result = parsed.data.id
-    ? await updateInvestment(user.id, parsed.data.id, parsed.data)
-    : await createInvestment(user.id, parsed.data);
+    ? await updateInvestment(scope.ownerId, parsed.data.id, parsed.data)
+    : await createInvestment(scope.ownerId, parsed.data);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
 
 // Vai para a lixeira (deleted_at); o "Desfazer" usa `restoreFinanceItem("investment", id)`.
 export async function deleteInvestment(investmentId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(investmentId).success) return fail("Investimento inválido.");
 
   const supabase = await createClient();
@@ -232,7 +232,7 @@ export async function deleteInvestment(investmentId: string): Promise<ActionResu
     .from("finance_investments")
     .update({ deleted_at: now, updated_at: now })
     .eq("id", investmentId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .is("deleted_at", null)
     .select("id")
     .maybeSingle();
@@ -271,12 +271,12 @@ function movementOverdraftError(state: InvestmentState, d: ParsedMovement): stri
   return `${d.id ? "Com essa mudança" : "Com esse resgate"}, o saldo ficaria negativo em ${day}.`;
 }
 
-async function insertMovement(userId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
+async function insertMovement(ownerId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .insert({
-      user_id: userId,
+      user_id: ownerId,
       investment_id: d.investmentId,
       kind: d.kind,
       date: d.date,
@@ -292,7 +292,7 @@ async function insertMovement(userId: string, d: ParsedMovement): Promise<Action
   return ok({ id: data.id });
 }
 
-async function updateMovement(userId: string, movementId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
+async function updateMovement(ownerId: string, movementId: string, d: ParsedMovement): Promise<ActionResult<{ id: string }>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investment_movements")
@@ -305,7 +305,7 @@ async function updateMovement(userId: string, movementId: string, d: ParsedMovem
       updated_at: new Date().toISOString(),
     })
     .eq("id", movementId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .eq("investment_id", d.investmentId)
     .is("deleted_at", null)
     .select("id")
@@ -320,30 +320,30 @@ async function updateMovement(userId: string, movementId: string, d: ParsedMovem
 
 // "Guardei" / "Resgatei" (cria) ou edição de um aporte/resgate (com `id`). Recusa se o saldo ficar negativo.
 export async function saveInvestmentMovement(input: SaveInvestmentMovementInput): Promise<ActionResult<{ id: string }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = saveMovementSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
   const d = parsed.data;
   if (d.date > todayIso()) return fail("A data não pode ser no futuro.");
 
-  const loaded = await loadInvestmentState(user.id, d.investmentId, [d.date]);
+  const loaded = await loadInvestmentState(scope.ownerId, d.investmentId, [d.date]);
   if (!loaded.ok) return loaded;
   const blocker = (d.id ? editBlocker(loaded.data, d.id) : null) ?? movementOverdraftError(loaded.data, d);
   if (blocker) return fail(blocker);
 
-  const result = d.id ? await updateMovement(user.id, d.id, d) : await insertMovement(user.id, d);
+  const result = d.id ? await updateMovement(scope.ownerId, d.id, d) : await insertMovement(scope.ownerId, d);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
 
 // Investimento de um movimento ativo do usuário.
-async function findMovementInvestmentId(userId: string, movementId: string): Promise<ActionResult<string>> {
+async function findMovementInvestmentId(ownerId: string, movementId: string): Promise<ActionResult<string>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .select("investment_id")
     .eq("id", movementId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null)
     .maybeSingle();
   if (error) {
@@ -360,14 +360,14 @@ function deletionOverdraftError(state: InvestmentState, movementId: string): str
   return date ? `Sem esse ${MOVEMENT_NOUN[movement.kind]}, o saldo ficaria negativo em ${formatDayMonth(date, state.today)}.` : null;
 }
 
-async function softDeleteMovement(userId: string, movementId: string): Promise<ActionResult> {
+async function softDeleteMovement(ownerId: string, movementId: string): Promise<ActionResult> {
   const supabase = await createClient();
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .update({ deleted_at: now, updated_at: now })
     .eq("id", movementId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null)
     .select("id")
     .maybeSingle();
@@ -381,17 +381,17 @@ async function softDeleteMovement(userId: string, movementId: string): Promise<A
 // Vai para a lixeira; o "Desfazer" usa `restoreFinanceItem("investment_movement", id)`.
 // Excluir o único movimento é permitido (o investimento fica zerado).
 export async function deleteInvestmentMovement(movementId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(movementId).success) return fail("Movimento inválido.");
 
-  const investment = await findMovementInvestmentId(user.id, movementId);
+  const investment = await findMovementInvestmentId(scope.ownerId, movementId);
   if (!investment.ok) return investment;
-  const loaded = await loadInvestmentState(user.id, investment.data);
+  const loaded = await loadInvestmentState(scope.ownerId, investment.data);
   if (!loaded.ok) return loaded;
   const blocker = deletionOverdraftError(loaded.data, movementId);
   if (blocker) return fail(blocker);
 
-  const result = await softDeleteMovement(user.id, movementId);
+  const result = await softDeleteMovement(scope.ownerId, movementId);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -400,12 +400,12 @@ export async function deleteInvestmentMovement(movementId: string): Promise<Acti
 // Acertar com o app
 // ---------------------------------------------------------------------------
 
-async function insertAdjustment(userId: string, investmentId: string, adjustment: InvestmentMovement): Promise<ActionResult<string>> {
+async function insertAdjustment(ownerId: string, investmentId: string, adjustment: InvestmentMovement): Promise<ActionResult<string>> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .insert({
-      user_id: userId,
+      user_id: ownerId,
       investment_id: investmentId,
       kind: "adjustment",
       date: adjustment.date,
@@ -424,18 +424,18 @@ async function insertAdjustment(userId: string, investmentId: string, adjustment
 // Grava hoje um ajuste com a diferença entre o app do banco e a nossa estimativa (nada, se já bate).
 // Como o valor do app é >= 0, o saldo depois do ajuste não fica negativo.
 export async function reconcileInvestment(input: ReconcileInvestmentInput): Promise<ActionResult<ReconcileInvestmentResult>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = reconcileSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
 
-  const loaded = await loadInvestmentState(user.id, parsed.data.investmentId);
+  const loaded = await loadInvestmentState(scope.ownerId, parsed.data.investmentId);
   if (!loaded.ok) return loaded;
   const state = loaded.data;
   const adjustmentCents = parsed.data.appValueCents - valueOn(state, state.movements, state.today);
   if (adjustmentCents === 0) return ok({ adjustmentId: null, adjustmentCents: 0 });
 
   const adjustment: InvestmentMovement = { date: state.today, kind: "adjustment", amountCents: adjustmentCents };
-  const inserted = await insertAdjustment(user.id, parsed.data.investmentId, adjustment);
+  const inserted = await insertAdjustment(scope.ownerId, parsed.data.investmentId, adjustment);
   if (!inserted.ok) return inserted;
   revalidatePath("/", "layout");
   return ok({ adjustmentId: inserted.data, adjustmentCents });
@@ -463,13 +463,13 @@ function rateOverdraftError(state: InvestmentState, rates: RateEntry[], prefix: 
   return date ? `${prefix}, o saldo ficaria negativo em ${formatDayMonth(date, state.today)}. Ajuste o resgate antes.` : null;
 }
 
-async function writeRates(userId: string, investmentId: string, rates: RateEntry[]): Promise<ActionResult> {
+async function writeRates(ownerId: string, investmentId: string, rates: RateEntry[]): Promise<ActionResult> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("finance_investments")
     .update({ rate_changes: serializeRateChanges(rates), updated_at: new Date().toISOString() })
     .eq("id", investmentId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null)
     .select("id")
     .maybeSingle();
@@ -482,13 +482,13 @@ async function writeRates(userId: string, investmentId: string, rates: RateEntry
 
 // "Mudar taxa": vale de `from` em diante (passado ou até ~1 ano à frente). A mesma data substitui a entrada.
 export async function saveInvestmentRate(input: SaveInvestmentRateInput): Promise<ActionResult<null>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = saveRateSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
   const d = parsed.data;
   if (d.from > addDays(todayIso(), MAX_RATE_DAYS_AHEAD)) return fail("A data pode ser no máximo daqui a um ano.");
 
-  const loaded = await loadInvestmentState(user.id, d.investmentId);
+  const loaded = await loadInvestmentState(scope.ownerId, d.investmentId);
   if (!loaded.ok) return loaded;
   const state = loaded.data;
   const rates = [...state.rates.filter((rate) => rate.from !== d.from), toRateEntry(d.rate, d.from)].sort((a, b) =>
@@ -497,7 +497,7 @@ export async function saveInvestmentRate(input: SaveInvestmentRateInput): Promis
   const blocker = rateOverdraftError(state, rates, "Com essa taxa");
   if (blocker) return fail(blocker);
 
-  const result = await writeRates(user.id, d.investmentId, rates);
+  const result = await writeRates(scope.ownerId, d.investmentId, rates);
   if (!result.ok) return result;
   revalidatePath("/", "layout");
   return ok(null);
@@ -506,12 +506,12 @@ export async function saveInvestmentRate(input: SaveInvestmentRateInput): Promis
 // Remove uma entrada do histórico de taxas (nunca a única). Devolve a entrada removida no formato de
 // `saveInvestmentRate` para o "Desfazer": saveInvestmentRate({ investmentId, ...removed }).
 export async function deleteInvestmentRate(input: DeleteInvestmentRateInput): Promise<ActionResult<{ removed: RateChangeInput }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = deleteRateSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
   const d = parsed.data;
 
-  const loaded = await loadInvestmentState(user.id, d.investmentId);
+  const loaded = await loadInvestmentState(scope.ownerId, d.investmentId);
   if (!loaded.ok) return loaded;
   const state = loaded.data;
   // Na mesma data vale a última entrada (como em `parseRateChanges`).
@@ -522,7 +522,7 @@ export async function deleteInvestmentRate(input: DeleteInvestmentRateInput): Pr
   const blocker = rateOverdraftError(state, rates, "Sem essa taxa");
   if (blocker) return fail(blocker);
 
-  const result = await writeRates(user.id, d.investmentId, rates);
+  const result = await writeRates(scope.ownerId, d.investmentId, rates);
   if (!result.ok) return result;
   revalidatePath("/", "layout");
   return ok({ removed: toRateChangeInput(removed) });

@@ -2,9 +2,9 @@
 
 import { getAiProvider, isAiConfigured } from "@/lib/ai";
 import { assertAreaAllowsAi } from "@/lib/ai/guard";
-import { getCurrentUser } from "@/lib/auth";
 import { getFinanceSummary } from "@/lib/data/finance";
 import { getHouseholdData } from "@/lib/data/finance-family";
+import { assertLedgerAllowed, getFinanceScope } from "@/lib/finance/scope";
 import { formatCentsToBrl } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import type { LedgerType } from "@/components/finance/meta";
@@ -30,8 +30,10 @@ export async function generateMonthDiagnostic(input: {
   member?: string | null;
 }): Promise<ActionResult<MonthDiagnosticResult>> {
   try {
-    await getCurrentUser();
+    const scope = await getFinanceScope();
     const { month, ledger } = input;
+    const denied = ledger === "all" ? null : assertLedgerAllowed(scope, ledger);
+    if (denied) return fail(denied);
     if (!/^\d{4}-\d{2}$/.test(month)) {
       return fail("Mês inválido para diagnóstico.");
     }

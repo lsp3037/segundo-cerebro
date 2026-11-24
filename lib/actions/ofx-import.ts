@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { assertLedgerAllowed, getFinanceScope } from "@/lib/finance/scope";
 import { parseOfx } from "@/lib/finance/ofx-parser";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
@@ -105,7 +105,9 @@ export async function analyzeOfxContent(params: {
   content: string;
   targetLedger: "pessoal" | "trustcare";
 }): Promise<ActionResult<OfxAnalysisReport>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
+  const denied = assertLedgerAllowed(scope, params.targetLedger);
+  if (denied) return fail(denied);
   const parsed = parseOfx(params.content);
 
   if (!parsed.success || parsed.transactions.length === 0) {
@@ -119,7 +121,7 @@ export async function analyzeOfxContent(params: {
   const { data: existingFitidsData } = await supabase
     .from("transactions")
     .select("bank_fitid")
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .in("bank_fitid", fitids)
     .is("deleted_at", null);
 
@@ -133,7 +135,7 @@ export async function analyzeOfxContent(params: {
   const { data: candidateTransactions } = await supabase
     .from("transactions")
     .select("id, date, description, amount_cents, kind")
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .eq("ledger", params.targetLedger)
     .is("deleted_at", null)
     .is("bank_fitid", null)
@@ -145,12 +147,12 @@ export async function analyzeOfxContent(params: {
     supabase
       .from("finance_rules")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .eq("ledger", params.targetLedger),
     supabase
       .from("finance_categories")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .eq("ledger", params.targetLedger)
       .is("deleted_at", null),
   ]);
@@ -280,9 +282,12 @@ export type ImportOfxBatchInput = z.infer<typeof importOfxBatchSchema>;
 export async function importOfxBatchAction(
   input: ImportOfxBatchInput,
 ): Promise<ActionResult<{ created: number; linked: number; rulesSaved: number }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = importOfxBatchSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
+  const ledgers = new Set([parsed.data.ledger, ...parsed.data.items.map((item) => item.ledger)]);
+  const denied = [...ledgers].map((ledger) => assertLedgerAllowed(scope, ledger)).find(Boolean);
+  if (denied) return fail(denied);
 
   const supabase = await createClient();
 
@@ -316,12 +321,12 @@ export async function importOfxBatchAction(
           updated_at: new Date().toISOString(),
         })
         .eq("id", item.matched_transaction_id)
-        .eq("user_id", user.id);
+        .eq("user_id", scope.ownerId);
 
       if (!error) linked++;
     } else if (item.action === "create") {
       toInsert.push({
-        user_id: user.id,
+        user_id: scope.ownerId,
         ledger: item.ledger,
         kind: item.kind,
         amount_cents: item.amount_cents,
@@ -340,7 +345,7 @@ export async function importOfxBatchAction(
       if (pattern.length >= 2) {
         const { error: ruleErr } = await supabase.from("finance_rules").upsert(
           {
-            user_id: user.id,
+            user_id: scope.ownerId,
             pattern,
             category_id: item.category_id,
             ledger: item.ledger,

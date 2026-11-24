@@ -2,11 +2,11 @@ import "server-only";
 
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
 import { addDays, todayIso, type IsoDate } from "@/lib/dates";
 import { isBusinessDay, previousBusinessDay } from "@/lib/finance/business-days";
 import { BUSINESS_DAYS_PER_YEAR } from "@/lib/finance/investments";
 import type { CdiInfo } from "@/lib/finance/investments-data";
+import { getFinanceScope } from "@/lib/finance/scope";
 import { createClient } from "@/lib/supabase/server";
 
 // CDI diário (série 12 do Banco Central), com cópia em `finance_cdi_daily`.
@@ -46,13 +46,13 @@ const bcbResponseSchema = z.array(
 // Cópia guardada
 // ---------------------------------------------------------------------------
 
-async function readStoredRows(supabase: SupabaseClient, userId: string, fromIso: IsoDate): Promise<StoredRow[]> {
+async function readStoredRows(supabase: SupabaseClient, ownerId: string, fromIso: IsoDate): Promise<StoredRow[]> {
   const rows: StoredRow[] = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await supabase
       .from("finance_cdi_daily")
       .select("date, daily_percent, fetched_at")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .gte("date", fromIso)
       .order("date", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -62,11 +62,11 @@ async function readStoredRows(supabase: SupabaseClient, userId: string, fromIso:
   }
 }
 
-async function saveRows(supabase: SupabaseClient, userId: string, points: CdiPoint[]) {
+async function saveRows(supabase: SupabaseClient, ownerId: string, points: CdiPoint[]) {
   const fetchedAt = new Date().toISOString();
   const { error } = await supabase.from("finance_cdi_daily").upsert(
     points.map((point) => ({
-      user_id: userId,
+      user_id: ownerId,
       date: point.date,
       daily_percent: point.dailyPercent,
       fetched_at: fetchedAt,
@@ -151,12 +151,12 @@ function buildSeries(percentByDate: Map<IsoDate, number>, stale: boolean): CdiSe
 // Busca no Banco Central o que falta e grava. Devolve null se não deu (e registra o erro).
 async function refreshFromBcb(
   supabase: SupabaseClient,
-  userId: string,
+  ownerId: string,
   range: { from: IsoDate; to: IsoDate },
 ): Promise<CdiPoint[] | null> {
   try {
     const points = await fetchBcbSeries(range.from, range.to);
-    if (points.length > 0) await saveRows(supabase, userId, points);
+    if (points.length > 0) await saveRows(supabase, ownerId, points);
     return points;
   } catch (error) {
     lastFailureAt = Date.now();
@@ -168,11 +168,11 @@ async function refreshFromBcb(
 // CDI de `fromIso` (com uma folga antes) até o último dia publicado. Só pergunta ao Banco Central
 // quando a cópia guardada não cobre o período ou está atrasada; em falha, usa a cópia com `stale: true`.
 export async function getCdiSeries(fromIso: IsoDate): Promise<CdiSeries> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const supabase = await createClient();
   const today = todayIso();
   const windowStart = addDays(fromIso, -LOOKBACK_DAYS);
-  const rows = await readStoredRows(supabase, user.id, windowStart);
+  const rows = await readStoredRows(supabase, scope.ownerId, windowStart);
   const percentByDate = new Map(rows.map((row) => [row.date, row.daily_percent]));
 
   const gap = findCoverageGap(rows, fromIso, today);
@@ -182,7 +182,7 @@ export async function getCdiSeries(fromIso: IsoDate): Promise<CdiSeries> {
 
   // "tail" continua da última linha guardada (inclusive), para a cópia seguir sem buraco.
   const from = gap === "tail" ? rows[rows.length - 1].date : windowStart;
-  const points = await refreshFromBcb(supabase, user.id, { from, to: today });
+  const points = await refreshFromBcb(supabase, scope.ownerId, { from, to: today });
   if (!points) return buildSeries(percentByDate, true);
   for (const point of points) percentByDate.set(point.date, point.dailyPercent);
   return buildSeries(percentByDate, false);

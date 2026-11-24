@@ -47,12 +47,12 @@ export function cdiStartDate(dates: IsoDate[], today: IsoDate): IsoDate {
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 // O FK ignora RLS: confirmar aqui que o investimento é do usuário e não está na lixeira.
-async function readOwnedRates(supabase: SupabaseClient, userId: string, investmentId: string): Promise<RateEntry[] | null> {
+async function readOwnedRates(supabase: SupabaseClient, ownerId: string, investmentId: string): Promise<RateEntry[] | null> {
   const { data, error } = await supabase
     .from("finance_investments")
     .select("rate_changes")
     .eq("id", investmentId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .is("deleted_at", null)
     .maybeSingle();
   if (error) throw error;
@@ -61,13 +61,13 @@ async function readOwnedRates(supabase: SupabaseClient, userId: string, investme
 
 async function readActiveMovements(
   supabase: SupabaseClient,
-  userId: string,
+  ownerId: string,
   investmentId: string,
 ): Promise<StoredInvestmentMovement[]> {
   const { data, error } = await supabase
     .from("finance_investment_movements")
     .select("id, date, kind, amount_cents")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .eq("investment_id", investmentId)
     .is("deleted_at", null);
   if (error) throw error;
@@ -76,12 +76,12 @@ async function readActiveMovements(
     .map((row) => ({ id: row.id, date: row.date, kind: row.kind as MovementKind, amountCents: row.amount_cents }));
 }
 
-async function readInvestmentState(userId: string, investmentId: string, extraDates: IsoDate[]): Promise<InvestmentState | null> {
+async function readInvestmentState(ownerId: string, investmentId: string, extraDates: IsoDate[]): Promise<InvestmentState | null> {
   const supabase = await createClient();
   const today = todayIso();
-  const rates = await readOwnedRates(supabase, userId, investmentId);
+  const rates = await readOwnedRates(supabase, ownerId, investmentId);
   if (rates === null) return null;
-  const movements = await readActiveMovements(supabase, userId, investmentId);
+  const movements = await readActiveMovements(supabase, ownerId, investmentId);
   const { cdiByDate } = await getCdiSeries(cdiStartDate([...movements.map((m) => m.date), ...extraDates], today));
   return { rates, movements, cdiByDate, today };
 }
@@ -89,12 +89,12 @@ async function readInvestmentState(userId: string, investmentId: string, extraDa
 // `extraDates`: datas que ainda não estão nos movimentos (novo movimento, edição, restauração),
 // para o CDI cobrir também esses dias.
 export async function loadInvestmentState(
-  userId: string,
+  ownerId: string,
   investmentId: string,
   extraDates: IsoDate[] = [],
 ): Promise<ActionResult<InvestmentState>> {
   try {
-    const state = await readInvestmentState(userId, investmentId, extraDates);
+    const state = await readInvestmentState(ownerId, investmentId, extraDates);
     return state ? ok(state) : fail("Investimento não encontrado.");
   } catch (error) {
     console.error("loadInvestmentState error:", error);

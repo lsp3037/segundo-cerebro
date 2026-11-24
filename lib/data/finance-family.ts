@@ -99,7 +99,7 @@ function monthBounds(month: string) {
 // e mantém o Dízimo pendente igual ao percentual das entradas do mês.
 // Quando `allowPastTithe` é true (ação explícita "Gerar 10%"), permite gerar o Dízimo em meses passados sem recriar contas fixas antigas.
 export async function ensureMonthBills(
-  userId: string,
+  ownerId: string,
   month: string,
   options?: { syncPendingFixed?: boolean; allowPastTithe?: boolean },
 ): Promise<{ titheTouched: boolean }> {
@@ -114,7 +114,7 @@ export async function ensureMonthBills(
     const { data: allBills } = await supabase
       .from("finance_recurring_bills")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .eq("active", true)
       .is("deleted_at", null)
       .order("sort_order");
@@ -128,7 +128,7 @@ export async function ensureMonthBills(
     const { data: existing } = await supabase
       .from("transactions")
       .select("id, recurring_bill_id, status, amount_cents, due_date, description, category_id")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .eq("ledger", "pessoal")
       .is("deleted_at", null)
       .gte("date", start)
@@ -142,7 +142,7 @@ export async function ensureMonthBills(
     const rowFor = (bill: RecurringBill, amount: number): TablesInsert<"transactions"> => {
       const due = dueDateFor(month, bill.due_day);
       return {
-        user_id: userId,
+        user_id: ownerId,
         ledger: "pessoal",
         kind: bill.kind,
         amount_cents: amount,
@@ -163,7 +163,7 @@ export async function ensureMonthBills(
       for (const id of outOfPeriodIds) {
         const stale = existingByBill.get(id);
         if (stale && stale.status === "pending") {
-          await supabase.from("transactions").delete().eq("id", stale.id).eq("user_id", userId);
+          await supabase.from("transactions").delete().eq("id", stale.id).eq("user_id", ownerId);
         }
       }
 
@@ -184,7 +184,7 @@ export async function ensureMonthBills(
               .from("transactions")
               .update({ amount_cents: target, due_date: targetDue, updated_at: new Date().toISOString() })
               .eq("id", cur.id)
-              .eq("user_id", userId);
+              .eq("user_id", ownerId);
           }
         }
       }
@@ -197,7 +197,7 @@ export async function ensureMonthBills(
     const { data: incomes } = await supabase
       .from("transactions")
       .select("amount_cents")
-      .eq("user_id", userId)
+      .eq("user_id", ownerId)
       .eq("ledger", "pessoal")
       .eq("kind", "income")
       .is("deleted_at", null)
@@ -240,12 +240,12 @@ export async function ensureMonthBills(
               .from("transactions")
               .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
               .eq("id", current.id)
-              .eq("user_id", userId);
+              .eq("user_id", ownerId);
             titheTouched = true;
           }
         } else {
           // Sem entradas suficientes no mês ou já totalmente quitado: remove o pendente vazio.
-          await supabase.from("transactions").delete().eq("id", current.id).eq("user_id", userId);
+          await supabase.from("transactions").delete().eq("id", current.id).eq("user_id", ownerId);
           titheTouched = true;
         }
       } else if (current.status === "paid") {
@@ -257,12 +257,12 @@ export async function ensureMonthBills(
                 .from("transactions")
                 .update({ amount_cents: remaining, updated_at: new Date().toISOString() })
                 .eq("id", complementRow.id)
-                .eq("user_id", userId);
+                .eq("user_id", ownerId);
               titheTouched = true;
             }
           } else if (!complementRow) {
             await supabase.from("transactions").insert({
-              user_id: userId,
+              user_id: ownerId,
               ledger: "pessoal",
               kind: "expense",
               amount_cents: remaining,
@@ -278,7 +278,7 @@ export async function ensureMonthBills(
             titheTouched = true;
           }
         } else if (complementRow && complementRow.status === "pending") {
-          await supabase.from("transactions").delete().eq("id", complementRow.id).eq("user_id", userId);
+          await supabase.from("transactions").delete().eq("id", complementRow.id).eq("user_id", ownerId);
           titheTouched = true;
         }
       }

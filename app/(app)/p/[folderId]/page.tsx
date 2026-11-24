@@ -1,7 +1,7 @@
 import { ChevronRightIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { HabitsManager } from "@/components/habits/habits-manager";
@@ -20,7 +20,6 @@ import { ReplyAssistant } from "@/components/trustcare/reply-assistant";
 import { ShortcutsBoard } from "@/components/trustcare/shortcuts-board";
 import { MarketingDirectorHub } from "@/components/trustcare/marketing/marketing-director-hub";
 import { isAiConfigured } from "@/lib/ai";
-import { getCurrentUser } from "@/lib/auth";
 import {
   ensureDefaultFinanceData,
   getFinanceCategories,
@@ -41,6 +40,7 @@ import { getSidebarData } from "@/lib/data/sidebar";
 import { getTasks } from "@/lib/data/tasks";
 import { getContentIdeas, getContentPillars, getPublications, getReplyCases, getServiceFlows, getShortcuts } from "@/lib/data/trustcare";
 import { startOfMonth, todayIso } from "@/lib/dates";
+import { getFinanceScope } from "@/lib/finance/scope";
 import { getOsSummary } from "@/lib/integrations/os-manager";
 import { type Folder, type FolderModule, MODULES } from "@/lib/modules";
 
@@ -70,6 +70,8 @@ export async function generateMetadata(props: PageProps<"/p/[folderId]">): Promi
 const FOLDER_TASK_VIEWS: TaskView[] = ["lista", "kanban", "semana", "mes"];
 
 export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
+  // Pastas são do dono: o membro das Finanças só usa /financas.
+  if ((await getFinanceScope()).isMember) redirect("/financas");
   const data = await loadFolder((await props.params).folderId);
   if (!data) notFound();
   const { folder, area, path, subtree } = data;
@@ -173,8 +175,8 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
         tab?: string;
         member?: string;
       };
-      const user = await getCurrentUser();
-      await ensureDefaultFinanceData(user.id);
+      const scope = await getFinanceScope();
+      if (!scope.isMember) await ensureDefaultFinanceData(scope.ownerId);
 
       const folderConfig = folder.config as { ledger?: "pessoal" | "trustcare" } | null;
       const targetLedger: "all" | "pessoal" | "trustcare" =
@@ -189,7 +191,7 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
       const effectiveMember = targetLedger === "pessoal" ? currentMember : null;
       const showInvestments = targetLedger === "pessoal" && searchParams.tab === "investimentos";
 
-      await ensureMonthBills(user.id, currentMonth);
+      await ensureMonthBills(scope.ownerId, currentMonth);
 
       // Atrasados de meses anteriores só entram na lista quando se olha o mês atual de verdade.
       const showOverdueEarlier = searchParams.tab === "fluxo" && currentMonth === today.slice(0, 7);

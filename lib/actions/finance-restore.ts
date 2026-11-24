@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { getCurrentUser } from "@/lib/auth";
+import { assertLedgerAllowed, getFinanceScope } from "@/lib/finance/scope";
 import { ensureMonthBills } from "@/lib/data/finance-family";
 import {
   formatDayMonth,
@@ -28,7 +28,7 @@ export async function setTransactionPaid(
   transactionId: string,
   paid: boolean,
 ): Promise<ActionResult<{ status: "paid" | "pending" }>> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   if (!uuidSchema.safeParse(transactionId).success) return fail("Lançamento inválido.");
 
   const status = paid ? "paid" : "pending";
@@ -37,7 +37,7 @@ export async function setTransactionPaid(
     .from("transactions")
     .update({ status, paid_at: paid ? todayIso() : null, updated_at: new Date().toISOString() })
     .eq("id", transactionId)
-    .eq("user_id", user.id)
+    .eq("user_id", scope.ownerId)
     .is("deleted_at", null)
     .select("id")
     .maybeSingle();
@@ -78,18 +78,18 @@ export type RestorableFinanceKind = z.infer<typeof restoreSchema>["kind"];
 
 // Restaurar um movimento de investimento não pode deixar o saldo negativo em nenhuma data.
 // Devolve a mensagem de erro, ou null se pode restaurar.
-async function investmentMovementRestoreError(userId: string, movementId: string): Promise<string | null> {
+async function investmentMovementRestoreError(ownerId: string, movementId: string): Promise<string | null> {
   const supabase = await createClient();
   const { data: row, error } = await supabase
     .from("finance_investment_movements")
     .select("investment_id, kind, date, amount_cents")
     .eq("id", movementId)
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .maybeSingle();
   if (error) console.error("investmentMovementRestoreError error:", error);
   if (!row || !isMovementKind(row.kind)) return "Não foi possível desfazer.";
 
-  const loaded = await loadInvestmentState(userId, row.investment_id, [row.date]);
+  const loaded = await loadInvestmentState(ownerId, row.investment_id, [row.date]);
   if (!loaded.ok) return loaded.error;
   const state = loaded.data;
   const restored = { date: row.date, kind: row.kind, amountCents: row.amount_cents };
@@ -98,30 +98,37 @@ async function investmentMovementRestoreError(userId: string, movementId: string
 }
 
 export async function restoreFinanceItem(kind: RestorableFinanceKind, itemId: string): Promise<ActionResult> {
-  const user = await getCurrentUser();
+  const scope = await getFinanceScope();
   const parsed = restoreSchema.safeParse({ kind, id: itemId });
   if (!parsed.success) return fail("Item inválido.");
+  if (parsed.data.kind === "notebook") {
+    const denied = assertLedgerAllowed(scope, "trustcare");
+    if (denied) return fail(denied);
+  }
 
   if (parsed.data.kind === "investment_movement") {
-    const blocker = await investmentMovementRestoreError(user.id, parsed.data.id);
+    const blocker = await investmentMovementRestoreError(scope.ownerId, parsed.data.id);
     if (blocker) return fail(blocker);
   }
 
   const supabase = await createClient();
-  const { error } =
+  const { data: restored, error } =
     parsed.data.kind === "recurring_bill"
       ? await supabase
           .from("finance_recurring_bills")
           .update({ deleted_at: null, active: true })
           .eq("id", parsed.data.id)
-          .eq("user_id", user.id)
+          .eq("user_id", scope.ownerId)
+          .select("id")
       : await supabase
           .from(TABLE_BY_KIND[parsed.data.kind])
           .update({ deleted_at: null })
           .eq("id", parsed.data.id)
-          .eq("user_id", user.id);
-  if (error) {
-    console.error("restoreFinanceItem error:", error);
+          .eq("user_id", scope.ownerId)
+          .select("id");
+  // Sem linha alterada = item que não existe mais ou que quem está logado não pode ver (RLS).
+  if (error || !restored || restored.length === 0) {
+    if (error) console.error("restoreFinanceItem error:", error);
     return fail("Não foi possível desfazer.");
   }
 
@@ -131,10 +138,10 @@ export async function restoreFinanceItem(kind: RestorableFinanceKind, itemId: st
       .from("transactions")
       .select("ledger, kind, date")
       .eq("id", parsed.data.id)
-      .eq("user_id", user.id)
+      .eq("user_id", scope.ownerId)
       .maybeSingle();
     if (data?.ledger === "pessoal" && data.kind === "income") {
-      await ensureMonthBills(user.id, monthKey(data.date));
+      await ensureMonthBills(scope.ownerId, monthKey(data.date));
     }
   }
 
