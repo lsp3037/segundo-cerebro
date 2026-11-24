@@ -75,6 +75,8 @@ interface FinanceDashboardProps {
   currentMember: string | null;
   baseFolderId?: string;
   contextLabel?: string;
+  // Membro das Finanças (esposa): só o Pessoal, sem seletor de livro nem Trust Care.
+  isMember?: boolean;
 }
 
 export function FinanceDashboard({
@@ -90,6 +92,7 @@ export function FinanceDashboard({
   currentLedger,
   currentMember,
   contextLabel,
+  isMember = false,
 }: FinanceDashboardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -363,16 +366,18 @@ export function FinanceDashboard({
           </div>
 
           {/* Seletor único e inequívoco: Pessoal | Trust Care | Consolidado (transitions-dev #16) */}
-          <SlidingTabs
-            ariaLabel="Escopo financeiro"
-            value={currentLedger}
-            onChange={(ldg) => handleSwitchLedger(ldg)}
-            items={[
-              { id: "pessoal", label: "Pessoal" },
-              { id: "trustcare", label: "Trust Care" },
-              { id: "all", label: "Consolidado" },
-            ]}
-          />
+          {!isMember && (
+            <SlidingTabs
+              ariaLabel="Escopo financeiro"
+              value={currentLedger}
+              onChange={(ldg) => handleSwitchLedger(ldg)}
+              items={[
+                { id: "pessoal", label: "Pessoal" },
+                { id: "trustcare", label: "Trust Care" },
+                { id: "all", label: "Consolidado" },
+              ]}
+            />
+          )}
 
           {/* Seletor de Mês compacto + Hoje inline */}
           <div className="flex items-center gap-1.5">
@@ -731,6 +736,7 @@ export function FinanceDashboard({
         defaultDescription={txDefaultDescription}
         defaultAmountCents={txDefaultAmountCents}
         transactionToEdit={txToEdit}
+        pessoalOnly={isMember}
       />
 
       <RecurringBillsDialog
@@ -742,20 +748,24 @@ export function FinanceDashboard({
         currentMonth={currentMonth}
       />
 
-      <NotebookDialog
-        open={nbDialogOpen}
-        onOpenChange={setNbDialogOpen}
-        categories={categories}
-        paymentMethods={paymentMethods}
-        notebookToEdit={nbToEdit}
-      />
+      {!isMember && (
+        <>
+          <NotebookDialog
+            open={nbDialogOpen}
+            onOpenChange={setNbDialogOpen}
+            categories={categories}
+            paymentMethods={paymentMethods}
+            notebookToEdit={nbToEdit}
+          />
 
-      <SaleNotebookDialog
-        open={saleDialogOpen}
-        onOpenChange={setSaleDialogOpen}
-        notebook={nbToSell}
-        paymentMethods={paymentMethods}
-      />
+          <SaleNotebookDialog
+            open={saleDialogOpen}
+            onOpenChange={setSaleDialogOpen}
+            notebook={nbToSell}
+            paymentMethods={paymentMethods}
+          />
+        </>
+      )}
 
       <OfxImportDialog
         open={ofxDialogOpen}
@@ -763,6 +773,7 @@ export function FinanceDashboard({
         categories={categories}
         paymentMethods={paymentMethods}
         defaultLedger={currentLedger === "trustcare" ? "trustcare" : "pessoal"}
+        pessoalOnly={isMember}
       />
 
       <InvestmentDialog
@@ -779,6 +790,7 @@ export function FinanceDashboard({
         onOpenChange={setCatDialogOpen}
         categories={categories}
         defaultLedger={currentLedger === "trustcare" ? "trustcare" : "pessoal"}
+        pessoalOnly={isMember}
       />
     </div>
   );

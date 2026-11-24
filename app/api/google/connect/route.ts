@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { buildAuthUrl, googleConfigured } from "@/lib/google/api";
 import { sign } from "@/lib/google/crypto";
 
@@ -8,6 +9,8 @@ import { sign } from "@/lib/google/crypto";
 // O "state" leva o id do usuário assinado e também fica num cookie, contra falsificação.
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
+  const denied = await requireFullAccess();
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const origin = new URL(request.url).origin;
 
   if (!googleConfigured()) {

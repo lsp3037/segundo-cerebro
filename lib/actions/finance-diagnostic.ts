@@ -138,7 +138,8 @@ export async function generateMonthDiagnostic(input: {
     };
 
     // Se a área Finanças tiver ai_enabled = true E provedor configurado, valida trava com assertAreaAllowsAi.
-    if (finArea?.id && finArea.ai_enabled && isAiConfigured()) {
+    // Membro nunca usa a IA (nem enxerga as áreas do dono): fica sempre no resumo local.
+    if (!scope.isMember && finArea?.id && finArea.ai_enabled && isAiConfigured()) {
       await assertAreaAllowsAi(finArea.id);
       const ai = getAiProvider();
       const aggregatePayload = {

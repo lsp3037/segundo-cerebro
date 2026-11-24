@@ -82,6 +82,7 @@ export default async function Page(props: PageProps<"/financas">) {
       currentMonth={currentMonth}
       currentLedger={currentLedger}
       currentMember={effectiveMember}
+      isMember={scope.isMember}
     />
   );
 }

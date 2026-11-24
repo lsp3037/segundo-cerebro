@@ -41,6 +41,7 @@ interface TransactionDialogProps {
   defaultAmountCents?: number | null;
   transactionToEdit?: Tables<"transactions"> | null;
   onSuccess?: () => void;
+  pessoalOnly?: boolean;
 }
 
 export function TransactionDialog(props: TransactionDialogProps) {
@@ -67,6 +68,7 @@ function TransactionDialogForm({
   defaultAmountCents,
   transactionToEdit,
   onSuccess,
+  pessoalOnly = false,
 }: TransactionDialogProps) {
   const [isPending, startTransition] = useTransition();
 
@@ -468,38 +470,40 @@ function TransactionDialogForm({
 
         {showDetails && (
           <div id="tx-details" className="space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
-            {/* De quem é */}
-            <div className="space-y-1.5">
-              <span id="tx-ledger-label" className="text-[13px] font-medium text-muted-foreground">
-                De quem é?
-              </span>
-              <div role="radiogroup" aria-labelledby="tx-ledger-label" className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    { id: "pessoal", label: "Pessoal / casa" },
-                    { id: "trustcare", label: "Trust Care" },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={ledger === opt.id}
-                    onClick={() => {
-                      setLedger(opt.id);
-                      setCategoryId("");
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors ${
-                      ledger === opt.id
-                        ? "border-foreground/40 bg-muted text-foreground"
-                        : "border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+            {/* De quem é (membro das Finanças só lança no Pessoal) */}
+            {!pessoalOnly && (
+              <div className="space-y-1.5">
+                <span id="tx-ledger-label" className="text-[13px] font-medium text-muted-foreground">
+                  De quem é?
+                </span>
+                <div role="radiogroup" aria-labelledby="tx-ledger-label" className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { id: "pessoal", label: "Pessoal / casa" },
+                      { id: "trustcare", label: "Trust Care" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={ledger === opt.id}
+                      onClick={() => {
+                        setLedger(opt.id);
+                        setCategoryId("");
+                      }}
+                      className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors ${
+                        ledger === opt.id
+                          ? "border-foreground/40 bg-muted text-foreground"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {ledger === "pessoal" && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

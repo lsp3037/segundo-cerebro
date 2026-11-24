@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { type AgentSuggestion, getMarketingAgent, isMarketingAgentLive } from "@/lib/integrations/marketing-agent";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 const id = z.uuid();
@@ -463,6 +464,8 @@ const FALLBACK_OOTTO_IDEAS: Record<ContentHypeFocus, AgentSuggestionView[]> = {
 export async function getAgentSuggestions(params?: {
   focus?: ContentHypeFocus;
 }): Promise<ActionResult<AgentSuggestionView[]>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   const supabase = await createClient();
   const { data: pillars } = await supabase.from("content_pillars").select("name").order("sort_order");
@@ -853,6 +856,8 @@ ${formatRule}
 }
 
 export async function sendIdeaToAgent(ideaId: string): Promise<ActionResult<{ ref: string }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   if (!id.safeParse(ideaId).success) return fail("Ideia inválida.");
 

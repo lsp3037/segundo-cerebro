@@ -13,6 +13,7 @@ import { RECURRENCE_OPTIONS } from "@/lib/recurrence";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 const id = z.uuid();
@@ -48,6 +49,8 @@ function message(error: unknown) {
 }
 
 export async function createEvent(input: EventInput): Promise<ActionResult<Tables<"events">>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   const parsed = eventFields.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);
@@ -75,6 +78,8 @@ export async function createEvent(input: EventInput): Promise<ActionResult<Table
 }
 
 export async function updateEvent(eventId: string, input: Partial<EventInput>): Promise<ActionResult> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   const parsed = eventFields.partial().safeParse(input);
   if (!id.safeParse(eventId).success || !parsed.success) return fail(parsed.error?.issues[0].message ?? "Evento inválido.");
@@ -111,6 +116,8 @@ export async function updateEvent(eventId: string, input: Partial<EventInput>): 
 }
 
 export async function removeEvent(eventId: string): Promise<ActionResult> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   if (!id.safeParse(eventId).success) return fail("Evento inválido.");
 
@@ -151,6 +158,8 @@ async function defaultCalendarFor(areaId: string) {
 }
 
 export async function scheduleTaskBlock(taskId: string): Promise<ActionResult<{ eventId: string }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   if (!id.safeParse(taskId).success) return fail("Tarefa inválida.");
 
@@ -207,6 +216,8 @@ export async function unscheduleTaskBlock(taskId: string): Promise<ActionResult>
 // ---------------------------------------------------------------------------
 
 export async function setCalendarSync(calendarId: string, enabled: boolean): Promise<ActionResult> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const user = await getCurrentUser();
   if (!id.safeParse(calendarId).success) return fail("Agenda inválida.");
 
@@ -246,6 +257,8 @@ export async function setCalendarArea(calendarId: string, areaId: string | null)
 }
 
 export async function syncNow(): Promise<ActionResult<{ calendars: number; errors: number }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const user = await getCurrentUser();
   const admin = createAdminClient();
   const { data: calendars } = await admin.from("calendars").select("*").eq("user_id", user.id).eq("sync_enabled", true);
@@ -265,6 +278,8 @@ export async function syncNow(): Promise<ActionResult<{ calendars: number; error
 }
 
 export async function disconnectGoogle(connectionId: string): Promise<ActionResult> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const user = await getCurrentUser();
   if (!id.safeParse(connectionId).success) return fail("Conexão inválida.");
 

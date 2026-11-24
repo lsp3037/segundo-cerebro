@@ -6,6 +6,7 @@ import { AiNotConfiguredError, getAiProvider } from "@/lib/ai";
 import { getCurrentUser } from "@/lib/auth";
 import { CONVERT_TARGETS, type ConvertTarget, TARGETS } from "@/lib/inbox";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 export type InboxSuggestion = { target: ConvertTarget; areaId: string; folderId: string | null; title: string };
@@ -13,6 +14,8 @@ export type InboxSuggestion = { target: ConvertTarget; areaId: string; folderId:
 // "Sugerir classificação": o texto do item vai para a IA, que propõe tipo, área, pasta e título.
 // Só roda quando o usuário clica; a tela avisa que o texto sai do sistema.
 export async function suggestInboxClassification(itemId: string): Promise<ActionResult<InboxSuggestion>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   if (!z.uuid().safeParse(itemId).success) return fail("Item inválido.");
 

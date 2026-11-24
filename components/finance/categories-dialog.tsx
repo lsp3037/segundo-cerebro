@@ -35,6 +35,7 @@ interface CategoriesDialogProps {
   categories: FinanceCategory[];
   defaultLedger?: "pessoal" | "trustcare";
   onSuccess?: () => void;
+  pessoalOnly?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -61,6 +62,7 @@ export function CategoriesDialog({
   categories,
   defaultLedger = "pessoal",
   onSuccess,
+  pessoalOnly = false,
 }: CategoriesDialogProps) {
   const [isPending, startTransition] = useTransition();
 
@@ -171,37 +173,39 @@ export function CategoriesDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Alternador de Conta: Pessoal / Familiar vs Trust Care */}
-        <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveLedger("pessoal");
-              handleCancelForm();
-            }}
-            className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
-              activeLedger === "pessoal"
-                ? "bg-background text-foreground shadow-xs border border-border/80"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Pessoal & Familiar
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveLedger("trustcare");
-              handleCancelForm();
-            }}
-            className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
-              activeLedger === "trustcare"
-                ? "bg-background text-foreground shadow-xs border border-border/80"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Trust Care
-          </button>
-        </div>
+        {/* Alternador de Conta: Pessoal / Familiar vs Trust Care (membro só vê o Pessoal) */}
+        {!pessoalOnly && (
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-xl bg-muted/40 p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveLedger("pessoal");
+                handleCancelForm();
+              }}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                activeLedger === "pessoal"
+                  ? "bg-background text-foreground shadow-xs border border-border/80"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Pessoal & Familiar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveLedger("trustcare");
+                handleCancelForm();
+              }}
+              className={`rounded-lg py-1.5 text-xs font-semibold transition-all ${
+                activeLedger === "trustcare"
+                  ? "bg-background text-foreground shadow-xs border border-border/80"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Trust Care
+            </button>
+          </div>
+        )}
 
         {/* Alternador: Entradas vs Saídas */}
         <div className="flex items-center justify-between border-b border-border/50 pb-2 pt-1 text-xs">

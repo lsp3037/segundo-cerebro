@@ -1,6 +1,7 @@
 import { after, NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUser } from "@/lib/auth";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { emailFromIdToken, exchangeCode, listCalendars } from "@/lib/google/api";
 import { encrypt, safeEqual, sign } from "@/lib/google/crypto";
 import { ensureWatch, syncCalendar } from "@/lib/google/sync";
@@ -11,6 +12,8 @@ import { createClient } from "@/lib/supabase/server";
 // cadastra as agendas e dispara a primeira sincronização da agenda principal.
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
+  const denied = await requireFullAccess();
+  if (denied) return NextResponse.json({ error: denied }, { status: 403 });
   const url = new URL(request.url);
   const done = (status: string) => {
     const response = NextResponse.redirect(`${url.origin}/configuracoes?agenda=${status}#agenda`);

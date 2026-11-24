@@ -10,6 +10,7 @@ import { maskPersonalData } from "@/lib/mask";
 import type { MessageTemplate, Objection } from "@/lib/service-flows";
 import type { Tables } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 const id = z.uuid();
@@ -53,6 +54,8 @@ const suggestInput = z
 // Assistente de Respostas: a conversa ou prints de tela + o fluxo + o
 // Repositório da Empresa vão para a IA, que devolve opções de resposta. Nada é enviado ao cliente.
 export async function suggestReplies(input: z.input<typeof suggestInput>): Promise<ActionResult<ReplyCase>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   const parsed = suggestInput.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0].message);

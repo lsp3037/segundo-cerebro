@@ -41,6 +41,7 @@ export function Topbar({
   onOpenNav,
   onOpenCommand,
   onOpenCapture,
+  isMember,
 }: {
   user: ShellUser;
   areas: Area[];
@@ -49,12 +50,15 @@ export function Topbar({
   onOpenNav: () => void;
   onOpenCommand: () => void;
   onOpenCapture: () => void;
+  isMember: boolean;
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const areaSlug = searchParams.get("area");
   const filterArea = areas.find((a) => a.slug === areaSlug);
   const query = filterArea ? `?area=${filterArea.slug}` : "";
+
+  if (isMember) return <MemberTopbar user={user} />;
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-3">
@@ -142,35 +146,58 @@ export function Topbar({
 
       <NotificationBell />
       <ThemeToggle />
+      <AccountMenu user={user} showSettings />
+    </header>
+  );
+}
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="rounded-full" aria-label="Menu da conta">
-            <Avatar className="size-7">
-              {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
-              <AvatarFallback className="text-xs">{initials(user.name)}</AvatarFallback>
-            </Avatar>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel className="font-normal">
-            <div className="truncate text-sm font-medium">{user.name}</div>
-            <div className="truncate text-xs text-muted-foreground">{user.email}</div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
+// Barra do membro das Finanças: só a marca, o sino de contas, o tema e a conta.
+function MemberTopbar({ user }: { user: ShellUser }) {
+  return (
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-2 md:px-3">
+      <Link href="/financas" className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1">
+        <BrainMark className="size-5" />
+        <span className="text-sm font-semibold tracking-tight">Finanças</span>
+      </Link>
+      <div className="flex-1" />
+      <NotificationBell financeOnly />
+      <ThemeToggle />
+      <AccountMenu user={user} showSettings={false} />
+    </header>
+  );
+}
+
+function AccountMenu({ user, showSettings }: { user: ShellUser; showSettings: boolean }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Menu da conta">
+          <Avatar className="size-7">
+            {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt="" />}
+            <AvatarFallback className="text-xs">{initials(user.name)}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="font-normal">
+          <div className="truncate text-sm font-medium">{user.name}</div>
+          <div className="truncate text-xs text-muted-foreground">{user.email}</div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {showSettings && (
           <DropdownMenuItem asChild>
             <Link href="/configuracoes">
               <SettingsIcon />
               Configurações
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => signOut()}>
-            <LogOutIcon />
-            Sair
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </header>
+        )}
+        <DropdownMenuItem onSelect={() => signOut()}>
+          <LogOutIcon />
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

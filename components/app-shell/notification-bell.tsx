@@ -68,7 +68,8 @@ const ACTION_LABEL = { "move-today": "Hoje", complete: "Concluir", pay: "Pagar" 
 const DONE_MESSAGE = { "move-today": "Movida para hoje.", complete: "Tarefa concluída.", pay: "Conta marcada como paga." } as const;
 
 // Sino da barra superior: avisos de agenda, tarefas, contas e Caixa de Entrada.
-export function NotificationBell() {
+// financeOnly (membro das Finanças): só contas, sem filtros nem atalho para a tela Hoje.
+export function NotificationBell({ financeOnly = false }: { financeOnly?: boolean }) {
   const router = useRouter();
   const [items, setItems] = useState<AppNotification[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -251,7 +252,7 @@ export function NotificationBell() {
       </PopoverTrigger>
 
       <PopoverContent align="end" sideOffset={8} className="w-[min(25rem,calc(100vw-1rem))] gap-0 overflow-hidden rounded-xl p-0">
-        <header className="flex items-center gap-2 px-4 pt-3.5 pb-2.5">
+        <header className={cn("flex items-center gap-2 px-4 pt-3.5 pb-2.5", financeOnly && "border-b")}>
           <h2 className="text-[15px] font-semibold">Notificações</h2>
           {unread > 0 && (
             <span className="rounded-full bg-red-500/15 px-2 py-px text-[11px] font-semibold text-red-600 dark:text-red-400">
@@ -268,25 +269,27 @@ export function NotificationBell() {
           </button>
         </header>
 
-        <div role="tablist" aria-label="Filtrar avisos" className="flex gap-1 border-b px-3 pb-2.5">
-          {NOTIFICATION_FILTERS.map((f) => (
-            <button
-              key={f.value}
-              type="button"
-              role="tab"
-              aria-selected={filter === f.value}
-              onClick={() => setFilter(f.value)}
-              className={cn(
-                "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                filter === f.value
-                  ? "border-transparent bg-foreground font-medium text-background"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
+        {!financeOnly && (
+          <div role="tablist" aria-label="Filtrar avisos" className="flex gap-1 border-b px-3 pb-2.5">
+            {NOTIFICATION_FILTERS.map((f) => (
+              <button
+                key={f.value}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.value}
+                onClick={() => setFilter(f.value)}
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                  filter === f.value
+                    ? "border-transparent bg-foreground font-medium text-background"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="max-h-[min(32rem,calc(100vh-11rem))] overflow-y-auto p-1.5">
           {items === null ? (
@@ -325,15 +328,17 @@ export function NotificationBell() {
           )}
         </div>
 
-        <footer className="border-t p-1.5">
-          <Link
-            href="/hoje"
-            onClick={() => setOpen(false)}
-            className="block rounded-lg py-1.5 text-center text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            Ver tela Hoje
-          </Link>
-        </footer>
+        {!financeOnly && (
+          <footer className="border-t p-1.5">
+            <Link
+              href="/hoje"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg py-1.5 text-center text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              Ver tela Hoje
+            </Link>
+          </footer>
+        )}
       </PopoverContent>
     </Popover>
   );

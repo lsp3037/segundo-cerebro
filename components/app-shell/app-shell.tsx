@@ -43,11 +43,14 @@ export function AppShell({
   user,
   areas,
   folders,
+  isMember = false,
   children,
 }: {
   user: ShellUser;
   areas: Area[];
   folders: Folder[];
+  // Membro das Finanças: só a tela de Finanças, sem menu lateral, busca, captura nem Configurações.
+  isMember?: boolean;
   children: React.ReactNode;
 }) {
   const [navOpen, setNavOpen] = useState(false);
@@ -71,6 +74,7 @@ export function AppShell({
 
   // Atalhos globais: Ctrl+K (⌘K no Mac) abre a busca; Alt+N abre a captura rápida.
   useEffect(() => {
+    if (isMember) return;
     function onKeyDown(event: KeyboardEvent) {
       const key = event.key.toLowerCase();
       if (key === "k" && (event.ctrlKey || event.metaKey)) {
@@ -83,7 +87,7 @@ export function AppShell({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [isMember]);
 
   const pathname = usePathname();
   const isFinanceRoute =
@@ -102,51 +106,58 @@ export function AppShell({
             onOpenNav={() => setNavOpen(true)}
             onOpenCommand={() => setCommandOpen(true)}
             onOpenCapture={() => setCaptureOpen(true)}
+            isMember={isMember}
           />
         </Suspense>
 
         <div className="flex min-h-0 flex-1">
-          <aside
-            className={cn(
-              "hidden shrink-0 border-r bg-sidebar transition-[width] duration-200 ease-out md:block",
-              sidebarCollapsed ? "w-14" : "w-64",
-            )}
-          >
-            <Suspense>
-              <Sidebar
-                areas={areas}
-                folders={folders}
-                collapsed={sidebarCollapsed}
-                onNavigate={() => setNavOpen(false)}
-              />
-            </Suspense>
-          </aside>
+          {!isMember && (
+            <aside
+              className={cn(
+                "hidden shrink-0 border-r bg-sidebar transition-[width] duration-200 ease-out md:block",
+                sidebarCollapsed ? "w-14" : "w-64",
+              )}
+            >
+              <Suspense>
+                <Sidebar
+                  areas={areas}
+                  folders={folders}
+                  collapsed={sidebarCollapsed}
+                  onNavigate={() => setNavOpen(false)}
+                />
+              </Suspense>
+            </aside>
+          )}
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         </div>
 
-        <Sheet open={navOpen} onOpenChange={setNavOpen}>
-          <SheetContent side="left" className="w-72 gap-0 p-0">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Navegação</SheetTitle>
-              <SheetDescription>Áreas e pastas</SheetDescription>
-            </SheetHeader>
-            <Suspense>
-              <Sidebar areas={areas} folders={folders} onNavigate={() => setNavOpen(false)} />
-            </Suspense>
-          </SheetContent>
-        </Sheet>
+        {!isMember && (
+          <>
+            <Sheet open={navOpen} onOpenChange={setNavOpen}>
+              <SheetContent side="left" className="w-72 gap-0 p-0">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>Navegação</SheetTitle>
+                  <SheetDescription>Áreas e pastas</SheetDescription>
+                </SheetHeader>
+                <Suspense>
+                  <Sidebar areas={areas} folders={folders} onNavigate={() => setNavOpen(false)} />
+                </Suspense>
+              </SheetContent>
+            </Sheet>
 
-        <CommandMenu
-          open={commandOpen}
-          onOpenChange={setCommandOpen}
-          areas={areas}
-          folders={folders}
-          onCapture={() => setCaptureOpen(true)}
-        />
-        <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
+            <CommandMenu
+              open={commandOpen}
+              onOpenChange={setCommandOpen}
+              areas={areas}
+              folders={folders}
+              onCapture={() => setCaptureOpen(true)}
+            />
+            <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
+          </>
+        )}
 
         {/* Botão de ação flutuante (FAB) exclusivo no mobile: captura rápida com o polegar (oculto em Finanças) */}
-        {!isFinanceRoute && (
+        {!isFinanceRoute && !isMember && (
           <button
             type="button"
             onClick={() => setCaptureOpen(true)}

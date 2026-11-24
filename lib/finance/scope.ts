@@ -57,3 +57,19 @@ export function readableLedger<T extends FinanceLedger | "all" | undefined>(
   if (ledger === "trustcare") throw new Error(NO_TRUSTCARE_ACCESS);
   return "pessoal";
 }
+
+export const NO_AREA_ACCESS = "Sem acesso a esta área.";
+
+// Tudo fora de Finanças (integrações com chave do servidor, IA, Google, O.S., Meta Ads) é só do dono.
+// Devolve a mensagem de erro (para `fail(...)`) ou null quando o acesso é completo.
+// Se não der para saber quem é (falha no banco), getFinanceScope lança: nunca libera por engano.
+export async function requireFullAccess(): Promise<string | null> {
+  const scope = await getFinanceScope();
+  return scope.isMember ? NO_AREA_ACCESS : null;
+}
+
+// Mesma regra para leituras que devolvem dados (não ActionResult): lança o erro.
+export async function assertFullAccess(): Promise<void> {
+  const denied = await requireFullAccess();
+  if (denied) throw new Error(denied);
+}

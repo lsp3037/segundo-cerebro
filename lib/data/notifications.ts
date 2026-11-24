@@ -1,8 +1,9 @@
 import "server-only";
 
 import { getOccurrences } from "@/lib/data/events";
-import { getUpcomingHouseholdBills } from "@/lib/data/finance-family";
+import { getUpcomingHouseholdBills, type UpcomingBill } from "@/lib/data/finance-family";
 import { addDays, formatOverdue, formatRelativeDay, minutesToTime, todayIso, wallParts } from "@/lib/dates";
+import { getFinanceScope } from "@/lib/finance/scope";
 import { formatCentsToBrl } from "@/lib/money";
 import type { AppNotification } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
@@ -19,9 +20,17 @@ export async function getReadKeys(): Promise<string[]> {
 
 // Avisos do sino, montados a partir do que já existe: agenda, tarefas, contas e Caixa de Entrada.
 export async function getNotifications(): Promise<AppNotification[]> {
-  const supabase = await createClient();
   const now = new Date();
   const today = todayIso(now);
+
+  // Membro das Finanças: só os avisos de contas (o resto não é dele).
+  const scope = await getFinanceScope();
+  if (scope.isMember) {
+    const [bills, readKeys] = await Promise.all([getUpcomingHouseholdBills(30), getReadKeys()]);
+    return withRead(billNotifications(bills, today), readKeys);
+  }
+
+  const supabase = await createClient();
   const nowMin = wallParts(now.toISOString()).minutes;
 
   const [tasksRes, areasRes, foldersRes, inboxRes, events, bills, readKeys] = await Promise.all([
@@ -51,7 +60,6 @@ export async function getNotifications(): Promise<AppNotification[]> {
   const folderName = new Map((foldersRes.data ?? []).map((f) => [f.id, f.name]));
   const placeOf = (t: { area_id: string; folder_id: string | null }) =>
     (t.folder_id && folderName.get(t.folder_id)) || areaName.get(t.area_id) || "";
-  const read = new Set(readKeys);
   const list: Omit<AppNotification, "read">[] = [];
 
   // Agora: compromissos que começam em até 1 h ou estão acontecendo.
@@ -117,24 +125,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
   }
 
   // Hoje: contas atrasadas ou que vencem hoje/amanhã.
-  const tomorrow = addDays(today, 1);
-  for (const b of bills) {
-    if (!b.due_date || b.due_date > tomorrow) continue;
-    const overdue = b.billStatus === "overdue";
-    list.push({
-      key: `bill:${b.id}:${b.due_date}`,
-      group: "hoje",
-      category: "financas",
-      tone: overdue ? "red" : "amber",
-      icon: "wallet",
-      title: overdue ? `${b.description} está atrasada` : `${b.description} vence ${b.due_date === today ? "hoje" : "amanhã"}`,
-      urgent: overdue ? `Venceu ${formatRelativeDay(b.due_date, today)}` : undefined,
-      detail: [formatCentsToBrl(b.amount_cents), b.member_label].filter(Boolean).join(" · "),
-      time: formatRelativeDay(b.due_date, today),
-      href: "/financas?ledger=pessoal&tab=fluxo",
-      action: { type: "pay", transactionId: b.id },
-    });
-  }
+  list.push(...billNotifications(bills, today));
 
   // Caixa de Entrada: um aviso só, com a contagem (muda a chave quando chega item novo).
   const inboxCount = inboxRes.count ?? 0;
@@ -154,5 +145,34 @@ export async function getNotifications(): Promise<AppNotification[]> {
     });
   }
 
+  return withRead(list, readKeys);
+}
+
+function withRead(list: Omit<AppNotification, "read">[], readKeys: string[]): AppNotification[] {
+  const read = new Set(readKeys);
   return list.map((n) => ({ ...n, read: read.has(n.key) }));
+}
+
+// Contas atrasadas ou que vencem hoje/amanhã.
+function billNotifications(bills: UpcomingBill[], today: string): Omit<AppNotification, "read">[] {
+  const tomorrow = addDays(today, 1);
+  return bills
+    .filter((b) => b.due_date && b.due_date <= tomorrow)
+    .map((b): Omit<AppNotification, "read"> => {
+      const due = b.due_date!;
+      const overdue = b.billStatus === "overdue";
+      return {
+        key: `bill:${b.id}:${due}`,
+        group: "hoje",
+        category: "financas",
+        tone: overdue ? "red" : "amber",
+        icon: "wallet",
+        title: overdue ? `${b.description} está atrasada` : `${b.description} vence ${due === today ? "hoje" : "amanhã"}`,
+        urgent: overdue ? `Venceu ${formatRelativeDay(due, today)}` : undefined,
+        detail: [formatCentsToBrl(b.amount_cents), b.member_label].filter(Boolean).join(" · "),
+        time: formatRelativeDay(due, today),
+        href: "/financas?ledger=pessoal&tab=fluxo",
+        action: { type: "pay", transactionId: b.id },
+      };
+    });
 }

@@ -1,5 +1,7 @@
 import "server-only";
 
+import { NO_AREA_ACCESS, requireFullAccess } from "@/lib/finance/scope";
+
 // Resumo do Gerenciador de O.S. (projeto "trustcare"), lido pela API pública dele
 // (GET /api/v1/orders) com uma chave só de leitura (escopo orders:read).
 // Só os números saem daqui: nada de cliente, problema ou valor é guardado ou mostrado.
@@ -30,6 +32,7 @@ export function osManagerUrl() {
 }
 
 export async function getOsSummary(): Promise<OsSummary> {
+  if (await requireFullAccess()) return { status: "error", message: NO_AREA_ACCESS };
   const base = osManagerUrl();
   const key = process.env.OS_API_KEY;
   if (!base || !key) return { status: "not_configured" };

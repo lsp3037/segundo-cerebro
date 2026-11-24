@@ -8,6 +8,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getMetaAdsClient } from "@/lib/integrations/meta-ads/client";
 import type { MetaRealAdSet } from "@/lib/integrations/meta-ads/types";
 import { createClient } from "@/lib/supabase/server";
+import { assertFullAccess, requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 export type CampaignDiagnosticReport = {
@@ -48,6 +49,7 @@ export async function getMetaAdsCredentials(): Promise<{
   isConfigured: boolean;
   isLive: boolean;
 }> {
+  await assertFullAccess();
   const user = await getCurrentUser();
   const supabase = await createClient();
   const settings = await getStoredMetaSettings(supabase, user.id);
@@ -74,6 +76,8 @@ export type MetaAdAccountOption = {
 export async function listMetaAdAccounts(
   customToken?: string
 ): Promise<ActionResult<MetaAdAccountOption[]>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const user = await getCurrentUser();
   const supabase = await createClient();
   const stored = await getStoredMetaSettings(supabase, user.id);
@@ -157,6 +161,8 @@ export async function saveMetaAdsCredentials(input: {
   adAccountId: string;
   accessToken?: string;
 }): Promise<ActionResult<{ accountName?: string }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const user = await getCurrentUser();
   const supabase = await createClient();
   const existingSettings = await getStoredMetaSettings(supabase, user.id);
@@ -213,6 +219,7 @@ export async function saveMetaAdsCredentials(input: {
 }
 
 export async function getStoredMetaAdSets(): Promise<MetaRealAdSet[]> {
+  await assertFullAccess();
   const user = await getCurrentUser();
   const supabase = await createClient();
   const metaSettings = await getStoredMetaSettings(supabase, user.id);
@@ -238,6 +245,8 @@ export type MetaSyncOptions = {
 export async function syncMetaAdsMetrics(
   campaignIdOrOptions?: string | MetaSyncOptions
 ): Promise<ActionResult<{ syncedCount: number; message?: string }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const options: MetaSyncOptions =
     typeof campaignIdOrOptions === "string" ? { campaignId: campaignIdOrOptions } : campaignIdOrOptions || {};
   const campaignId = options.campaignId;
@@ -515,6 +524,8 @@ export async function analyzeCampaignsWithAi(data?: {
   periodLabel?: string;
   campaigns?: CampaignSummaryInput[];
 }): Promise<ActionResult<CampaignDiagnosticReport>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
 
   const supabase = await createClient();
@@ -677,6 +688,8 @@ DIRETRIZES DE PEDRO SOBRAL:
  * de uma campanha específica ou de todas as campanhas, gerando o parecer executivo.
  */
 export async function generateAiAdsDiagnostics(campaignId?: string): Promise<ActionResult<CampaignDiagnosticReport>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
   const supabase = await createClient();
 

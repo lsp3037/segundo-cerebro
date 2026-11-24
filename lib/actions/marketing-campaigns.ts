@@ -8,6 +8,7 @@ import { assertAreaAllowsAi } from "@/lib/ai/guard";
 import { getCurrentUser } from "@/lib/auth";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 
 const idSchema = z.uuid("ID inválido");
@@ -234,6 +235,8 @@ export interface GenerateAngleSuggestionsInput {
 export async function generateAngleSuggestions(
   input: GenerateAngleSuggestionsInput
 ): Promise<ActionResult<SuggestedAngleItem[]>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
 
   const supabase = await createClient();
@@ -356,6 +359,8 @@ export async function suggestHooksWithAi(params: {
   targetAvatar?: string;
   hookAngle: string;
 }): Promise<ActionResult<SuggestedAngleResult>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   const result = await generateAngleSuggestions({
     campaignName: params.campaignName,
     campaignObjective: "whatsapp_leads",

@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth";
 import type { ScriptData } from "@/lib/data/marketing";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
+import { requireFullAccess } from "@/lib/finance/scope";
 import { type ActionResult, fail, ok } from "./result";
 import type {
   CarouselScriptData,
@@ -323,6 +324,8 @@ export async function deleteContentScript(scriptId: string): Promise<ActionResul
 // ---------------------------------------------------------------------------
 
 export async function generateReelWithAi(topic: string): Promise<ActionResult<Omit<ReelScriptData, "type"> & { title: string }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
 
   const supabase = await createClient();
@@ -390,6 +393,8 @@ Estruture um roteiro magnético de Reel com 30 a 60 segundos:
 }
 
 export async function generateStorySequenceWithAi(topic: string): Promise<ActionResult<{ title: string; frames: StorySequenceData["frames"] }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
 
   const supabase = await createClient();
@@ -476,6 +481,8 @@ Quadro 4: Oferta / Chamada de ação com caixinha ou link do WhatsApp.`;
 }
 
 export async function generateCarouselWithAi(topic: string): Promise<ActionResult<{ title: string; slides: CarouselScriptData["slides"] }>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   await getCurrentUser();
 
   const supabase = await createClient();
@@ -581,6 +588,8 @@ export interface GenerateScriptWithAiInput {
  * Ação unificada para gerar roteiro com IA em qualquer um dos 3 formatos.
  */
 export async function generateScriptWithAi(input: GenerateScriptWithAiInput): Promise<ActionResult<ScriptData>> {
+  const denied = await requireFullAccess();
+  if (denied) return fail(denied);
   if (input.format === "reel") {
     const res = await generateReelWithAi(input.topic);
     if (!res.ok) return fail(res.error);

@@ -3,6 +3,7 @@ import "server-only";
 import { googleConfigured } from "@/lib/google/api";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { assertFullAccess } from "@/lib/finance/scope";
 
 export type ConnectionView = {
   id: string;
@@ -24,6 +25,7 @@ export type ConnectionView = {
 // A tabela de conexões é fechada para o navegador: lemos com o cliente admin,
 // filtrando pelo usuário e sem nunca devolver os tokens.
 export async function getGoogleConnections(userId: string): Promise<ConnectionView[] | null> {
+  await assertFullAccess();
   if (!googleConfigured()) return null;
 
   const admin = createAdminClient();

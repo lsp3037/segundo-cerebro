@@ -49,6 +49,8 @@ interface OfxImportDialogProps {
   paymentMethods: PaymentMethod[];
   defaultLedger?: "pessoal" | "trustcare";
   onSuccess?: () => void;
+  // Membro das Finanças: o extrato vai sempre para o Pessoal.
+  pessoalOnly?: boolean;
 }
 
 interface EditableItemState {
@@ -67,6 +69,7 @@ export function OfxImportDialog({
   paymentMethods,
   defaultLedger = "pessoal",
   onSuccess,
+  pessoalOnly = false,
 }: OfxImportDialogProps) {
   const fileInputId = useId();
   const [isPending, startTransition] = useTransition();
@@ -254,37 +257,39 @@ export function OfxImportDialog({
         {/* ETAPA 1: Upload e Configurações Iniciais */}
         {!report ? (
           <div className="space-y-4 py-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">De quem é o extrato?</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTargetLedger("pessoal")}
-                    className={`rounded-lg border p-2.5 text-xs font-medium text-left transition-all ${
-                      targetLedger === "pessoal"
-                        ? "border-violet-500/50 bg-violet-500/10 text-violet-300"
-                        : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    <div className="font-semibold text-foreground">Pessoal & Familiar</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Bancos e cartões pessoais</div>
-                  </button>
+            <div className={`grid grid-cols-1 gap-3 ${pessoalOnly ? "" : "sm:grid-cols-2"}`}>
+              {!pessoalOnly && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">De quem é o extrato?</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTargetLedger("pessoal")}
+                      className={`rounded-lg border p-2.5 text-xs font-medium text-left transition-all ${
+                        targetLedger === "pessoal"
+                          ? "border-violet-500/50 bg-violet-500/10 text-violet-300"
+                          : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="font-semibold text-foreground">Pessoal & Familiar</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Bancos e cartões pessoais</div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setTargetLedger("trustcare")}
-                    className={`rounded-lg border p-2.5 text-xs font-medium text-left transition-all ${
-                      targetLedger === "trustcare"
-                        ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300"
-                        : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
-                    }`}
-                  >
-                    <div className="font-semibold text-foreground">Trust Care</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">Banco PJ da assistência</div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setTargetLedger("trustcare")}
+                      className={`rounded-lg border p-2.5 text-xs font-medium text-left transition-all ${
+                        targetLedger === "trustcare"
+                          ? "border-cyan-500/50 bg-cyan-500/10 text-cyan-300"
+                          : "border-border/60 bg-muted/20 text-muted-foreground hover:bg-muted/40"
+                      }`}
+                    >
+                      <div className="font-semibold text-foreground">Trust Care</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">Banco PJ da assistência</div>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">Meio de Pagamento Padrão (Opcional)</Label>
@@ -653,8 +658,8 @@ export function OfxImportDialog({
                           {isMatched && item.matchedTransaction && (
                             <div className="rounded-lg border border-blue-500/30 bg-blue-950/30 p-2 text-xs text-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                               <div>
-                                <span className="font-semibold text-white">Lançamento prévio no sistema:</span> "
-                                {item.matchedTransaction.description}" em {item.matchedTransaction.date} (
+                                <span className="font-semibold text-white">Lançamento prévio no sistema:</span> &ldquo;
+                                {item.matchedTransaction.description}&rdquo; em {item.matchedTransaction.date} (
                                 {formatCentsToBrl(item.matchedTransaction.amount_cents)})
                               </div>
                               <div className="flex items-center gap-1">
