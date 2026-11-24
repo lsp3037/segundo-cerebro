@@ -748,6 +748,36 @@ export type Database = {
         }
         Relationships: []
       }
+      finance_members: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          member_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          member_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          member_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       finance_recurring_bills: {
         Row: {
           account_id: string | null
@@ -2215,6 +2245,7 @@ export type Database = {
         Args: { secret_name: string; secret_value: string }
         Returns: undefined
       }
+      finance_member_owner: { Args: never; Returns: string }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       search_all: {
         Args: { max_results?: number; q: string }
