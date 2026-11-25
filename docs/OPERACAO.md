@@ -106,6 +106,24 @@ As variáveis ficam no `.env.local` (PC) e em Vercel › Settings › Environmen
 - [x] O filtro abre em "Falta resolver" e os botões mostram as contagens.
 - [ ] As setas ← → trocam o mês, menos com folha, linha rápida ou popover abertos.
 
+### Membro das Finanças (esposa) — como adicionar alguém
+Quem é membro entra só em **Finanças › Pessoal** (tudo do Pessoal, nada da Trust Care, nenhuma outra área). Detalhes e decisões: `docs/plano-acesso-financas-esposa.md`. Só entra com **conta Google**.
+
+1. **Pergunte o e-mail exato da conta Google da pessoa** (com pontos; para o banco "a.b@gmail.com" e "ab@gmail.com" são e-mails diferentes).
+2. **Cadastrar no banco** (Supabase › SQL Editor), trocando o e-mail:
+   ```sql
+   insert into public.finance_members (user_id, email)
+   select id, 'EMAIL-EXATO-DA-PESSOA' from auth.users order by created_at limit 1;
+   ```
+   (`user_id` é o dono, o primeiro usuário do app.)
+3. **Liberar no app publicado:** Vercel › projeto › Settings › Environment Variables › `ALLOWED_EMAILS`: acrescentar o e-mail separado por vírgula, salvar e fazer **Redeploy**. No PC, o mesmo no `.env.local`.
+4. **Primeiro login:** Supabase › Authentication › Sign In / Providers › ligar **Allow new users to sign up**. A pessoa abre o app e usa **Entrar com Google**. Depois **desligar** de novo.
+5. **Conferir** (SQL Editor): `select m.email, m.member_id is not null as ligado, (select count(*) from public.areas a where a.user_id = m.member_id) as areas from public.finance_members m;` → `ligado = true` e `areas = 0`.
+
+Regras para o futuro: toda tabela **nova de Finanças** precisa das políticas de membro (ver migration `20261124120000_finance_members.sql`); toda tabela **nova fora de Finanças** precisa da política "membro: fora de Finanças".
+
+Remover o acesso: `update public.finance_members set active = false where email = '...';`.
+
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
 ## 4. Problemas comuns
