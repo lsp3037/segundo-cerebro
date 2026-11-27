@@ -32,6 +32,7 @@ import {
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getInvestmentsData } from "@/lib/data/finance-investments";
+import { financeAppUrl, getPersonalFinanceSummary } from "@/lib/integrations/finance-api";
 import { getHabits } from "@/lib/data/habits";
 import { getIdeas, getLearningItems } from "@/lib/data/learning-ideas";
 import { getMarketingCampaigns, getCampaignAngles, getMetaAdsMetrics, getMarketingContentScripts } from "@/lib/data/marketing";
@@ -196,7 +197,7 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
       // Atrasados de meses anteriores só entram na lista quando se olha o mês atual de verdade.
       const showOverdueEarlier = searchParams.tab === "fluxo" && currentMonth === today.slice(0, 7);
 
-      const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
+      const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData, personalSummary] = await Promise.all([
         getFinanceSummary({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         getTransactions({ ledger: targetLedger, month: currentMonth, member: effectiveMember }),
         showOverdueEarlier
@@ -207,6 +208,7 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
         getPaymentMethods(),
         getHouseholdData({ month: currentMonth, member: effectiveMember }),
         showInvestments ? getInvestmentsData({ month: currentMonth, member: effectiveMember }) : null,
+        targetLedger === "pessoal" ? getPersonalFinanceSummary(currentMonth) : null,
       ]);
 
       content = (
@@ -217,6 +219,8 @@ export default async function FolderPage(props: PageProps<"/p/[folderId]">) {
           initialNotebooks={notebooks}
           householdData={householdData}
           investmentsData={investmentsData}
+          personalSummary={personalSummary ?? undefined}
+          personalAppUrl={financeAppUrl()}
           categories={categories}
           paymentMethods={paymentMethods}
           currentMonth={currentMonth}

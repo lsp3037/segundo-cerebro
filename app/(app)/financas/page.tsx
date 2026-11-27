@@ -14,6 +14,7 @@ import {
 } from "@/lib/data/finance";
 import { ensureMonthBills, getHouseholdData } from "@/lib/data/finance-family";
 import { getInvestmentsData } from "@/lib/data/finance-investments";
+import { financeAppUrl, getPersonalFinanceSummary } from "@/lib/integrations/finance-api";
 import { startOfMonth, todayIso } from "@/lib/dates";
 import { getFinanceScope } from "@/lib/finance/scope";
 import { TABS } from "@/lib/modules";
@@ -56,7 +57,7 @@ export default async function Page(props: PageProps<"/financas">) {
   const today = todayIso();
   const showOverdueEarlier = searchParams.tab === "fluxo" && currentMonth === today.slice(0, 7);
 
-  const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData] = await Promise.all([
+  const [summary, transactions, overdueEarlier, notebooks, categories, paymentMethods, householdData, investmentsData, personalSummary] = await Promise.all([
     getFinanceSummary({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     getTransactions({ ledger: currentLedger, month: currentMonth, member: effectiveMember }),
     showOverdueEarlier
@@ -67,6 +68,7 @@ export default async function Page(props: PageProps<"/financas">) {
     getPaymentMethods(),
     getHouseholdData({ month: currentMonth, member: effectiveMember }),
     showInvestments ? getInvestmentsData({ month: currentMonth, member: effectiveMember }) : null,
+    currentLedger === "pessoal" ? getPersonalFinanceSummary(currentMonth) : null,
   ]);
 
   return (
@@ -77,6 +79,8 @@ export default async function Page(props: PageProps<"/financas">) {
       initialNotebooks={notebooks}
       householdData={householdData}
       investmentsData={investmentsData}
+      personalSummary={personalSummary ?? undefined}
+      personalAppUrl={financeAppUrl()}
       categories={categories}
       paymentMethods={paymentMethods}
       currentMonth={currentMonth}

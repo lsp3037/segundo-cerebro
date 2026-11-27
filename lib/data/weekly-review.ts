@@ -3,6 +3,7 @@ import "server-only";
 import { getCurrentUser } from "@/lib/auth";
 import { addDays, startOfWeek, todayIso } from "@/lib/dates";
 import { getFinanceSummary } from "@/lib/data/finance";
+import { getPersonalFinanceSummary } from "@/lib/integrations/finance-api";
 import { getInboxItems } from "@/lib/data/inbox";
 import { getTasks, type Task } from "@/lib/data/tasks";
 import { getContentIdeas, type ContentIdea } from "@/lib/data/trustcare";
@@ -40,12 +41,14 @@ export async function getWeeklyReviewData(targetWeekStart?: string): Promise<Wee
   const next7Days = addDays(today, 7);
 
   // 1. Busca dados em paralelo
-  const [inboxItems, tasks, contentIdeas, financeSummary, currentReviewRes, historyRes] =
+  const currentMonth = today.slice(0, 7);
+  const [inboxItems, tasks, contentIdeas, trustcareSummary, personalSummary, currentReviewRes, historyRes] =
     await Promise.all([
       getInboxItems("new"),
       getTasks(),
       getContentIdeas(),
-      getFinanceSummary({ month: today.slice(0, 7) }),
+      getFinanceSummary({ ledger: "trustcare", month: currentMonth }),
+      getPersonalFinanceSummary(currentMonth),
       supabase
         .from("weekly_reviews")
         .select("*")
@@ -77,6 +80,11 @@ export async function getWeeklyReviewData(targetWeekStart?: string): Promise<Wee
 
   const reviewRecord = currentReviewRes.data ?? null;
 
+  const personalIncome = personalSummary.status === "ok" ? personalSummary.kpis.incomeCents : 0;
+  const personalExpense = personalSummary.status === "ok" ? personalSummary.kpis.expenseCents : 0;
+  const incomeCents = trustcareSummary.totalIncomeCents + personalIncome;
+  const expenseCents = trustcareSummary.totalExpenseCents + personalExpense;
+
   return {
     weekStart,
     today,
@@ -88,9 +96,9 @@ export async function getWeeklyReviewData(targetWeekStart?: string): Promise<Wee
     contentIdeasCount: contentIdeas.length,
     recentIdeas: contentIdeas.slice(0, 5),
     finance: {
-      incomeCents: financeSummary.totalIncomeCents,
-      expenseCents: financeSummary.totalExpenseCents,
-      balanceCents: financeSummary.netBalanceCents,
+      incomeCents,
+      expenseCents,
+      balanceCents: incomeCents - expenseCents,
     },
     recentHistory: historyRes.data ?? [],
   };

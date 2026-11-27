@@ -10,7 +10,6 @@ import {
   ChevronRightIcon,
   ClockIcon,
   FileSpreadsheetIcon,
-  ListChecksIcon,
   PlusIcon,
   SlidersHorizontalIcon,
   TagIcon,
@@ -24,8 +23,8 @@ import type {
   Transaction,
 } from "@/lib/data/finance";
 import type { HouseholdData } from "@/lib/data/finance-family";
+import type { PersonalFinanceSummary } from "@/lib/integrations/finance-api";
 import { todayIso } from "@/lib/dates";
-import { HOUSEHOLD_MEMBERS } from "@/lib/finance/household";
 import type { InvestmentView, InvestmentsData } from "@/lib/finance/investments-data";
 import { formatCentsToBrl } from "@/lib/money";
 import type { Tables } from "@/lib/supabase/database.types";
@@ -34,27 +33,22 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AccountsCardsView } from "./accounts-cards-view";
-import { BudgetsView } from "./budgets-view";
 import { CategoriesDialog } from "./categories-dialog";
 import { CategoryBreakdown } from "./category-breakdown";
 import { ConsolidatedOverview } from "./consolidated-overview";
 import { FinanceHero, FinanceKpiStrip, signedResult } from "./finance-hierarchy";
 import { EmptyMonth, monthNameLong } from "./getting-started";
-import { HouseholdOverview } from "./household-overview";
 import { InvestmentDialog } from "./investment-dialog";
-import { InvestmentsView } from "./investments-view";
 import { LEDGER_TABS, type FinanceTab, type LedgerType } from "./meta";
 import { MonthDiagnosticCard } from "./month-diagnostic-card";
 import { MonthlyChart } from "./monthly-chart";
 import { NotebookDialog } from "./notebook-dialog";
 import { NotebooksTracker } from "./notebooks-tracker";
 import { OfxImportDialog } from "./ofx-import-dialog";
+import { PersonalSummaryPanel } from "./personal-summary-panel";
 import { RecurringBillsDialog } from "./recurring-bills-dialog";
-import { ReportsComparisonsView } from "./reports-comparisons-view";
 import { SaleNotebookDialog } from "./sale-notebook-dialog";
 import { TransactionDialog } from "./transaction-dialog";
 import type { NewTransactionPrefill } from "./quick-entry";
@@ -68,6 +62,8 @@ interface FinanceDashboardProps {
   initialNotebooks: Notebook[];
   householdData: HouseholdData;
   investmentsData: InvestmentsData | null;
+  personalSummary?: PersonalFinanceSummary;
+  personalAppUrl?: string | null;
   categories: FinanceCategory[];
   paymentMethods: PaymentMethod[];
   currentMonth: string; // YYYY-MM
@@ -86,6 +82,8 @@ export function FinanceDashboard({
   initialNotebooks,
   householdData,
   investmentsData,
+  personalSummary,
+  personalAppUrl = null,
   categories,
   paymentMethods,
   currentMonth,
@@ -333,23 +331,10 @@ export function FinanceDashboard({
     setNbDialogOpen(true);
   };
 
-  const handleOpenNewInvestment = () => {
-    setInvToEdit(null);
-    setInvDialogOpen(true);
-  };
-
-  const handleEditInvestment = (investment: InvestmentView) => {
-    setInvToEdit(investment);
-    setInvDialogOpen(true);
-  };
-
   const isNotebooksPrimary = currentLedger === "trustcare" && activeTab === "notebooks";
-  const isInvestmentsPrimary = currentLedger === "pessoal" && activeTab === "investimentos";
   const primaryAction = isNotebooksPrimary
     ? { label: "Novo Notebook", onClick: handleOpenNewNotebook }
-    : isInvestmentsPrimary
-      ? { label: "Novo investimento", onClick: handleOpenNewInvestment }
-      : { label: "Lançamento", onClick: () => handleOpenNewTransaction() };
+    : { label: "Lançamento", onClick: () => handleOpenNewTransaction() };
 
   return (
     <div className="px-4 pb-8 md:px-6">
@@ -419,102 +404,80 @@ export function FinanceDashboard({
           </div>
         </div>
 
-        {/* Ações do Workspace: 1 menu Configurar + 1 CTA primário invertido */}
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-              >
-                <SlidersHorizontalIcon className="size-3.5" />
-                <span>Configurar</span>
-                <ChevronDownIcon className="size-3.5 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {currentLedger !== "trustcare" && (
-                <>
-                  <DropdownMenuItem onSelect={() => setRecurringDialogOpen(true)}>
-                    <ListChecksIcon className="size-4" />
-                    <span>Contas Fixas &amp; Dízimo</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem onSelect={() => setOfxDialogOpen(true)}>
-                <FileSpreadsheetIcon className="size-4" />
-                <span>Importar Extrato (.OFX)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setCatDialogOpen(true)}>
-                <TagIcon className="size-4" />
-                <span>Gerenciar Categorias</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* Ações do Workspace: 1 menu Configurar + 1 CTA primário invertido (apenas Trust Care / Consolidado) */}
+        {currentLedger !== "pessoal" && (
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <SlidersHorizontalIcon className="size-3.5" />
+                  <span>Configurar</span>
+                  <ChevronDownIcon className="size-3.5 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onSelect={() => setOfxDialogOpen(true)}>
+                  <FileSpreadsheetIcon className="size-4" />
+                  <span>Importar Extrato (.OFX)</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setCatDialogOpen(true)}>
+                  <TagIcon className="size-4" />
+                  <span>Gerenciar Categorias</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          <Button
-            size="sm"
-            onClick={primaryAction.onClick}
-            className="h-8 gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background hover:bg-foreground/90"
-          >
-            <PlusIcon className="size-3.5" />
-            <span>{primaryAction.label}</span>
-          </Button>
-        </div>
+            <Button
+              size="sm"
+              onClick={primaryAction.onClick}
+              className="h-8 gap-1.5 rounded-md bg-foreground px-3 text-xs font-medium text-background hover:bg-foreground/90"
+            >
+              <PlusIcon className="size-3.5" />
+              <span>{primaryAction.label}</span>
+            </Button>
+          </div>
+        )}
       </header>
 
-      {/* 2. Sub-abas (~40px) + Filtro de Pessoa exclusivo de Pessoal */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70">
-        <nav
-          className="-mb-px flex items-center gap-5 overflow-x-auto"
-          aria-label="Abas financeiras"
-        >
-          {allowedTabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => {
-                  if (tab.id === "fluxo") setFluxoStatusFilter("pending");
-                  updateParams({ tab: tab.id });
-                }}
-                className={`flex h-10 cursor-pointer items-center gap-1.5 border-b-2 text-xs whitespace-nowrap transition-colors ${
-                  isActive
-                    ? "border-foreground font-medium text-foreground"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.id === "notebooks" && (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                    {initialNotebooks.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          {currentLedger === "pessoal" && (
-            <div className="flex items-center gap-2 py-1.5 text-xs">
-              <span className="text-xs text-muted-foreground">Pessoa:</span>
-              <SlidingTabs
-                ariaLabel="Filtrar por pessoa"
-                value={activeMember ?? "todos"}
-                onChange={(m) => updateParams({ member: m === "todos" ? null : m })}
-                items={[
-                  { id: "todos", label: "Todos" },
-                  ...HOUSEHOLD_MEMBERS.map((m) => ({ id: m, label: m })),
-                ]}
-              />
-            </div>
-          )}
+      {/* 2. Sub-abas (~40px) — apenas Trust Care / Consolidado */}
+      {currentLedger !== "pessoal" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70">
+          <nav
+            className="-mb-px flex items-center gap-5 overflow-x-auto"
+            aria-label="Abas financeiras"
+          >
+            {allowedTabs.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    if (tab.id === "fluxo") setFluxoStatusFilter("pending");
+                    updateParams({ tab: tab.id });
+                  }}
+                  className={`flex h-10 cursor-pointer items-center gap-1.5 border-b-2 text-xs whitespace-nowrap transition-colors ${
+                    isActive
+                      ? "border-foreground font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  {tab.id === "notebooks" && (
+                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                      {initialNotebooks.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
-      </div>
+      )}
 
       <div className="t-pending-bar" data-active={isPending ? "true" : "false"} aria-hidden="true" />
 
@@ -527,33 +490,14 @@ export function FinanceDashboard({
       >
         {showSkeleton ? (
           <FinanceMonthSkeleton />
+        ) : currentLedger === "pessoal" ? (
+          <PersonalSummaryPanel
+            month={currentMonth}
+            summary={personalSummary ?? { status: "not_configured" }}
+            appUrl={personalAppUrl}
+          />
         ) : (
           <>
-            {/* Visão Geral Pessoal / Familiar */}
-            {activeTab === "visao" && currentLedger === "pessoal" && (
-              <HouseholdOverview
-                data={householdData}
-                categoriesBreakdown={householdData.categoriesBreakdown}
-                onGoToPendingFluxo={() => {
-                  setFluxoStatusFilter("pending");
-                  updateParams({ tab: "fluxo" });
-                }}
-                onGoToAllFluxo={() => {
-                  setFluxoStatusFilter("all");
-                  updateParams({ tab: "fluxo" });
-                }}
-                onOpenRecurringDialog={() => setRecurringDialogOpen(true)}
-                onEditTransaction={handleEditTransaction}
-                month={currentMonth}
-                memberFilter={activeMember}
-                onSelectMonth={(m) => updateParams({ m })}
-                onSelectMember={(m) => updateParams({ member: m })}
-                onAddAccount={() => updateParams({ tab: "contas" })}
-                onNewIncome={() => handleOpenNewTransaction("pessoal", "income")}
-                onNewExpense={() => handleOpenNewTransaction("pessoal", "expense")}
-                onImportOfx={() => setOfxDialogOpen(true)}
-              />
-            )}
 
             {/* Resumo Trust Care */}
             {activeTab === "visao" && currentLedger === "trustcare" && initialSummary.transactionCount === 0 && (
@@ -629,40 +573,8 @@ export function FinanceDashboard({
           <ConsolidatedOverview summary={initialSummary} currentMonth={currentMonth} />
         )}
 
-        {/* Tela 2: Contas & Cartões */}
-        {activeTab === "contas" && <AccountsCardsView accounts={householdData.accounts} />}
-
-        {/* Investimentos (só Pessoal) */}
-        {activeTab === "investimentos" && currentLedger === "pessoal" && (
-          <InvestmentsView
-            data={investmentsData}
-            month={currentMonth}
-            memberFilter={activeMember}
-            onNewInvestment={handleOpenNewInvestment}
-            onEditInvestment={handleEditInvestment}
-          />
-        )}
-
-        {/* Tela 3: Orçamentos da Casa */}
-        {activeTab === "orcamentos" && <BudgetsView budgets={householdData.budgets} categories={categories} />}
-
-        {/* Tela 4: Relatórios, KPIs & Categorias */}
-        {activeTab === "relatorios" && currentLedger === "pessoal" && (
-          <div className="space-y-5">
-            <MonthDiagnosticCard
-              month={currentMonth}
-              ledger={currentLedger}
-              member={activeMember}
-            />
-            <ReportsComparisonsView
-              data={householdData}
-              categoriesBreakdown={householdData.categoriesBreakdown}
-              currentMonth={currentMonth}
-              onSelectMonth={(m) => updateParams({ m })}
-            />
-          </div>
-        )}
-        {activeTab === "relatorios" && currentLedger !== "pessoal" && (
+        {/* Tela 4: Relatórios, KPIs & Categorias (Trust Care / Consolidado) */}
+        {activeTab === "relatorios" && (
           <div className="space-y-5">
             <MonthDiagnosticCard
               month={currentMonth}

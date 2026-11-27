@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getOccurrences } from "@/lib/data/events";
-import { getUpcomingHouseholdBills, type UpcomingBill } from "@/lib/data/finance-family";
+import type { UpcomingBill } from "@/lib/data/finance-family";
+import { getUpcomingPersonalBillsFromApi } from "@/lib/integrations/finance-api";
 import { addDays, formatOverdue, formatRelativeDay, minutesToTime, todayIso, wallParts } from "@/lib/dates";
 import { getFinanceScope } from "@/lib/finance/scope";
 import { formatCentsToBrl } from "@/lib/money";
@@ -26,7 +27,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
   // Membro das Finanças: só os avisos de contas (o resto não é dele).
   const scope = await getFinanceScope();
   if (scope.isMember) {
-    const [bills, readKeys] = await Promise.all([getUpcomingHouseholdBills(30), getReadKeys()]);
+    const [bills, readKeys] = await Promise.all([getUpcomingPersonalBillsFromApi(30, 50), getReadKeys()]);
     return withRead(billNotifications(bills, today), readKeys);
   }
 
@@ -52,7 +53,7 @@ export async function getNotifications(): Promise<AppNotification[]> {
       .order("created_at")
       .limit(1),
     getOccurrences(new Date(now.getTime() - 3 * 3_600_000).toISOString(), new Date(now.getTime() + SOON_MIN * 60_000).toISOString()),
-    getUpcomingHouseholdBills(30),
+    getUpcomingPersonalBillsFromApi(30, 50),
     getReadKeys(),
   ]);
 

@@ -10,7 +10,7 @@ import { TASK_VIEWS, type TaskView } from "@/components/tasks/meta";
 import { TasksBoard } from "@/components/tasks/tasks-board";
 import { getAreaFilter } from "@/lib/data/area-filter";
 import { getCalendars, getOccurrences } from "@/lib/data/events";
-import { getUpcomingHouseholdBills } from "@/lib/data/finance-family";
+import { getUpcomingPersonalBillsFromApi } from "@/lib/integrations/finance-api";
 import { getHabits } from "@/lib/data/habits";
 import { countOpenInbox } from "@/lib/data/inbox";
 import { getSidebarData } from "@/lib/data/sidebar";
@@ -35,7 +35,7 @@ export default async function TodayPage(props: PageProps<"/hoje">) {
     countOpenInbox(),
     view === "hoje" ? getOccurrences(fromWallParts(today, 0), fromWallParts(addDays(today, 1), 0), area?.id) : Promise.resolve([]),
     view === "hoje" ? getCalendars() : Promise.resolve([]),
-    view === "hoje" ? getUpcomingHouseholdBills() : Promise.resolve([]),
+    view === "hoje" ? getUpcomingPersonalBillsFromApi(7, 8) : Promise.resolve([]),
   ]);
 
   const defaultArea = area ?? areas.find((a) => a.slug === "pessoal") ?? areas[0];

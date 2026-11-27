@@ -5,7 +5,7 @@ import { AlertTriangleIcon, CheckIcon, WalletIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { AsideCard } from "@/components/today/aside-card";
-import { toggleTransactionPaid } from "@/lib/actions/finance-family";
+import { payPersonalBillAction } from "@/lib/actions/finance-api";
 import type { UpcomingBill } from "@/lib/data/finance-family";
 import { formatCentsToBrl } from "@/lib/money";
 
@@ -22,7 +22,7 @@ export function UpcomingBillsCard({ bills }: UpcomingBillsCardProps) {
 
   const handlePay = (bill: UpcomingBill) => {
     startTransition(async () => {
-      const res = await toggleTransactionPaid(bill.id);
+      const res = await payPersonalBillAction(bill.id, true);
       if (res.ok) toast.success(`"${bill.description}" pago!`);
       else toast.error(res.error);
     });

@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { toggleTransactionPaid } from "@/lib/actions/finance-family";
+import { payPersonalBillAction } from "@/lib/actions/finance-api";
 import { markNotificationsRead } from "@/lib/actions/notifications";
 import { setTaskStatus, updateTask } from "@/lib/actions/tasks";
 import { todayIso } from "@/lib/dates";
@@ -183,7 +183,7 @@ export function NotificationBell({ financeOnly = false }: { financeOnly?: boolea
         ? await updateTask(action.taskId, { due_date: todayIso() })
         : action.type === "complete"
           ? await setTaskStatus(action.taskId, "done")
-          : await toggleTransactionPaid(action.transactionId);
+          : await payPersonalBillAction(action.transactionId, true);
 
     if (!result.ok) {
       toast.error(result.error);
@@ -206,7 +206,7 @@ export function NotificationBell({ financeOnly = false }: { financeOnly?: boolea
               ? await updateTask(action.taskId, { due_date: action.previousDue })
               : action.type === "complete"
                 ? await setTaskStatus(action.taskId, "todo")
-                : await toggleTransactionPaid(action.transactionId);
+                : await payPersonalBillAction(action.transactionId, false);
           if (!undo.ok) toast.error(undo.error);
           router.refresh();
           load();
