@@ -1,6 +1,6 @@
 # Segundo Cérebro: documento de produto (PRD)
 
-> Atualizado em 2026-11-12, com as Fases 1 a 5 concluídas.
+> Atualizado em 2026-11-27: Fases 1 a 5 concluídas, mais Investimentos, Lançamentos redesenhado e acesso da esposa às Finanças.
 > Fonte: a especificação original do Luan ([`especificacao-original.md`](especificacao-original.md)) e as decisões tomadas durante o projeto ([`PLANO.md`](PLANO.md)).
 > Este documento diz **o que** o sistema faz e **por quê**. O **como** (tecnologia, banco, telas) fica no PLANO.md, e o dia a dia (rodar, testar, resolver problemas) no [`OPERACAO.md`](OPERACAO.md).
 
@@ -12,10 +12,10 @@ Um lugar só para organizar as quatro frentes da vida do Luan: o trabalho na SES
 
 ## 2. Para quem
 
-**Um único usuário: o Luan.** Mora em Cuiabá-MT e trabalha com apoio administrativo na Saúde Digital da SES-MT. Faz mestrado e é dono da Trust Care (manutenção de PCs, upgrades e revenda de notebooks). É formado em Administração, não em Computação.
+**O dono é o Luan.** Mora em Cuiabá-MT e trabalha com apoio administrativo na Saúde Digital da SES-MT. Faz mestrado e é dono da Trust Care (manutenção de PCs, upgrades e revenda de notebooks). É formado em Administração, não em Computação.
 
 Consequências para o produto:
-- Não há cadastro, convites nem permissões entre usuários. O acesso é fechado ao e-mail dele.
+- Não há cadastro aberto nem convites. O acesso é fechado ao e-mail dele, com uma exceção: **membro das Finanças** (a esposa, Rayzza), que entra com a conta Google dela e vê só **Finanças › Pessoal**.
 - O uso principal é no **PC**. O celular serve para consultar e capturar (PWA e Telegram, na Fase 6).
 - A linguagem da interface é simples, em português, sem jargão técnico.
 
@@ -37,11 +37,11 @@ Consequências para o produto:
 - **Gerenciador de O.S.**: é outro sistema. Aqui só lemos um resumo (números), sem editar nada.
 - **Enviar mensagens a clientes**: o Assistente de Respostas só sugere. Quem envia é o Luan, no WhatsApp.
 - **Integração bancária via API aberta**: lançamentos manuais e importador local de extrato `.ofx` sem envio para terceiros ou IA.
-- **Uso por outras pessoas**.
+- **Uso por outras pessoas**, além do membro das Finanças. Não há perfis configuráveis, tela de convite nem marca de quem criou cada lançamento.
 
 ## 5. Regras que valem para o sistema todo
 
-1. **Acesso fechado:** só o e-mail do Luan entra. O app confere em três camadas: cadastro desligado, lista no servidor e lista no banco.
+1. **Acesso fechado:** só entram o Luan e quem ele cadastrar como membro das Finanças (só pelo Google). O app confere em três camadas: cadastro desligado, lista no servidor e lista no banco.
 2. **Cada dado tem dono:** RLS em todas as tabelas, sem exceção.
 3. **Segredos nunca no navegador:** os tokens do Google ficam criptografados e só o servidor lê.
 4. **LGPD e IA:**
@@ -132,6 +132,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 - **Trust Care:** receitas de serviços, custos de peças e **lucro por notebook** (compra + peças/reparo vs. venda + taxa de maquininha + custos pós-venda/garantia), com preço de vitrine e alerta para estoque parado (>30 dias).
 - **Importação OFX e Privacidade:** leitor local de extratos `.ofx` sem envio para IA, detecção de duplicidades via `FITID` e aprendizado automático de regras de categorização (`finance_rules`). Área nasce travada para IA (`ai_enabled = false`).
 - **Integração com `/hoje`:** card lateral **Contas da Semana** alertando vencimentos atrasados ou nos próximos 7 dias.
+- **Acesso da esposa (2026-11-23 a 27):** como membro, ela vê e faz tudo no **Pessoal** (lançamentos de Casa, Luan e Rayzza, contas fixas e Dízimo, categorias, metas, bancos e cartões, análises, Cofrinho e investimentos, importação de extrato). Não vê as Finanças da Trust Care (livro Trust Care, Consolidado e Notebooks) nem outras áreas do app. O que ela lança fica junto com o que o Luan lança. Ela não anexa arquivos e não apaga de vez categorias, bancos e formas de pagamento. A separação é garantida no banco, não só na tela.
 - **Investimentos (só Pessoal, 2026-11-13):** aba entre "Bancos e cartões" e "Análises". O Luan cadastra o Cofrinho do Mercado Pago com quanto tem lá e desde quando; a taxa já vem pronta (120% do CDI até R$ 10.000, 100% acima) e o app busca o CDI sozinho no Banco Central. Mostra o valor de hoje, quanto rendeu hoje, no mês e no total, e o próximo crédito. Rende só em dias úteis; por padrão desconta o imposto de renda por depósito (22,5% até 180 dias, 20% até 360, 17,5% até 720, 15% depois), como o Mercado Pago, e a opção pode ser desligada. Botões "Guardei", "Resgatei", "Acertar com o app" (quando o número do banco ficar diferente) e "Mudar taxa", com histórico e "Desfazer". Guardar e resgatar aqui não mexe nos lançamentos nem no saldo dos bancos.
 
 ### 7.13 Revisão Semanal ✅ Fase 5
@@ -189,6 +190,7 @@ Legenda: ✅ entregue · 🟡 entregue em parte · ⏳ fase futura.
 | 2026-11-12 | Menu lateral desktop retrátil (`w-64` ↔ `w-14`) com trilho apenas de ícones + tooltips e troca dos pontos coloridos por ícones minimalistas outline nas áreas. |
 | 2026-11-13 | Investimentos só no Pessoal. Taxa por faixas de "% do CDI" sobre a taxa diária (padrão do Cofrinho: 120% até R$ 10.000, 100% acima) ou taxa fixa ao ano. CDI buscado sozinho no Banco Central (só datas saem do app; nada vai para a IA). Rende só em dias úteis, crédito com o CDI do dia útil anterior, aporte rende a partir do próximo dia útil. Em 2026-11-19, com os créditos reais do Luan, confirmou-se que o Mercado Pago credita o rendimento líquido (imposto de renda regressivo por depósito); o app passou a descontar o imposto por padrão. Aporte e resgate não viram lançamentos nem mexem no saldo dos bancos, para não inflar o Dízimo nem contar em dobro. |
 | 2026-11-19 a 23 | Lançamentos redesenhado, aprovado pelo Luan com prévia visual: lista em grupos por situação (padrão "Falta resolver"), totais do mês em texto, "Lançar rápido" (linha no computador, folha no celular; sempre grava como pago), régua do mês só no computador e ícone por categoria (automático pelo nome ou escolhido). Atrasados de meses anteriores só aparecem no mês atual. Nada vai para a IA. |
+| 2026-11-23 a 27 | Acesso da esposa às Finanças: Finanças continua dentro do Segundo Cérebro (sem sistema separado). Ela tem acesso a todo o Pessoal e a nada da Trust Care nem das outras áreas. O Luan continua dono dos dados. Sem marcar quem criou, por enquanto. |
 
 ## 10. Pendências e riscos
 

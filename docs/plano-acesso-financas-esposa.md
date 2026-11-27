@@ -1,6 +1,6 @@
 # Plano: acesso da esposa às Finanças
 
-Status: **revisão 2, aguardando aprovação do Luan** (nada foi alterado no código ou no banco).
+Status: **aprovado e implementado** (etapas 1 a 3 publicadas). Etapa 4: conta de teste criada e ligada; falta o teste completo. Etapa 5: Rayzza cadastrada no banco e na Vercel; falta o primeiro login dela. Situação atual em [`OPERACAO.md`](OPERACAO.md).
 Elaborado em 2026-11-23 a partir de um mapeamento completo do código (`explorer-agent`).
 
 ## 1. O que o Luan decidiu

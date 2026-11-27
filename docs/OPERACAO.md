@@ -124,6 +124,14 @@ Regras para o futuro: toda tabela **nova de Finanças** precisa das políticas d
 
 Remover o acesso: `update public.finance_members set active = false where email = '...';`.
 
+**Situação em 2026-11-27**
+- [x] Migrations dos membros executadas e primeiro login da conta de teste conferido (ligado, Google, sem áreas).
+- [x] Rayzza cadastrada no banco e e-mail dela em `ALLOWED_EMAILS` na Vercel, com Redeploy.
+- [ ] Primeiro login da Rayzza (até agora o banco mostra "não ligado").
+- [ ] "Allow new users to sign up" desligado depois do login dela.
+- [ ] Teste completo na conta de teste (endereços forçados, Trust Care, lançar/baixar/editar/excluir).
+- [ ] Depois dos testes, decidir se a conta de teste continua ativa (se não, remover o acesso dela).
+
 **Dica para testes:** comece os dados de teste com `[teste]`, para achá-los e apagá-los depois.
 
 ## 4. Problemas comuns
@@ -146,12 +154,14 @@ Remover o acesso: `update public.finance_members set active = false where email 
 | A régua do mês não aparece | Ela só existe no computador, com a lista em 896 px de largura ou mais | Alargue a janela ou recolha o menu lateral. No celular, use os filtros. |
 | Ícone da categoria errado | Sem escolha, o app deduz o ícone pelo nome da categoria | No gerenciador de categorias, escolha outro ícone (ou "Automático" para voltar ao do nome). |
 | O lançar rápido gravou "pago" mas era uma conta a pagar | A linha rápida do computador sempre grava como pago | Use "+ Lançamento" (formulário completo) ou, no celular, a folha com "Já foi pago? Ainda não". |
+| Membro vê "E-mail não autorizado" ou "Signups not allowed" | E-mail diferente do cadastrado (confira os pontos), fora do `ALLOWED_EMAILS` (sem Redeploy) ou cadastro desligado no Supabase | Siga o roteiro "Membro das Finanças" (seção 3). |
 | A conta da SES deixou de conectar | A administração do Google da SES bloqueou apps externos | Plano B: compartilhar a agenda da SES com o Gmail pessoal. |
 
 ## 5. Pendências
 
 | Item | Detalhe |
 |---|---|
+| Acesso da Rayzza | Falta o primeiro login dela, desligar o cadastro no Supabase e o teste completo na conta de teste (seção 3). |
 | Busca `Ctrl+K` incompleta | Falta procurar em fluxos, eventos e ideias de conteúdo, como pede a especificação. |
 | API do Agente de Marketing | Ainda é versão de teste. Combinar rotas, formato e chave na Fase 6. |
 | RLS no Gerenciador de O.S. | A tabela `order_status_transitions` do Supabase "Trust Care" está sem RLS: com a chave pública daquele app, dá para alterar as regras de status. Corrigir **no projeto do Gerenciador**, ligando o RLS e criando uma regra de leitura (ligar sem a regra bloqueia o próprio Gerenciador). |

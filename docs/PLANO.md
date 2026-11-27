@@ -416,3 +416,30 @@ Cada item = 1 commit. Ao fim, o app está no ar na Vercel com login funcionando.
 - O lançar rápido grava **sempre como "pago"**; conta a pagar continua pelo formulário completo ou pela folha do celular ("ainda não foi pago").
 - Atrasados antigos só aparecem no mês atual, com limite de 200.
 - Sem colunas configuráveis, sem lançamento por voz ou texto livre, sem ícones enviados pelo usuário (só a lista curada).
+
+## 18. Acesso da esposa às Finanças (2026-11-23 a 27)
+
+> Plano aprovado: [`plano-acesso-financas-esposa.md`](plano-acesso-financas-esposa.md). Passo a passo para adicionar ou remover alguém: [`OPERACAO.md`](OPERACAO.md).
+
+**Modelo:** o dono continua sendo o `user_id` de todos os registros. A tabela `finance_members` (dono, e-mail, `member_id`, `active`) liga a conta da pessoa ao dono, e `public.finance_member_owner()` responde "de quem eu sou membro". Descartado: um "id da casa" em cada tabela.
+
+**Banco** (as três migrations já executadas: `20261124120000`, `20261124180000`, `20261124190000`)
+- Políticas permissivas "membro: …" liberam o livro `pessoal` do dono (lançamentos, categorias, regras, sem notebooks) e as tabelas de finanças (bancos, formas de pagamento, contas fixas, orçamento, investimentos, CDI).
+- Políticas **restritivas**: o membro só grava em nome do dono, fica fora de todas as outras tabelas e dos anexos, e não apaga de vez itens compartilhados.
+- Um gatilho troca o `user_id` do que o membro grava pelo do dono.
+- Só o servidor/SQL Editor grava em `finance_members` (sem `insert`/`update`/`delete` para usuários logados), para ninguém se declarar membro ou dono.
+- Conta de membro só é aceita e ligada se vier do **Google**. O membro não recebe áreas, pastas nem categorias próprias.
+
+**App**
+- `getFinanceScope()` (`lib/finance/scope.ts`) dá o dono, se é membro e os livros permitidos; todo o código de Finanças usa esse escopo no lugar do usuário logado.
+- `lib/supabase/proxy.ts` leva o membro para `/financas` em qualquer outra página e responde 403 nas APIs, menos `/api/notificacoes`.
+- Integrações com chave do servidor (Google Agenda, O.S., Meta Ads, IA) recusam membro (`requireFullAccess` / `assertFullAccess`).
+- A tela do membro não tem abas, menu lateral, busca, captura nem seletor de livro.
+
+**Lição:** no momento em que o Supabase cria a conta, `auth.identities` ainda está vazia. A conferência de "veio do Google" precisa olhar também `raw_app_meta_data.provider` (correção `20261124190000`).
+
+**Regras para tabelas novas:** de Finanças, criar as políticas de membro; fora de Finanças, criar a política "membro: fora de Finanças".
+
+**Pendente:** teste completo na conta de teste (telas, endereços forçados e pedidos forjados).
+
+**Conhecido, fora deste trabalho:** o `upsert` das regras do OFX usa um `onConflict` que não casa com o índice atual, e `getAgentSuggestions` chama a IA sem `assertAreaAllowsAi`.
